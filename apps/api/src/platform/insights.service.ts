@@ -6,6 +6,7 @@ import { found } from '../common/errors';
 import { addonMrrCents, addonPrices } from '../billing/addons';
 import { Db } from '../db/db.service';
 import { IntegrationsService } from '../integrations/integrations.service';
+import { effectiveLimits } from '../tenancy/effective-limits';
 import {
   addDays, addMonths, dayStart, daysBetween, healthScore, Limit, limitsOf, monthKey, monthlyMovements, MonthPoint, monthRange,
   mrrFor, ratio, Usage, USAGE_MODULES, UsageModule,
@@ -333,7 +334,7 @@ export class InsightsService {
           members: cm.get(t.id) ?? 0,
           students: cs.get(t.id) ?? 0,
           storageBytes: Number(t.storageUsedBytes),
-          plan: t.plan,
+          plan: { ...t.plan, ...effectiveLimits(t) },
           studentSeats: t.studentSeats,
         }),
       };

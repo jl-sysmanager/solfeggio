@@ -9,6 +9,7 @@ import { env } from '../config/env';
 import { FEATURE_MODULES } from '../billing/feature-catalog';
 import { Db } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
+import { effectiveLimits } from './effective-limits';
 import { OnboardingService } from './onboarding.service';
 
 const onboardingSchema = z.object({
@@ -123,8 +124,10 @@ export class TenancyController {
         pendingCharges: pending ? { count: pending._count, amountCents: pending._sum.amountCents ?? 0 } : null,
         // Tasa como fracción 0–1 (la web la formatea como porcentaje).
         attendanceRate30d: totalAtt ? Math.round((present / totalAtt) * 1000) / 1000 : null,
-        storage: showAccount ? { usedBytes: Number(tenant.storageUsedBytes), limitBytes: tenant.plan.storageMb * 1024 * 1024 } : null,
-        users: showAccount ? { used: users, limit: tenant.plan.maxUsers } : null,
+        storage: showAccount
+          ? { usedBytes: Number(tenant.storageUsedBytes), limitBytes: effectiveLimits(tenant).storageMb * 1024 * 1024 }
+          : null,
+        users: showAccount ? { used: users, limit: effectiveLimits(tenant).maxUsers } : null,
       };
     });
   }

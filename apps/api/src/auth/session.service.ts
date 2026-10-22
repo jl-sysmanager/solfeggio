@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { featuresFor } from '../billing/entitlements';
 import { Db } from '../db/db.service';
 import { IMPERSONATION_PERMISSIONS, IMPERSONATION_ROLE } from '../platform/impersonation.util';
+import { effectiveLimits } from '../tenancy/effective-limits';
 
 export interface Session {
   user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean };
@@ -61,9 +62,7 @@ export class SessionService {
             code: active.tenant.plan.code,
             name: active.tenant.plan.name,
             features,
-            maxUsers: active.tenant.plan.maxUsers,
-            maxMembers: active.tenant.plan.maxMembers,
-            storageMb: active.tenant.plan.storageMb,
+            ...effectiveLimits(active.tenant),
           }
         : null,
       memberId: active?.memberId ?? null,
@@ -93,9 +92,7 @@ export class SessionService {
         code: tenant.plan.code,
         name: tenant.plan.name,
         features: [...(await featuresFor(this.db, tenant))],
-        maxUsers: tenant.plan.maxUsers,
-        maxMembers: tenant.plan.maxMembers,
-        storageMb: tenant.plan.storageMb,
+        ...effectiveLimits(tenant),
       },
       memberId: null,
       memberships: [],

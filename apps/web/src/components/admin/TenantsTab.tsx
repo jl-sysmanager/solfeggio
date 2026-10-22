@@ -12,32 +12,82 @@ import { ErrorNote, Loading } from '../EmptyState';
 import { Checkbox, FormError, SelectField, TextField, formValues } from '../Field';
 import { Modal } from '../Modal';
 import { bytes, date } from '../../lib/format';
-import { tenantStatus } from '../../lib/labels';
+import { featureLabels, tenantStatus } from '../../lib/labels';
 
-/** Funcionalidades extra (fuera del plan) que soporte puede activar a mano. La escuela va en el plan. */
-const EXTRA_FEATURES: [string, string][] = [
-  ['performances', 'Contrataciones'], ['reinforcements', 'Bolsa de refuerzos'], ['governance', 'Gobierno'],
-  ['treasury', 'Tesorería'], ['wardrobe', 'Mayordomía'], ['instruments', 'Instrumentación'], ['communications', 'Comunicaciones'],
-  ['market', 'BandMarket'], ['calendar_sync', 'Calendario externo'], ['archive_ai', 'Particellas automáticas'],
-];
+type TenantDetail = AdminTenant & {
+  addons: string[];
+  activeStudents: number;
+  maxUsersOverride: number | null;
+  maxMembersOverride: number | null;
+  storageMbOverride: number | null;
+  plan?: AdminTenant['plan'] & { features?: string[]; maxUsers?: number; maxMembers?: number; storageMb?: number };
+};
 
-type TenantDetail = AdminTenant & { addons: string[]; activeStudents: number; plan?: AdminTenant['plan'] & { features?: string[] } };
+/** Vacío → null (usar plan); número → override. */
+function parseOverride(raw: string): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
 
 function TenantExtras({ detail }: { detail: TenantDetail }) {
   const inPlan = new Set(detail.plan?.features ?? []);
+  const fmtCap = (n: number | undefined, unit = '') => (n == null ? '—' : n < 0 ? '∞' : `${n}${unit}`);
   return (
-    <fieldset className="stack" style={{ gap: 8, border: 0, padding: 0 }}>
-      <legend className="label-caps">Funcionalidades extra</legend>
-      <p className="small muted">La escuela se habilita en el plan (Admin → Planes). Familias y profesores con acceso cuentan como usuarios del plan.</p>
-      <div className="form-row">
-        {EXTRA_FEATURES.map(([key, label]) => (
-          <Checkbox key={key} name="addons" value={key} defaultChecked={detail.addons.includes(key)} label={`${label}${inPlan.has(key) ? ' (incluido en el plan)' : ''}`} />
-        ))}
-      </div>
-      <p className="small">
-        Alumnos activos: <strong>{detail.activeStudents}</strong>
-      </p>
-    </fieldset>
+    <div className="stack" style={{ gap: 16 }}>
+      <fieldset className="stack" style={{ gap: 8, border: 0, padding: 0 }}>
+        <legend className="label-caps">Funcionalidades</legend>
+        <p className="small muted">
+          Las marcadas se suman al plan (add-ons). Las del plan aparecen como incluidas. Familias y profesores con acceso cuentan como usuarios.
+        </p>
+        <div className="form-row">
+          {Object.entries(featureLabels).map(([key, label]) => (
+            <Checkbox
+              key={key}
+              name="addons"
+              value={key}
+              defaultChecked={detail.addons.includes(key)}
+              label={`${label}${inPlan.has(key) ? ' (incluido en el plan)' : ''}`}
+            />
+          ))}
+        </div>
+        <p className="small">
+          Alumnos activos: <strong>{detail.activeStudents}</strong>
+        </p>
+      </fieldset>
+
+      <fieldset className="stack" style={{ gap: 8, border: 0, padding: 0 }}>
+        <legend className="label-caps">Cupos personalizados</legend>
+        <p className="small muted">
+          Vacío = límite del plan. Usuarios/socios: −1 = ilimitado. Almacenamiento en MB.
+        </p>
+        <div className="form-row">
+          <TextField
+            label={`Usuarios (plan: ${fmtCap(detail.plan?.maxUsers)})`}
+            name="maxUsersOverride"
+            type="number"
+            defaultValue={detail.maxUsersOverride ?? ''}
+            placeholder="Usar plan"
+          />
+          <TextField
+            label={`Socios (plan: ${fmtCap(detail.plan?.maxMembers)})`}
+            name="maxMembersOverride"
+            type="number"
+            defaultValue={detail.maxMembersOverride ?? ''}
+            placeholder="Usar plan"
+          />
+          <TextField
+            label={`Almacenamiento (plan: ${fmtCap(detail.plan?.storageMb, ' MB')})`}
+            name="storageMbOverride"
+            type="number"
+            min={1}
+            defaultValue={detail.storageMbOverride ?? ''}
+            placeholder="Usar plan"
+          />
+        </div>
+      </fieldset>
+    </div>
   );
 }
 
@@ -105,7 +155,12 @@ export function TenantsTab() {
             const form = e.currentTarget;
             const v = formValues(form);
             const extras = detail.data
-              ? { addons: Array.from(form.querySelectorAll<HTMLInputElement>('input[name="addons"]:checked')).map((i) => i.value) }
+              ? {
+                  addons: Array.from(form.querySelectorAll<HTMLInputElement>('input[name="addons"]:checked')).map((i) => i.value),
+                  maxUsersOverride: parseOverride(String(v.maxUsersOverride ?? '')),
+                  maxMembersOverride: parseOverride(String(v.maxMembersOverride ?? '')),
+                  storageMbOverride: parseOverride(String(v.storageMbOverride ?? '')),
+                }
               : {};
             if (editing) update.mutate({ id: editing.id, body: { status: v.status, planCode: v.planCode as PlanCode, ...extras } });
           }}

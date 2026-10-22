@@ -103,13 +103,21 @@ export class OpsService {
   async storageStats() {
     const sys = this.db.system;
     const [top, total, orphans] = await Promise.all([
-      sys.tenant.findMany({ where: { deletedAt: null }, orderBy: { storageUsedBytes: 'desc' }, take: 10, select: { id: true, name: true, storageUsedBytes: true, plan: { select: { storageMb: true } } } }),
+      sys.tenant.findMany({
+        where: { deletedAt: null },
+        orderBy: { storageUsedBytes: 'desc' },
+        take: 10,
+        select: { id: true, name: true, storageUsedBytes: true, storageMbOverride: true, plan: { select: { storageMb: true } } },
+      }),
       sys.tenant.aggregate({ _sum: { storageUsedBytes: true } }),
       sys.opsHeartbeat.findUnique({ where: { name: ORPHANS } }),
     ]);
     return {
       totalBytes: Number(total._sum.storageUsedBytes ?? 0),
-      topTenants: top.map((t) => ({ id: t.id, name: t.name, usedBytes: Number(t.storageUsedBytes), quotaBytes: t.plan.storageMb < 0 ? null : t.plan.storageMb * 1024 * 1024 })),
+      topTenants: top.map((t) => {
+        const quota = t.storageMbOverride ?? t.plan.storageMb;
+        return { id: t.id, name: t.name, usedBytes: Number(t.storageUsedBytes), quotaBytes: quota < 0 ? null : quota * 1024 * 1024 };
+      }),
       orphans,
     };
   }

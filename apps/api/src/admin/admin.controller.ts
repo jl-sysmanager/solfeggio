@@ -24,6 +24,10 @@ const tenantPatch = z.object({
   planCode: z.enum(['FREE', 'BASIC', 'PRO', 'ENTERPRISE']).optional(),
   addons: z.array(z.enum(FEATURES)).max(FEATURES.length).optional(),
   studentSeats: z.number().int().min(0).max(100_000).optional(),
+  /** Cupos personalizados. null borra el override (vuelve al plan). −1 = ilimitado (usuarios/socios). */
+  maxUsersOverride: z.number().int().min(-1).nullable().optional(),
+  maxMembersOverride: z.number().int().min(-1).nullable().optional(),
+  storageMbOverride: z.number().int().min(1).nullable().optional(),
 });
 const planPatch = z.object({
   name: z.string().trim().min(2).max(60).optional(),
@@ -157,9 +161,20 @@ export class AdminController {
   async updateTenant(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(tenantPatch)) body: z.infer<typeof tenantPatch>) {
     found(await this.db.system.tenant.findUnique({ where: { id } }), 'Banda');
     const plan = body.planCode ? await this.db.system.plan.findUniqueOrThrow({ where: { code: body.planCode } }) : undefined;
-    const t = await this.db.system.tenant.update({ where: { id }, data: { status: body.status, planId: plan?.id, addons: body.addons, studentSeats: body.studentSeats } });
+    const t = await this.db.system.tenant.update({
+      where: { id },
+      data: {
+        status: body.status,
+        planId: plan?.id,
+        addons: body.addons,
+        studentSeats: body.studentSeats,
+        maxUsersOverride: body.maxUsersOverride,
+        maxMembersOverride: body.maxMembersOverride,
+        storageMbOverride: body.storageMbOverride,
+      },
+    });
     await this.auditFor(id, ctx, 'tenant.updated', 'tenant', id, body);
-    // Los add-ons y las plazas de alumno se reflejan en la suscripción de Stripe; nunca falla la petición.
+    // Retira ítems legacy de escuela en Stripe si aún quedan; nunca falla la petición.
     if (body.addons !== undefined || body.studentSeats !== undefined) await this.billingOps.syncAddons(id, { userId: ctx.userId, ip: ctx.ip });
     return { ...t, storageUsedBytes: Number(t.storageUsedBytes) };
   }

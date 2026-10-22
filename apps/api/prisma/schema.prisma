@@ -80,10 +80,14 @@ model Tenant {
   planId              String       @db.Uuid
   plan                Plan         @relation(fields: [planId], references: [id])
   storageUsedBytes    BigInt       @default(0)
-  /// Funcionalidades contratadas aparte del plan (p. ej. `school`), gestionadas desde el panel global.
+  /// Funcionalidades contratadas aparte del plan, gestionadas desde el panel global.
   addons              String[]     @default([])
-  /// Plazas de alumno adicionales del add-on Escuela, que se suman a `plan.maxStudents`.
+  /// Plazas de alumno adicionales (legado; la escuela ya no se factura aparte).
   studentSeats        Int          @default(0)
+  /// Cupos personalizados (−1 = ilimitado). NULL = usar los del plan.
+  maxUsersOverride    Int?
+  maxMembersOverride  Int?
+  storageMbOverride   Int?
   /// Gestión de cuenta (panel global): etiquetas, gestor asignado y comunidad autónoma para segmentar.
   tags                String[]     @default([])
   accountManagerId    String?      @db.Uuid

@@ -5,6 +5,7 @@ import { env } from '../config/env';
 import { Db } from '../db/db.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { Jobs } from '../jobs/jobs.service';
+import { effectiveLimits } from '../tenancy/effective-limits';
 import { addonLines, addonPrices, isComplimentary } from './addons';
 import { StripeClient } from './stripe.provider';
 
@@ -31,16 +32,22 @@ export class BillingService {
         tx.invoice.findMany({ orderBy: { createdAt: 'desc' }, take: 24 }),
       ]);
       const s = tenant.subscription;
+      const limits = effectiveLimits(tenant);
       return {
         billingEnabled: await this.stripe.enabled(),
         status: tenant.status,
-        plan: tenant.plan,
+        plan: { ...tenant.plan, ...limits },
         subscription: s
           ? { status: s.stripeStatus, interval: s.interval, currentPeriodEnd: s.currentPeriodEnd, trialEndsAt: s.trialEndsAt, cancelAtPeriodEnd: s.cancelAtPeriodEnd, graceUntil: s.graceUntil }
           : null,
         usage: { users, members, storageBytes: Number(tenant.storageUsedBytes) },
         addons: addonLines(tenant, prices).map(({ priceId: _p, ...l }) => l),
         studentSeats: tenant.studentSeats,
+        limitOverrides: {
+          maxUsers: tenant.maxUsersOverride,
+          maxMembers: tenant.maxMembersOverride,
+          storageMb: tenant.storageMbOverride,
+        },
         complimentaryUntil: isComplimentary(tenant) ? tenant.complimentaryUntil : null,
         invoices,
       };

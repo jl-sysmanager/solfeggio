@@ -1,35 +1,36 @@
 import { Injectable } from '@nestjs/common';
 import { PlanLimitException } from '../common/errors';
 import { Db, Tx } from '../db/db.service';
+import { effectiveLimits } from './effective-limits';
 
-/** Límites del plan. -1 significa ilimitado. */
+/** Límites efectivos (plan + overrides). -1 significa ilimitado. */
 @Injectable()
 export class LimitsService {
   constructor(private readonly db: Db) {}
 
-  private plan(tenantId: string) {
+  private async tenant(tenantId: string) {
     return this.db.system.tenant.findUniqueOrThrow({ where: { id: tenantId }, include: { plan: true } });
   }
 
   /** Cupo de accesos a la plataforma (junta, músicos, profesores, familias del portal, etc.). */
   async assertCanAddUser(tx: Tx, tenantId: string) {
-    const { plan } = await this.plan(tenantId);
-    if (plan.maxUsers < 0) return;
+    const { maxUsers } = effectiveLimits(await this.tenant(tenantId));
+    if (maxUsers < 0) return;
     const [users, pending] = await Promise.all([
       tx.membership.count({ where: { status: 'ACTIVE' } }),
       tx.invitation.count({ where: { acceptedAt: null, expiresAt: { gt: new Date() } } }),
     ]);
-    if (users + pending >= plan.maxUsers) {
-      throw new PlanLimitException(`Tu plan permite ${plan.maxUsers} usuarios (incluye familias y profesores con acceso). Mejora el plan para invitar a más.`);
+    if (users + pending >= maxUsers) {
+      throw new PlanLimitException(`Tu plan permite ${maxUsers} usuarios (incluye familias y profesores con acceso). Mejora el plan para invitar a más.`);
     }
   }
 
   async assertCanAddMember(tx: Tx, tenantId: string) {
-    const { plan } = await this.plan(tenantId);
-    if (plan.maxMembers < 0) return;
+    const { maxMembers } = effectiveLimits(await this.tenant(tenantId));
+    if (maxMembers < 0) return;
     const count = await tx.member.count({ where: { status: { not: 'LEFT' } } });
-    if (count >= plan.maxMembers) {
-      throw new PlanLimitException(`Tu plan permite ${plan.maxMembers} socios activos.`);
+    if (count >= maxMembers) {
+      throw new PlanLimitException(`Tu plan permite ${maxMembers} socios activos.`);
     }
   }
 
@@ -43,13 +44,14 @@ export class LimitsService {
 
   /** Reserva almacenamiento de forma atómica; falla si supera la cuota. */
   async reserveStorage(tenantId: string, bytes: number) {
-    const tenant = await this.plan(tenantId);
-    const limit = BigInt(tenant.plan.storageMb) * 1024n * 1024n;
+    const tenant = await this.tenant(tenantId);
+    const { storageMb } = effectiveLimits(tenant);
+    const limit = BigInt(storageMb) * 1024n * 1024n;
     const { count } = await this.db.system.tenant.updateMany({
       where: { id: tenantId, storageUsedBytes: { lte: limit - BigInt(bytes) } },
       data: { storageUsedBytes: { increment: BigInt(bytes) } },
     });
-    if (count === 0) throw new PlanLimitException(`Has alcanzado el almacenamiento de tu plan (${tenant.plan.storageMb} MB).`);
+    if (count === 0) throw new PlanLimitException(`Has alcanzado el almacenamiento de tu plan (${storageMb} MB).`);
   }
 
   async releaseStorage(tenantId: string, bytes: number) {
