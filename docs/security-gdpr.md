@@ -84,3 +84,11 @@
 | Negocio | Tenants que pasan a `PAST_DUE` o `READ_ONLY` | Resumen diario |
 
 Los logs se envían en JSON por la salida estándar al agregador (Loki, CloudWatch o Datadog) y se conservan 30 días.
+
+## 8. Acceso del equipo de plataforma
+
+- **«Ver como»:** el equipo de plataforma sólo puede entrar en una banda en modo lectura, con un motivo de al menos 10 caracteres y durante un máximo de 60 minutos. El token no permite escrituras ni ver DNI ni IBAN, no se renueva y deja de valer en cuanto la sesión termina, caduca o se bloquea o degrada al administrador.
+- **Transparencia:** el inicio y el fin de cada acceso se escriben en la auditoría de la propia banda (`platform.impersonation.started` y `platform.impersonation.ended`), y todas las acciones del equipo de plataforma sobre una banda llevan el prefijo `platform.`.
+- **Mínima exposición:** las tablas del panel global (fotos, notas, avisos, registros de correo, latidos, denuncias) no son accesibles para el rol de la aplicación. Las notas internas de soporte no llegan nunca a la banda, ni siquiera con una consulta directa (RLS).
+- **Bloqueo de cuentas:** un usuario bloqueado por moderación pierde el acceso y sus tokens de refresco se revocan. Las acciones de bloqueo quedan en el registro de plataforma.
+- **Webhooks y latidos:** los endpoints públicos `/webhooks/email/:provider` y `/ops/heartbeat/:name` exigen un token propio (`EMAIL_WEBHOOK_TOKEN` y `OPS_HEARTBEAT_TOKEN`, de al menos 16 caracteres) y responden 401 si no está configurado.

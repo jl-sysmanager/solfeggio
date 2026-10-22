@@ -220,13 +220,46 @@ Lectura [finance:read], escritura [finance:write].
 - `GET /admin/metrics` → `{ tenants: { total, byStatus }, mrrCents, openIncidents, pendingListings }`
 - `GET /admin/tenants?q&status&page` · `GET /admin/tenants/:id` · `PATCH /admin/tenants/:id { status?, planCode?, addons?, studentSeats? }` (add-ons y plazas de alumno del add-on Escuela)
 - `GET /admin/plans` · `PATCH /admin/plans/:id`
-- `GET /admin/incidents?status` · `PATCH /admin/incidents/:id { status, resolution? }`
-- `GET /admin/market/pending` · `POST /admin/market/listings/:id/moderate { approve, note? }`
+- `GET /admin/market/pending` (con `waitingHours` y `slaBreached` frente a las 24 h) · `POST /admin/market/listings/:id/moderate { approve, note? }`
 - `GET /admin/integrations` → categorías (`payments`, `email`) con sus proveedores, la definición de sus campos y el estado actual `{ source: database|env|none, provider, enabled, config, secrets: { clave: { set, hint } }, updatedAt, updatedBy }`. Los secretos nunca se devuelven: sólo si existen y sus 4 últimos caracteres (si miden 12 o más).
 - `PUT /admin/integrations/:category { provider, enabled, config?, secrets? }`. En `config` y `secrets`, una clave ausente conserva el valor guardado, `null` lo borra y un valor nuevo lo sustituye. Para habilitar, los campos obligatorios deben estar completos (400 `VALIDATION_ERROR` con `details[].path` = `config.x` o `secrets.x`). Cambiar de proveedor descarta los secretos del anterior.
 - `DELETE /admin/integrations/:category` → borra la configuración guardada y vuelve a las variables de entorno.
 - `POST /admin/integrations/:category/test { to? }` → `{ ok, message }`. Prueba la configuración guardada aunque esté deshabilitada: correo envía un mensaje de prueba; pagos consulta el saldo de Stripe. Limitado a 5/min.
 - `GET /admin/audit-logs?entity&page` → auditoría de plataforma (cambios y pruebas de integraciones, sin valores secretos).
+
+### Negocio y salud de las bandas (Fase 7, bloque 1)
+Todas las rutas de `/admin/insights` son sólo de plataforma y rechazan los tokens de «ver como» (403 `IMPERSONATION_FORBIDDEN`).
+- `POST /admin/insights/snapshot { date? }` → foto de cada banda para esa fecha (el worker la hace cada noche a las 02:30). Cada foto guarda MRR (incluido el add-on Escuela), usuarios activos, socios, alumnos, uso por módulo y puntuación de salud. Una fecha pasada sólo incluye las bandas que ya existían.
+- `GET /admin/insights/metrics?months=12` → `current` (MRR, ARR, ingreso medio por banda, retención neta), `months[]` (altas, reactivaciones, mejoras, bajadas, bajas, retención neta), bandas por estado y estacionalidad. Con pocos datos, cada mes hereda la última foto anterior.
+- `GET /admin/insights/funnel?from&to` → registro → banda creada → onboarding → prueba → pago, con la conversión de cada paso
+- `GET /admin/insights/cohorts` → % de bandas activas a los 3, 6 y 12 meses por mes de alta
+- `GET /admin/insights/health?sort&risk&q&status&plan&page` · `GET /admin/insights/at-risk` · `GET /admin/insights/upsell` → puntuación y uso por banda; listas de bandas en riesgo y listas para mejorar de plan, con `reasons[]`
+- `GET /admin/insights/tenants/:id` (ficha con límites, tendencia a 90 días, contactos y cronología) · `GET …/:id/timeline` · `PATCH …/:id { tags?, accountManagerId? }` · `GET /admin/insights/managers` · `POST …/:id/notes` · `DELETE …/:id/notes/:noteId`
+- **«Ver como»:** `POST /admin/impersonation { tenantId, reason (mín. 10 caracteres), minutes (5–60) }` → `{ accessToken, expiresAt, session }` · `GET /admin/impersonation?tenantId` (historial) · `POST /admin/impersonation/:id/end` · `POST /impersonation/end` (con el propio token). Acceso de sólo lectura: permisos `*:read` sin `members:sensitive`, 403 `IMPERSONATION_READ_ONLY` en cualquier escritura, 401 `IMPERSONATION_ENDED` al terminar o caducar. Inicio y fin quedan en la auditoría de la banda (`platform.impersonation.*`).
+
+**Puntuación de salud (0–100):** amplitud de uso (7 puntos por cada módulo con actividad en 30 días, máx. 35) + usuarios activos (máx. 30) + recencia de la última actividad (máx. 35), menos 15 con pago pendiente y 30 en sólo lectura; 0 si está cancelada o suspendida.
+
+### Facturación (Fase 7, bloque 2)
+- `GET /admin/billing/dunning` · `GET /admin/billing/tenants/:id`
+- `POST /admin/billing/tenants/:id/` `retry` (reintenta el cobro) · `remind` · `read-only` · `grace { days }` · `coupon { couponId }` · `credit { amountCents, description }` · `free-months { months }` · `extend-trial { days }` · `complimentary { until, reason, planCode }` · `sync-addons`; `DELETE …/:id/complimentary`
+- `GET|POST /admin/billing/coupons` · `DELETE /admin/billing/coupons/:id` · `GET /admin/billing/addons`
+- `GET /admin/billing/webhooks?type&status&page` · `GET …/:id` · `POST …/:id/replay` (vuelve a procesar el evento aunque ya estuviera procesado)
+- Cuenta bonificada: sin cobro en Stripe hasta la fecha indicada; ni los webhooks, ni el periodo de gracia ni la sincronización la degradan, y al vencer pasa a Free (a no ser que tenga una suscripción de Stripe activa). Se avisa a los propietarios 7 días antes.
+- Add-on Escuela: cuota fija mensual (`schoolAddonPrice`) y precio por plaza adicional (`schoolSeatPrice`, cantidad = `studentSeats`) en la suscripción mensual. Los precios salen de la integración de pagos o de `STRIPE_PRICE_SCHOOL_ADDON` y `STRIPE_PRICE_SCHOOL_SEAT`. `PATCH /admin/tenants/:id` sincroniza al cambiar add-ons o plazas, y `billing.reconcile-addons` lo repite cada noche. `GET /billing` de la banda incluye `addons[]`, `studentSeats` y `complimentaryUntil`.
+
+### Soporte y avisos (Fase 7, bloque 2)
+- Soporte [plataforma]: `GET /admin/support/kpis` · `GET /admin/support/agents` · `GET /admin/support/incidents?status&priority&assignee=none|me|<id>&sla=overdue|at_risk&tenantId&q` · `GET|PATCH /admin/support/incidents/:id { status?, priority?, assigneeId?, resolution? }` · `POST …/:id/messages { body, internal }` (la primera respuesta pública fija la primera respuesta y avisa a quien abrió la incidencia) · `GET|POST /admin/support/canned-replies` · `PATCH|DELETE …/:id`
+- Soporte [banda, `incidents:write`]: `GET|POST /incidents` · `GET /incidents/:id` (sólo mensajes públicos) · `POST /incidents/:id/messages` (reabre una incidencia resuelta)
+- SLA de primera respuesta por prioridad 1–5: 4, 8, 24, 48 y 72 horas. `support.sla-sweep` (cada 15 minutos) avisa una sola vez a los administradores y al responsable.
+- Avisos [plataforma]: `GET|POST /admin/announcements` · `PATCH|DELETE …/:id` · `POST …/:id/end` · `POST /admin/announcements/preview { segment }` → `{ tenants, users }`
+- Avisos [cualquier usuario autenticado]: `GET /announcements/active` · `POST /announcements/:id/dismiss`. El segmento combina plan, comunidad autónoma (`tenants.region`), funcionalidades y bandas concretas: se exigen todos los criterios y basta cualquier valor dentro de cada lista. El nivel `MAINTENANCE` llega a todos.
+
+### Sistema y moderación (Fase 7, bloque 2)
+- `GET /admin/ops/queues` · `POST /admin/ops/queues/failed/retry` · `POST|DELETE /admin/ops/queues/failed/:id/retry|…` · `GET /admin/ops/email` · `GET /admin/ops/storage` · `POST /admin/ops/storage/orphans/scan` · `POST /admin/ops/storage/orphans/delete { confirm: "ELIMINAR" }` · `GET /admin/ops/schedules` · `GET /admin/ops/heartbeats`
+- `POST /ops/heartbeat/:name` (público, cabecera `x-ops-token` = `OPS_HEARTBEAT_TOKEN`; cuerpo `{ status: ok|error, detail? }`): lo usa `infra/backup/pg-backup.sh` con `BACKUP_HEARTBEAT_URL` y `BACKUP_HEARTBEAT_TOKEN`. El panel marca en rojo si pasan más de 26 horas. Los nombres `cron.*` y `storage.*` están reservados.
+- `POST /webhooks/email/:provider` (público, cabecera `x-webhook-token` = `EMAIL_WEBHOOK_TOKEN`): `{ email, type: bounce|complaint, reason? }` o una lista de hasta 100. Se guarda en el registro de correo.
+- Moderación: `GET /admin/moderation/kpis` · `GET /admin/moderation/reinforcements` · `POST /admin/moderation/reinforcements/reports/:id/resolve { action: dismiss|hide_request|hide_profile|block_user, note? }` · `GET /admin/moderation/users?q&blocked` · `POST /admin/moderation/users/:id/block { reason }` · `POST …/:id/unblock`. Un usuario bloqueado no inicia sesión (403 `ACCOUNT_BLOCKED`), no refresca tokens y deja de aparecer como músico disponible; no se puede bloquear a un administrador ni a uno mismo.
+- Bolsa de refuerzos [banda]: `POST /reinforcements/requests/:id/report { reason }` · `POST /reinforcements/musicians/:profileId/report { reason }`
 
 ## Salud
 - `GET /health` (liveness) · `GET /health/ready` (comprueba la base de datos y Redis) · `GET /metrics` (Prometheus; exige `Authorization: Bearer <METRICS_TOKEN>` si está definido; no exponer fuera de la red interna)

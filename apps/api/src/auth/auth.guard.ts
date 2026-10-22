@@ -5,8 +5,10 @@ import { Db } from '../db/db.service';
 import { FeatureNotInPlanException } from '../common/errors';
 import { env } from '../config/env';
 import { AccessTokenPayload, AuthedRequest, RequestContext } from './context';
+import { ALLOW_IMPERSONATION, IMPERSONATION_PERMISSIONS } from '../platform/impersonation.util';
 import { ALLOW_READ_ONLY, FEATURE, IS_PUBLIC, NO_TENANT, PERMS, PLATFORM_ADMIN } from './decorators';
 
+const SEEN_EVERY_MS = 3_600_000;
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 /**
@@ -39,6 +41,7 @@ export class AuthGuard implements CanActivate {
 
     const user = await this.db.system.user.findUnique({ where: { id: payload.sub } });
     if (!user) throw new UnauthorizedException({ message: 'No autenticado', code: 'UNAUTHENTICATED' });
+    if (user.blockedAt) throw new UnauthorizedException({ message: 'Cuenta bloqueada', code: 'ACCOUNT_BLOCKED' });
 
     const ctx: RequestContext = {
       userId: user.id,
@@ -54,6 +57,8 @@ export class AuthGuard implements CanActivate {
       ip: req.ip,
     };
     req.ctx = ctx;
+
+    if (payload.imp) return this.impersonation(payload, user, ctx, req, meta);
 
     if (meta<boolean>(PLATFORM_ADMIN)) {
       if (!user.isPlatformAdmin) throw new ForbiddenException({ message: 'Acceso restringido', code: 'FORBIDDEN' });
@@ -77,6 +82,7 @@ export class AuthGuard implements CanActivate {
         permissions: new Set(membership.role.permissions),
         features: new Set([...membership.tenant.plan.features, ...membership.tenant.addons]),
       });
+      this.touch(membership.id, membership.lastSeenAt);
     }
 
     if (meta<boolean>(NO_TENANT)) return true;
@@ -95,6 +101,54 @@ export class AuthGuard implements CanActivate {
         message: 'La banda está en modo sólo lectura por un pago pendiente',
         code: 'TENANT_READ_ONLY',
       });
+    }
+    return true;
+  }
+
+  /** Marca la última actividad como mucho una vez por hora; nunca hace fallar la petición. */
+  private touch(membershipId: string, lastSeenAt: Date | null) {
+    const now = Date.now();
+    if (lastSeenAt && now - lastSeenAt.getTime() < SEEN_EVERY_MS) return;
+    this.db.system.membership
+      .updateMany({ where: { id: membershipId, OR: [{ lastSeenAt: null }, { lastSeenAt: { lt: new Date(now - SEEN_EVERY_MS) } }] }, data: { lastSeenAt: new Date(now) } })
+      .catch(() => undefined);
+  }
+
+  /** Token «ver como»: sesión vigente, administrador vigente, sólo lectura y sin rutas de plataforma. */
+  private async impersonation(
+    payload: AccessTokenPayload,
+    user: { id: string; isPlatformAdmin: boolean },
+    ctx: RequestContext,
+    req: AuthedRequest,
+    meta: <T>(key: string) => T,
+  ): Promise<boolean> {
+    const revoked = () => new UnauthorizedException({ message: 'La sesión «ver como» ha terminado', code: 'IMPERSONATION_ENDED' });
+    const imp = await this.db.system.impersonationSession.findUnique({ where: { id: payload.imp! } });
+    if (!imp || imp.endedAt || imp.expiresAt <= new Date() || imp.adminId !== user.id || imp.tenantId !== payload.tid || !user.isPlatformAdmin) throw revoked();
+    const tenant = await this.db.system.tenant.findUnique({ where: { id: imp.tenantId }, include: { plan: true } });
+    if (!tenant || tenant.deletedAt) throw revoked();
+
+    if (meta<boolean>(PLATFORM_ADMIN)) {
+      throw new ForbiddenException({ message: 'No disponible durante «ver como»', code: 'IMPERSONATION_FORBIDDEN' });
+    }
+    Object.assign(ctx, {
+      isPlatformAdmin: false,
+      tenantId: tenant.id,
+      roleKey: 'impersonation',
+      tenantStatus: tenant.status,
+      permissions: new Set(IMPERSONATION_PERMISSIONS),
+      features: new Set([...tenant.plan.features, ...tenant.addons]),
+      impersonationId: imp.id,
+    });
+    if (WRITE_METHODS.has(req.method) && !meta<boolean>(ALLOW_IMPERSONATION)) {
+      throw new ForbiddenException({ message: 'Estás viendo la banda en modo sólo lectura', code: 'IMPERSONATION_READ_ONLY' });
+    }
+    if (meta<boolean>(NO_TENANT)) return true;
+    const feature = meta<string>(FEATURE);
+    if (feature && !ctx.features.has(feature)) throw new FeatureNotInPlanException(feature);
+    const perms = meta<string[]>(PERMS) ?? [];
+    if (!perms.every((p) => ctx.permissions.has(p))) {
+      throw new ForbiddenException({ message: 'No tienes permiso para esta acción', code: 'FORBIDDEN' });
     }
     return true;
   }

@@ -3,7 +3,9 @@ import { BillingInterval, PlanCode, Prisma, TenantStatus } from '@prisma/client'
 import Stripe from 'stripe';
 import { env } from '../config/env';
 import { Db } from '../db/db.service';
+import { IntegrationsService } from '../integrations/integrations.service';
 import { Jobs } from '../jobs/jobs.service';
+import { addonLines, addonPrices, isComplimentary } from './addons';
 import { StripeClient } from './stripe.provider';
 
 const DAY = 86_400_000;
@@ -16,10 +18,12 @@ export class BillingService {
     private readonly db: Db,
     private readonly stripe: StripeClient,
     private readonly jobs: Jobs,
+    private readonly integrations: IntegrationsService,
   ) {}
 
   async overview(tenantId: string) {
     const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: tenantId }, include: { plan: true, subscription: true } });
+    const prices = await addonPrices(this.integrations);
     return this.db.tenant(tenantId, async (tx) => {
       const [users, members, invoices] = await Promise.all([
         tx.membership.count({ where: { status: 'ACTIVE' } }),
@@ -35,6 +39,10 @@ export class BillingService {
           ? { status: s.stripeStatus, interval: s.interval, currentPeriodEnd: s.currentPeriodEnd, trialEndsAt: s.trialEndsAt, cancelAtPeriodEnd: s.cancelAtPeriodEnd, graceUntil: s.graceUntil }
           : null,
         usage: { users, members, storageBytes: Number(tenant.storageUsedBytes) },
+        // Conceptos del add-on Escuela que se cobran aparte del plan (importes orientativos sin IVA).
+        addons: addonLines(tenant, prices).map(({ priceId: _p, ...l }) => l),
+        studentSeats: tenant.studentSeats,
+        complimentaryUntil: isComplimentary(tenant) ? tenant.complimentaryUntil : null,
         invoices,
       };
     });
@@ -70,13 +78,21 @@ export class BillingService {
     // La prueba gratuita sólo se ofrece a bandas que nunca han tenido suscripción.
     const hadSubscription = !!(await this.db.system.invoice.findFirst({ where: { tenantId } })) || !!tenant.subscription?.stripeSubscriptionId;
     const trialDays = hadSubscription ? undefined : plan.trialDays || env().TRIAL_DAYS;
+    // Add-on Escuela: precios mensuales, así que sólo se añaden a suscripciones mensuales (en anual se
+    // regularizan desde el panel global). Un concepto sin precio configurado se omite.
+    const addonItems =
+      interval === 'MONTH'
+        ? addonLines({ ...tenant, plan }, await addonPrices(this.integrations))
+            .filter((l) => l.priceId)
+            .map((l) => ({ price: l.priceId!, quantity: l.quantity }))
+        : [];
 
     const session = await (await this.stripe.api()).checkout.sessions.create(
       {
         mode: 'subscription',
         customer: customerId,
         client_reference_id: tenantId,
-        line_items: [{ price, quantity: 1 }],
+        line_items: [{ price, quantity: 1 }, ...addonItems],
         subscription_data: { metadata: { tenantId, planCode }, ...(trialDays ? { trial_period_days: trialDays } : {}) },
         metadata: { tenantId, planCode },
         allow_promotion_codes: true,
@@ -104,13 +120,14 @@ export class BillingService {
    * Procesa un evento verificado. Idempotente: el id del evento se registra antes de procesar;
    * un evento ya procesado se ignora y uno que falló se reintenta.
    */
-  async handleEvent(event: Stripe.Event): Promise<'processed' | 'duplicate' | 'ignored'> {
+  async handleEvent(event: Stripe.Event, opts: { force?: boolean } = {}): Promise<'processed' | 'duplicate' | 'ignored'> {
     try {
       await this.db.system.stripeEvent.create({ data: { id: event.id, type: event.type } });
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
         const prev = await this.db.system.stripeEvent.findUnique({ where: { id: event.id } });
-        if (prev?.processedAt) return 'duplicate';
+        // `force`: reprocesado manual desde el panel global aunque ya se procesara.
+        if (prev?.processedAt && !opts.force) return 'duplicate';
       } else {
         throw e;
       }
@@ -169,9 +186,15 @@ export class BillingService {
     return sub?.tenantId ?? null;
   }
 
-  private async planForPrice(priceId?: string) {
-    if (!priceId) return null;
-    return this.db.system.plan.findFirst({ where: { OR: [{ stripePriceMonthly: priceId }, { stripePriceYearly: priceId }] } });
+  /** El plan sale del concepto cuyo precio es de un plan; el resto son add-ons. */
+  private async planItem(items: Stripe.SubscriptionItem[]) {
+    const ids = items.map((i) => i.price.id);
+    const plans = await this.db.system.plan.findMany({ where: { OR: [{ stripePriceMonthly: { in: ids } }, { stripePriceYearly: { in: ids } }] } });
+    for (const item of items) {
+      const plan = plans.find((p) => p.stripePriceMonthly === item.price.id || p.stripePriceYearly === item.price.id);
+      if (plan) return { item, plan };
+    }
+    return { item: items[0], plan: null };
   }
 
   /** Lee el estado actual de Stripe (no el del evento) para tolerar eventos desordenados. */
@@ -182,10 +205,12 @@ export class BillingService {
       this.logger.warn(`Suscripción ${sub.id} sin tenant asociado`);
       return;
     }
-    const item = sub.items.data[0];
-    const plan = await this.planForPrice(item?.price.id);
+    const { item, plan } = await this.planItem(sub.items.data);
     const free = await this.db.system.plan.findUniqueOrThrow({ where: { code: 'FREE' } });
     const current = await this.db.system.subscription.findUnique({ where: { tenantId } });
+    // Cuenta bonificada: Stripe no cambia su plan ni su estado mientras dure.
+    const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: tenantId }, select: { complimentaryUntil: true } });
+    const complimentary = isComplimentary(tenant);
     const ended = sub.status === 'canceled' || sub.status === 'incomplete_expired';
 
     const tenantStatus: Record<Stripe.Subscription.Status, TenantStatus | null> = {
@@ -217,16 +242,18 @@ export class BillingService {
       }),
       this.db.system.tenant.update({
         where: { id: tenantId },
-        data: {
-          // Al terminar la suscripción la banda pasa a Free sin perder datos.
-          planId: ended ? free.id : (plan?.id ?? undefined),
-          ...(tenantStatus[sub.status] ? { status: tenantStatus[sub.status]! } : {}),
-        },
+        data: complimentary
+          ? {}
+          : {
+              // Al terminar la suscripción la banda pasa a Free sin perder datos.
+              planId: ended ? free.id : (plan?.id ?? undefined),
+              ...(tenantStatus[sub.status] ? { status: tenantStatus[sub.status]! } : {}),
+            },
       }),
     ]);
   }
 
-  private async upsertInvoice(tenantId: string, inv: Stripe.Invoice) {
+  async upsertInvoice(tenantId: string, inv: Stripe.Invoice) {
     const data = {
       tenantId,
       number: inv.number,
@@ -249,7 +276,10 @@ export class BillingService {
     const graceUntil = sub?.graceUntil ?? new Date(Date.now() + env().GRACE_PERIOD_DAYS * DAY);
     await this.db.system.$transaction([
       this.db.system.subscription.update({ where: { tenantId }, data: { graceUntil } }),
-      this.db.system.tenant.updateMany({ where: { id: tenantId, status: { in: ['ACTIVE', 'TRIALING'] } }, data: { status: 'PAST_DUE' } }),
+      this.db.system.tenant.updateMany({
+        where: { id: tenantId, status: { in: ['ACTIVE', 'TRIALING'] }, OR: [{ complimentaryUntil: null }, { complimentaryUntil: { lte: new Date() } }] },
+        data: { status: 'PAST_DUE' },
+      }),
     ]);
     await this.notifyBillingManagers(
       tenantId,
@@ -259,7 +289,7 @@ export class BillingService {
     );
   }
 
-  private async clearGrace(tenantId: string) {
+  async clearGrace(tenantId: string) {
     await this.db.system.$transaction([
       this.db.system.subscription.update({ where: { tenantId }, data: { graceUntil: null } }),
       this.db.system.tenant.updateMany({ where: { id: tenantId, status: { in: ['PAST_DUE', 'READ_ONLY'] } }, data: { status: 'ACTIVE' } }),
@@ -269,7 +299,7 @@ export class BillingService {
   /** Barrido periódico: bandas con el periodo de gracia vencido pasan a sólo lectura. */
   async sweepGracePeriods(now = new Date()) {
     const expired = await this.db.system.subscription.findMany({
-      where: { graceUntil: { lt: now }, tenant: { status: 'PAST_DUE' } },
+      where: { graceUntil: { lt: now }, tenant: { status: 'PAST_DUE', OR: [{ complimentaryUntil: null }, { complimentaryUntil: { lte: now } }] } },
       select: { tenantId: true },
     });
     for (const { tenantId } of expired) {
@@ -279,7 +309,7 @@ export class BillingService {
     return expired.length;
   }
 
-  private async notifyBillingManagers(tenantId: string, title: string, body: string) {
+  async notifyBillingManagers(tenantId: string, title: string, body: string) {
     const managers = await this.db.system.membership.findMany({
       where: { tenantId, status: 'ACTIVE', role: { permissions: { has: 'billing:manage' } } },
       select: { userId: true },

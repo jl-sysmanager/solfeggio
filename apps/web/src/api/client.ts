@@ -18,12 +18,21 @@ export class ApiError extends Error {
 let accessToken: string | null = null;
 let refreshing: Promise<string | null> | null = null;
 let onSessionExpired: (() => void) | null = null;
+// «Ver como»: el token no tiene refresh; un 401 significa que la sesión terminó o caducó.
+let refreshDisabled = false;
+let onImpersonationLost: (() => void) | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
 }
 export function getAccessToken() {
   return accessToken;
+}
+export function setRefreshDisabled(disabled: boolean) {
+  refreshDisabled = disabled;
+}
+export function setImpersonationLostHandler(fn: (() => void) | null) {
+  onImpersonationLost = fn;
 }
 export function setSessionExpiredHandler(fn: (() => void) | null) {
   onSessionExpired = fn;
@@ -95,7 +104,9 @@ export async function api<T = unknown>(path: string, opts: RequestOptions = {}):
   let res = await doFetch();
   if (res.status === 401 && !opts.noRefresh) {
     const err = await parseError(res.clone());
-    if (err.code !== 'MFA_REQUIRED') {
+    if (refreshDisabled) {
+      onImpersonationLost?.();
+    } else if (err.code !== 'MFA_REQUIRED') {
       const token = await refreshAccessToken();
       if (token) {
         res = await doFetch();

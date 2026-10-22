@@ -1,6 +1,6 @@
 # Pautas de UX/UI
 
-Estas pautas complementan [DESIGN.md](../DESIGN.md) y [SKILL.md](../SKILL.md), que fijan el sistema visual (Material). Aquí se recogen los patrones de interacción y los componentes que debe usar cualquier pantalla nueva. Todos están en `apps/web/src/components`.
+Estas pautas complementan el sistema visual, que replica el de [Breeze](https://github.com/lanternops/breeze) (ver la sección de interfaz de [architecture.md](architecture.md)). Aquí se recogen los patrones de interacción y los componentes que debe usar cualquier pantalla nueva. Todos están en `apps/web/src/components`.
 
 ## Navegación y orientación
 

@@ -1,5 +1,16 @@
 import { useEffect, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { NAV } from '../nav';
+import { Icon, type IconName } from './Icon';
+
+/** Icono de la sección según la ruta (entrada de navegación con el prefijo más largo). */
+function useSectionIcon(): IconName {
+  const { pathname } = useLocation();
+  const match = NAV.flatMap((g) => g.items)
+    .filter((i) => (i.to === '/' ? pathname === '/' : pathname === i.to || pathname.startsWith(`${i.to}/`)))
+    .sort((a, b) => b.to.length - a.to.length)[0];
+  return match?.icon ?? 'home';
+}
 
 export function PageHeader({
   eyebrow,
@@ -14,6 +25,7 @@ export function PageHeader({
   actions?: ReactNode;
   tone?: 'cool' | 'cream' | 'warm';
 }) {
+  const icon = useSectionIcon();
   // Título de la pestaña por pantalla (WCAG 2.4.2).
   useEffect(() => {
     document.title = `${title} · Solfeggio`;
@@ -33,8 +45,16 @@ export function PageHeader({
               </ol>
             </nav>
           )}
-          <h1>{title}</h1>
-          {description && <p className="band__desc">{description}</p>}
+          {/* Breeze PageHeader: icono en recuadro bg-muted + título + descripción */}
+          <div className="band__heading">
+            <span className="band__icon">
+              <Icon name={icon} size={18} />
+            </span>
+            <div>
+              <h1>{title}</h1>
+              {description && <p className="band__desc">{description}</p>}
+            </div>
+          </div>
         </div>
         {actions && <div className="band__actions">{actions}</div>}
       </div>

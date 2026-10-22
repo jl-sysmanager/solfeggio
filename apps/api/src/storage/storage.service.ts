@@ -1,5 +1,5 @@
 import { BadRequestException, Global, Injectable, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 import { env } from '../config/env';
@@ -102,6 +102,18 @@ export class Storage implements OnApplicationBootstrap {
   /** Sube un objeto generado en servidor. La clave debe venir de `newKey`. */
   async putObject(key: string, body: Buffer | Uint8Array, mimeType: string) {
     await this.client.send(new PutObjectCommand({ Bucket: env().S3_BUCKET, Key: key, Body: body, ContentType: mimeType, ContentLength: body.byteLength }));
+  }
+
+  /** Lista las claves bajo un prefijo (recorrido paginado). `max` limita el recorrido. */
+  async list(prefix: string, max = 200_000): Promise<{ key: string; size: number; lastModified: Date | null }[]> {
+    const out: { key: string; size: number; lastModified: Date | null }[] = [];
+    let token: string | undefined;
+    do {
+      const r = await this.client.send(new ListObjectsV2Command({ Bucket: env().S3_BUCKET, Prefix: prefix, ContinuationToken: token }));
+      for (const o of r.Contents ?? []) if (o.Key) out.push({ key: o.Key, size: o.Size ?? 0, lastModified: o.LastModified ?? null });
+      token = r.IsTruncated ? r.NextContinuationToken : undefined;
+    } while (token && out.length < max);
+    return out;
   }
 
   async remove(key: string) {

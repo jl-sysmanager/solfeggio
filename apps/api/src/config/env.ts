@@ -45,6 +45,10 @@ const schema = z.object({
   GRACE_PERIOD_DAYS: z.coerce.number().default(7),
 
   METRICS_TOKEN: z.string().optional(),
+  /** Token de las copias de seguridad y otras tareas externas (`POST /ops/heartbeat/:name`). */
+  OPS_HEARTBEAT_TOKEN: z.string().min(16).optional(),
+  /** Token del webhook de rebotes de correo (`POST /webhooks/email/:provider`). */
+  EMAIL_WEBHOOK_TOKEN: z.string().min(16).optional(),
   PLATFORM_ADMIN_EMAIL: z.string().email().optional(),
   DATA_ENCRYPTION_KEY_PREVIOUS: z.string().optional(),
 

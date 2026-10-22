@@ -4,6 +4,8 @@ import { useAuth } from '../auth/AuthProvider';
 import { visibleItems } from '../nav';
 import { useApi } from '../api/hooks';
 import type { NotificationItem } from '../api/types';
+import { AnnouncementBanner } from './admin/AnnouncementBanner';
+import { ImpersonationBanner } from './admin/ImpersonationBanner';
 import { Avatar } from './Avatar';
 import { CommandPalette, useCommandPaletteShortcut } from './CommandPalette';
 import { Icon } from './Icon';
@@ -159,11 +161,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {session?.tenant && (
                   <Link to="/notifications" className="btn btn--ghost btn--icon icon-badge" aria-label={`Avisos: ${unreadCount} sin leer`}>
                     <Icon name="bell" size={18} />
-                    {unreadCount > 0 && (
-                      <span className="icon-badge__count" aria-hidden="true">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
-                    )}
+                    {/* Breeze: punto primario; el número va en el nombre accesible */}
+                    {unreadCount > 0 && <span className="icon-badge__count" aria-hidden="true" />}
                   </Link>
                 )}
                 {session && (
@@ -192,6 +191,8 @@ export function AppShell({ children }: { children: ReactNode }) {
               {can('billing:manage') && <Link to={alert.to}>Ver facturación</Link>}
             </div>
           )}
+          <ImpersonationBanner />
+          <AnnouncementBanner />
           <main id="main" tabIndex={-1}>
             {children}
           </main>

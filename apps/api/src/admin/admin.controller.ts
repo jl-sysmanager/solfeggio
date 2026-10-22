@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -9,8 +9,8 @@ import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
+import { BillingOpsService } from '../billing/billing-ops.service';
 import { Db } from '../db/db.service';
-import { Jobs } from '../jobs/jobs.service';
 import { FEATURES } from '../iam/permissions';
 
 const tenantsQuery = pageQuery.extend({
@@ -37,8 +37,6 @@ const planPatch = z.object({
   trialDays: z.number().int().min(0).max(90).optional(),
   active: z.boolean().optional(),
 });
-const incidentPatch = z.object({ status: z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']), resolution: z.string().trim().max(5000).optional() });
-const moderateSchema = z.object({ approve: z.boolean(), note: z.string().trim().max(1000).optional() });
 
 /**
  * Panel global de plataforma. Usa el cliente de sistema (sin RLS) y sólo expone metadatos de
@@ -51,7 +49,7 @@ const moderateSchema = z.object({ approve: z.boolean(), note: z.string().trim().
 export class AdminController {
   constructor(
     private readonly db: Db,
-    private readonly jobs: Jobs,
+    private readonly billingOps: BillingOpsService,
   ) {}
 
   private auditFor(tenantId: string, ctx: RequestContext, action: string, entity: string, entityId: string, metadata?: object) {
@@ -142,7 +140,9 @@ export class AdminController {
     const plan = body.planCode ? await this.db.system.plan.findUniqueOrThrow({ where: { code: body.planCode } }) : undefined;
     const t = await this.db.system.tenant.update({ where: { id }, data: { status: body.status, planId: plan?.id, addons: body.addons, studentSeats: body.studentSeats } });
     await this.auditFor(id, ctx, 'tenant.updated', 'tenant', id, body);
-    return t;
+    // Los add-ons y las plazas de alumno se reflejan en la suscripción de Stripe; nunca falla la petición.
+    if (body.addons !== undefined || body.studentSeats !== undefined) await this.billingOps.syncAddons(id, { userId: ctx.userId, ip: ctx.ip });
+    return { ...t, storageUsedBytes: Number(t.storageUsedBytes) };
   }
 
   @Get('plans')
@@ -153,74 +153,5 @@ export class AdminController {
   @Patch('plans/:id')
   updatePlan(@Param('id', zod(idParam)) id: string, @Body(zod(planPatch)) body: z.infer<typeof planPatch>) {
     return this.db.system.plan.update({ where: { id }, data: body });
-  }
-
-  @Get('incidents')
-  incidents(@Query('status') status?: string) {
-    const parsed = z.enum(['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED']).optional().safeParse(status || undefined);
-    return this.db.system.incident.findMany({
-      where: { status: parsed.success ? parsed.data : undefined },
-      orderBy: [{ status: 'asc' }, { priority: 'asc' }, { createdAt: 'desc' }],
-      take: 200,
-    });
-  }
-
-  @Patch('incidents/:id')
-  async updateIncident(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(incidentPatch)) body: z.infer<typeof incidentPatch>) {
-    const inc = await this.db.system.incident.update({ where: { id }, data: body });
-    await this.auditFor(inc.tenantId, ctx, 'incident.updated', 'incident', id, { status: body.status });
-    if (inc.openedById && (body.status === 'RESOLVED' || body.status === 'CLOSED')) {
-      await this.jobs.add('notify.fanout', {
-        tenantId: inc.tenantId, userIds: [inc.openedById], type: 'incident', title: `Incidencia resuelta: ${inc.subject}`,
-        body: body.resolution ?? 'El equipo de soporte ha cerrado la incidencia.', link: '/incidents', email: true,
-      });
-    }
-    return inc;
-  }
-
-  @Get('market/pending')
-  async pending() {
-    const listings = await this.db.system.listing.findMany({
-      where: { status: 'PENDING_REVIEW' },
-      include: { reports: { where: { resolvedAt: null } } },
-      orderBy: { updatedAt: 'asc' },
-    });
-    const reported = await this.db.system.listing.findMany({
-      where: { status: 'PUBLISHED', reports: { some: { resolvedAt: null } } },
-      include: { reports: { where: { resolvedAt: null } } },
-    });
-    const tenants = await this.db.system.tenant.findMany({ where: { id: { in: [...listings, ...reported].map((l) => l.tenantId) } }, select: { id: true, name: true } });
-    const name = (id: string) => tenants.find((t) => t.id === id)?.name;
-    return {
-      pending: listings.map((l) => ({ ...l, seller: { name: name(l.tenantId) } })),
-      reported: reported.map((l) => ({ ...l, seller: { name: name(l.tenantId) } })),
-    };
-  }
-
-  @HttpCode(200)
-  @Post('market/listings/:id/moderate')
-  async moderate(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(moderateSchema)) body: z.infer<typeof moderateSchema>) {
-    const listing = found(await this.db.system.listing.findUnique({ where: { id } }), 'Anuncio');
-    const updated = await this.db.system.$transaction(async (tx) => {
-      const l = await tx.listing.update({
-        where: { id },
-        data: {
-          status: body.approve ? 'PUBLISHED' : 'REJECTED',
-          moderationNote: body.note ?? null,
-          moderatedAt: new Date(),
-          publishedAt: body.approve ? (listing.publishedAt ?? new Date()) : null,
-        },
-      });
-      await tx.listingReport.updateMany({ where: { listingId: id, resolvedAt: null }, data: { resolvedAt: new Date() } });
-      return l;
-    });
-    await this.auditFor(listing.tenantId, ctx, body.approve ? 'listing.approved' : 'listing.rejected', 'listing', id, { note: body.note });
-    await this.jobs.add('notify.fanout', {
-      tenantId: listing.tenantId, userIds: [listing.createdById], type: 'market.moderation', email: true,
-      title: body.approve ? `Anuncio publicado: ${listing.title}` : `Anuncio rechazado: ${listing.title}`,
-      body: body.note ?? (body.approve ? 'Tu anuncio ya es visible en BandMarket.' : 'Revisa el anuncio y vuelve a enviarlo.'),
-      link: '/market',
-    });
-    return updated;
   }
 }

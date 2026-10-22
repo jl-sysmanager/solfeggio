@@ -1,14 +1,20 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import type IORedis from 'ioredis';
+import { BillingOpsService } from '../billing/billing-ops.service';
 import { BillingService } from '../billing/billing.service';
 import { env } from '../config/env';
 import { Db } from '../db/db.service';
 import { TYPE_LABEL } from '../events/events.controller';
 import { Mailer } from '../integrations/mailer.service';
+import { InsightsService } from '../platform/insights.service';
+import { OpsService } from '../platform/ops.service';
+import { SupportService } from '../platform/support.service';
 import { JobMap, Jobs } from './jobs.service';
 
 const REMINDER_TICK_MIN = 15;
+/** Tareas periódicas (coinciden con SCHEDULES del worker). */
+export const CRONS = new Set<string>(['events.reminders', 'billing.grace-sweep', 'finance.overdue', 'storage.recount', 'platform.snapshot', 'support.sla-sweep', 'billing.reconcile-addons', 'ops.orphan-scan']);
 
 @Injectable()
 export class Processors {
@@ -19,9 +25,38 @@ export class Processors {
     private readonly jobs: Jobs,
     private readonly billing: BillingService,
     private readonly mailer: Mailer,
+    private readonly insights: InsightsService,
+    private readonly support: SupportService,
+    private readonly ops: OpsService,
+    private readonly billingOps: BillingOpsService,
   ) {}
 
+  /** Cada tarea periódica deja su latido (`cron.<nombre>`) para el panel de salud técnica. */
   async handle(job: Job, redis: IORedis) {
+    const name = job.name as keyof JobMap;
+    if (!CRONS.has(name)) return this.run(job, redis);
+    const started = new Date();
+    try {
+      const result = await this.run(job, redis);
+      await this.beat(name, 'ok', started, { durationMs: Date.now() - started.getTime() });
+      return result;
+    } catch (e) {
+      await this.beat(name, 'error', started, { error: (e as Error).message.slice(0, 300) });
+      throw e;
+    }
+  }
+
+  private async beat(name: string, status: string, at: Date, detail: object) {
+    await this.db.system.opsHeartbeat
+      .upsert({
+        where: { name: `cron.${name}` },
+        create: { name: `cron.${name}`, status, detail, lastRunAt: at },
+        update: { status, detail, lastRunAt: at },
+      })
+      .catch((e) => this.logger.warn(`No se pudo registrar el latido de ${name}: ${e.message}`));
+  }
+
+  private async run(job: Job, redis: IORedis) {
     switch (job.name as keyof JobMap) {
       case 'email.send':
         return this.email(job.data);
@@ -35,6 +70,14 @@ export class Processors {
         return this.overdue();
       case 'storage.recount':
         return this.recount();
+      case 'platform.snapshot':
+        return this.insights.snapshot();
+      case 'support.sla-sweep':
+        return this.support.slaSweep();
+      case 'ops.orphan-scan':
+        return this.ops.scanOrphans();
+      case 'billing.reconcile-addons':
+        return this.billingOps.reconcileAddons();
       default:
         this.logger.warn(`Trabajo desconocido: ${job.name}`);
     }
@@ -42,7 +85,18 @@ export class Processors {
 
   private async email(data: JobMap['email.send']) {
     // Con el correo deshabilitado el trabajo termina sin reintentos; los fallos del proveedor sí reintentan.
-    return this.mailer.send(data);
+    const log = (status: 'SENT' | 'FAILED', error?: string) =>
+      this.db.system.emailLog
+        .create({ data: { tenantId: data.tenantId ?? null, to: data.to, subject: data.subject.slice(0, 300), status, error: error?.slice(0, 500) } })
+        .catch((e) => this.logger.warn(`No se pudo registrar el correo: ${e.message}`));
+    try {
+      const result = await this.mailer.send(data);
+      if (result.sent) await log('SENT');
+      return result;
+    } catch (e) {
+      await log('FAILED', (e as Error).message);
+      throw e;
+    }
   }
 
   /** Crea notificaciones in-app para los usuarios afectados y, opcionalmente, encola emails. */
@@ -66,7 +120,7 @@ export class Processors {
       const users = await this.db.system.user.findMany({ where: { id: { in: [...userIds] } }, select: { email: true } });
       users.forEach((u) => emails.add(u.email));
       const link = data.link ? `\n\n${env().APP_URL}${data.link}` : '';
-      for (const to of emails) await this.jobs.add('email.send', { to, subject: data.title, text: `${data.body}${link}` });
+      for (const to of emails) await this.jobs.add('email.send', { to, subject: data.title, text: `${data.body}${link}`, tenantId: data.tenantId });
     }
     return { users: userIds.size, emails: data.email ? emails.size : 0 };
   }

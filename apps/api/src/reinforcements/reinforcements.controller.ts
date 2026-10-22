@@ -51,6 +51,7 @@ const requestCreate = requestFields.refine((r) => new Date(r.date) > new Date(),
 const requestPatch = requestFields.partial().extend({ status: z.enum(['OPEN', 'FILLED', 'CANCELLED']).optional() });
 const prefillQuery = z.object({ eventId: z.string().uuid() });
 const musiciansQuery = z.object({ instrument: z.string().trim().max(60).optional(), province: z.string().trim().max(60).optional() });
+const reportSchema = z.object({ reason: z.string().trim().min(5).max(1000) });
 const contactSchema = z.object({ requestId: z.string().uuid(), message: z.string().trim().min(5).max(2000) });
 const externalFields = z.object({
   firstName: z.string().trim().min(1).max(80),
@@ -379,6 +380,33 @@ export class ReinforcementsController {
       });
     }
     return { id, status: 'REJECTED' };
+  }
+
+  // ── Denuncias (las resuelve el equipo de plataforma en Moderación) ─────────
+
+  private async report(ctx: RequestContext, target: { requestId?: string; profileId?: string }, reason: string) {
+    const existing = await this.db.system.reinforcementReport.findFirst({ where: { ...target, reporterUserId: ctx.userId, resolvedAt: null } });
+    if (existing) return { id: existing.id, reported: true };
+    const r = await this.db.system.reinforcementReport.create({ data: { ...target, reporterTenantId: ctx.tenantId, reporterUserId: ctx.userId, reason } });
+    return { id: r.id, reported: true };
+  }
+
+  @HttpCode(201)
+  @Post('requests/:id/report')
+  async reportRequest(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(reportSchema)) body: z.infer<typeof reportSchema>) {
+    await this.db.tenant(ctx.tenantId, async (tx) => {
+      const r = found(await tx.reinforcementRequest.findUnique({ where: { id } }), 'Necesidad');
+      if (r.tenantId === ctx.tenantId) throw new BadRequestException({ message: 'Es una necesidad de tu banda', code: 'OWN_REQUEST' });
+    });
+    return this.report(ctx, { requestId: id }, body.reason);
+  }
+
+  @HttpCode(201)
+  @Post('musicians/:profileId/report')
+  async reportMusician(@Ctx() ctx: RequestContext, @Param('profileId', zod(idParam)) profileId: string, @Body(zod(reportSchema)) body: z.infer<typeof reportSchema>) {
+    const profile = found(await this.db.system.musicianProfile.findUnique({ where: { id: profileId } }), 'Músico');
+    if (profile.userId === ctx.userId) throw new BadRequestException({ message: 'Es tu propio perfil', code: 'OWN_PROFILE' });
+    return this.report(ctx, { profileId }, body.reason);
   }
 
   // ── Búsqueda y contacto de músicos ────────────────────────────────────────

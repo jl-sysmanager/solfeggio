@@ -28,6 +28,7 @@ const Notifications = lazy(() => import('./pages/Notifications'));
 const Incidents = lazy(() => import('./pages/Incidents'));
 const Security = lazy(() => import('./pages/Security'));
 const Admin = lazy(() => import('./pages/Admin'));
+const AdminTenant = lazy(() => import('./pages/AdminTenant'));
 const School = lazy(() => import('./pages/School'));
 const StudentDetail = lazy(() => import('./pages/StudentDetail'));
 const FamilyPortal = lazy(() => import('./pages/FamilyPortal'));
@@ -104,6 +105,7 @@ export function App() {
       <Route path="/billing" element={<Shell><Guard perm={['billing:manage']}><Billing /></Guard></Shell>} />
       <Route path="/incidents" element={<Shell><Guard perm={['incidents:write']}><Incidents /></Guard></Shell>} />
       <Route path="/admin" element={<Shell tenant={false}><Guard admin><Admin /></Guard></Shell>} />
+      <Route path="/admin/tenants/:id" element={<Shell tenant={false}><Guard admin><AdminTenant /></Guard></Shell>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

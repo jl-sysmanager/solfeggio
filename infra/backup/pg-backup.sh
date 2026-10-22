@@ -7,11 +7,21 @@
 #   BACKUP_AGE_RECIPIENT  clave pública age (age1...) para cifrar
 # Opcionales:
 #   BACKUP_RETENTION_DAYS (30)  AWS_* / --endpoint-url vía AWS_ENDPOINT_URL
+#   BACKUP_HEARTBEAT_URL    p. ej. https://api.solfeggio.app/api/v1/ops/heartbeat/backup
+#   BACKUP_HEARTBEAT_TOKEN  valor de OPS_HEARTBEAT_TOKEN de la API (el panel marca en rojo si pasan >26 h)
 #
 # Uso (cron):  30 1 * * *  /opt/solfeggio/infra/backup/pg-backup.sh >> /var/log/solfeggio-backup.log 2>&1
 #
 # NOTA: en Postgres gestionado se recomienda además PITR nativo (ver docs/security-gdpr.md).
 set -eu
+
+# Avisa al panel global del resultado (ok/error). Un fallo del aviso no interrumpe la copia.
+heartbeat() {
+  [ -n "${BACKUP_HEARTBEAT_URL:-}" ] || return 0
+  curl -fsS -m 15 -X POST "$BACKUP_HEARTBEAT_URL" -H "x-ops-token: ${BACKUP_HEARTBEAT_TOKEN:-}" \
+    -H 'Content-Type: application/json' -d "{\"status\":\"$1\",\"detail\":{\"file\":\"${2:-}\"}}" >/dev/null 2>&1 || echo "heartbeat no enviado"
+}
+trap 'rc=$?; [ "$rc" -eq 0 ] || heartbeat error "${FILE:-}"; rm -rf "${WORKDIR:-}"' EXIT
 
 : "${BACKUP_DATABASE_URL:?}"
 : "${BACKUP_S3_URI:?}"
@@ -20,7 +30,6 @@ RETENTION_DAYS="${BACKUP_RETENTION_DAYS:-30}"
 
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 WORKDIR="$(mktemp -d)"
-trap 'rm -rf "$WORKDIR"' EXIT
 FILE="$WORKDIR/solfeggio-$STAMP.dump.age"
 
 echo "[$(date -u +%FT%TZ)] backup start"
@@ -43,3 +52,4 @@ aws s3 ls "$BACKUP_S3_URI/" | awk '{print $4}' | while read -r key; do
   fi
 done
 echo "[$(date -u +%FT%TZ)] backup done"
+heartbeat ok "$(basename "$FILE")"

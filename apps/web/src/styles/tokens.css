@@ -1,256 +1,236 @@
-/* Sistema «Material» (DESIGN.md + SKILL.md) para Solfeggio.
-   Intención: interfaz moderna, mínima y limpia con superficies en capas (tonos de superficie +
-   elevación), capas de estado explícitas y movimiento breve, cumpliendo WCAG 2.2 AA.
-
-   Tokens base de DESIGN.md: primary #6442D6, secondary #C8B3FD, success #16A34A, warning #D97706,
-   danger #DC2626, surface/neutral #FFFFFF, text #111827. Los roles (on-*, *-container,
-   surface-container-*, outline) se derivan de ellos siguiendo el modelo de color de Material 3.
-
-   Conflictos estética ↔ accesibilidad (SKILL.md: se prioriza accesibilidad):
-   - secondary (#C8B3FD) sólo como relleno con texto oscuro (9.56:1); como borde sobre blanco da 1.85:1.
-   - success (3.30:1) y warning (3.19:1) no sirven como texto: se usan en iconos/indicadores; el
-     texto de estado usa tonos oscuros (on-*-container).
-   - Bordes de campos con outline #79747E (4.55:1 ≥ 3:1, WCAG 1.4.11).
-   - Tema oscuro derivado con los roles oscuros de Material 3 (DESIGN.md sólo define el claro). */
+/* Tema inspirado en Breeze (github.com/lanternops/breeze, apps/web/src/styles/globals.css):
+   tokens estilo shadcn con superficies cálidas (no blanco puro), primario azul pizarra,
+   neutros con tinte cálido, semánticos de tonos distintos y radio de 0.5rem.
+   Valores HSL tomados de su :root y .dark. Tipografía: Plus Jakarta Sans. */
 :root {
-  /* Tokens de DESIGN.md */
-  --color-primary-token: #6442d6;
-  --color-secondary-token: #c8b3fd;
-  --color-success-token: #16a34a;
-  --color-warning-token: #d97706;
-  --color-danger-token: #dc2626;
-  --color-surface-token: #ffffff;
-  --color-text-token: #111827;
+  /* ── Paleta Breeze (claro) ─────────────────────────────── */
+  --background: hsl(220 20% 98%);
+  --foreground: hsl(224 28% 14%);
+  --card: hsl(220 20% 99%);
+  --card-foreground: hsl(224 28% 14%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(224 28% 14%);
+  --primary: hsl(225 62% 48%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 16% 94%);
+  --secondary-foreground: hsl(224 20% 18%);
+  --muted: hsl(220 16% 94%);
+  --muted-foreground: hsl(220 10% 46%);
+  --accent: hsl(220 20% 92%);
+  --accent-foreground: hsl(224 20% 18%);
+  --destructive: hsl(4 76% 44%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --success: hsl(152 56% 37%);
+  --success-foreground: hsl(0 0% 100%);
+  --warning: hsl(36 88% 50%);
+  --warning-foreground: hsl(28 60% 16%);
+  --warning-strong: hsl(30 85% 38%);
+  --info: hsl(205 85% 38%);
+  --info-foreground: hsl(0 0% 100%);
+  --chart-neutral: hsl(220 12% 72%);
+  --border-color: hsl(220 16% 90%);
+  --input-color: hsl(220 16% 90%);
+  --ring: hsl(225 62% 48%);
+  --radius: 0.5rem;
+  /* Ajustes AA sobre Breeze: borde de campo ≥ 3:1 (WCAG 1.4.11; el de Breeze da 1.2:1) y
+     texto atenuado sobre fondo muted ≥ 4.5:1 (muted-foreground sobre muted da 4.2:1). */
+  --input-border-strong: hsl(220 10% 58%);
+  --muted-on-muted: hsl(220 12% 40%);
 
-  /* Tipografía: escala 12/14/16/20/24/32 */
-  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-display: 'Roboto', 'Inter', system-ui, sans-serif;
-  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* Tipografía (Breeze: Plus Jakarta Sans en toda la UI) */
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --text-2xs: 11px;
   --text-xs: 12px;
   --text-sm: 14px;
-  --text-base: 16px;
-  --text-lg: 20px;
-  --text-xl: 24px;
-  --text-2xl: 32px;
-  /* Alias usados por los componentes */
-  --text-2xs: 12px;
-  --text-3xl: 32px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 24px;
   --leading-body: 1.5;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
   --weight-bold: 700;
 
-  /* Espaciado: escala 4/8/12/16/24/32 */
+  /* Espaciado (escala Tailwind) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
-  --space-5: 20px; /* sólo para compatibilidad; preferir 16 o 24 */
+  --space-5: 20px;
   --space-6: 24px;
   --space-8: 32px;
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Layout */
+  /* Layout (Breeze: sidebar w-64, header h-16, main p-6) */
   --sidebar-width: 256px;
   --topbar-height: 64px;
-  --page-max-width: 1400px;
+  --page-max-width: 1440px;
   --section-gap: var(--space-6);
   --card-padding: var(--space-6);
   --element-gap: var(--space-4);
 
-  /* Forma: DESIGN.md sm 4px / md 8px */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
+  /* Radios: lg = --radius, md = -2px, sm = -4px */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
   --radius-full: 9999px;
 
-  /* Movimiento (Material): estándar y enfatizado */
-  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  /* Sombras (Tailwind: shadow-sm / shadow-lg) */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+  /* Movimiento */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --duration-short: 150ms;
-  --duration-medium: 250ms;
-
-  /* Capas de estado (opacidad del color de contenido sobre el contenedor) */
-  --state-hover: 8%;
-  --state-focus: 10%;
-  --state-pressed: 10%;
-
-  /* Elevación */
-  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
-  --elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
-  --elevation-3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
-
-  /* Roles de color — tema claro */
-  --md-primary: var(--color-primary-token);
-  --md-on-primary: #ffffff;
-  --md-primary-container: #e8deff;
-  --md-on-primary-container: #21005d;
-  --md-secondary-container: var(--color-secondary-token);
-  --md-on-secondary-container: var(--color-text-token);
-  --md-surface: var(--color-surface-token);
-  --md-surface-container-lowest: #ffffff;
-  --md-surface-container-low: #f8f5fc;
-  --md-surface-container: #f3effa;
-  --md-surface-container-high: #ede8f5;
-  --md-surface-container-highest: #e7e1f0;
-  --md-on-surface: var(--color-text-token);
-  --md-on-surface-variant: #49454f;
-  --md-outline: #79747e;
-  --md-outline-variant: #cac4d0;
-  --md-inverse-surface: #322f35;
-  --md-inverse-on-surface: #f5eff7;
-  --md-inverse-primary: #d0bcff;
-
-  /* Semánticos (contenedor tonal + texto oscuro; el token vivo va en iconos/puntos) */
-  --md-success: var(--color-success-token);
-  --md-success-container: #dcfce7;
-  --md-on-success-container: #14532d;
-  --md-warning: var(--color-warning-token);
-  --md-warning-container: #fef3c7;
-  --md-on-warning-container: #78350f;
-  --md-error: var(--color-danger-token);
-  --md-error-text: #b91c1c;
-  --md-error-container: #fee2e2;
-  --md-on-error-container: #7f1d1d;
+  --duration-medium: 200ms;
 
   /* ── Roles de la aplicación (los consumen los componentes) ── */
-  --bg: var(--md-surface-container-low);
-  --surface: var(--md-surface);
-  --surface-alt: var(--md-surface-container);
-  --surface-hover: color-mix(in srgb, var(--md-on-surface) var(--state-hover), transparent);
-  --text: var(--md-on-surface);
-  --text-strong: var(--md-on-surface);
-  --text-muted: var(--md-on-surface-variant);
-  --border: var(--md-outline-variant);
-  --border-soft: var(--md-surface-container-high);
-  --input-border: var(--md-outline);
-  --input-bg: var(--md-surface);
-  --link: var(--md-primary);
-  --focus: var(--md-primary);
-  --btn-bg: var(--md-primary);
-  --btn-text: var(--md-on-primary);
-  --btn-hover: color-mix(in srgb, var(--md-on-primary) var(--state-hover), var(--md-primary));
-  --pill-active-bg: var(--md-secondary-container);
-  --pill-active-text: var(--md-on-secondary-container);
-  --danger: var(--md-error-text);
-  --chart-bar: var(--md-primary);
-  --chart-bar-alt: var(--md-outline-variant);
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-alt: color-mix(in srgb, var(--muted) 30%, var(--card));
+  --surface-hover: color-mix(in srgb, var(--muted) 60%, transparent);
+  --text: var(--foreground);
+  --text-strong: var(--foreground);
+  --text-muted: var(--muted-foreground);
+  --border: var(--border-color);
+  --border-soft: var(--border-color);
+  --input-border: var(--input-border-strong);
+  --input-bg: var(--card);
+  --link: var(--primary);
+  --focus: var(--ring);
+  --btn-bg: var(--primary);
+  --btn-text: var(--primary-foreground);
+  --btn-hover: color-mix(in srgb, var(--primary) 90%, black);
+  --pill-active-bg: var(--primary);
+  --pill-active-text: var(--primary-foreground);
+  --danger: var(--destructive);
+  --chart-bar: var(--primary);
+  --chart-bar-alt: var(--chart-neutral);
 
-  /* Cajón de navegación (Material navigation drawer) */
-  --sidebar-bg: var(--md-surface-container-low);
-  --sidebar-text: var(--md-on-surface-variant);
-  --sidebar-text-active: var(--md-on-secondary-container);
-  --sidebar-hover: color-mix(in srgb, var(--md-on-surface) var(--state-hover), transparent);
-  --sidebar-active: var(--md-secondary-container);
-  --sidebar-label: var(--md-on-surface-variant);
-  --sidebar-border: var(--md-outline-variant);
+  /* Barra lateral (Breeze: bg-card + border-r, activo = bg-primary) */
+  --sidebar-bg: var(--card);
+  --sidebar-text: var(--muted-foreground);
+  --sidebar-text-active: var(--primary-foreground);
+  --sidebar-hover: var(--muted);
+  --sidebar-active: var(--primary);
+  --sidebar-label: var(--muted-foreground);
+  --sidebar-border: var(--border-color);
 
-  /* Tintes y estados */
-  --tint-blue: var(--md-primary-container);
-  --tint-green: var(--md-success-container);
-  --tint-amber: var(--md-warning-container);
-  --chip-neutral: var(--md-surface-container-high);
-  --chip-neutral-text: var(--md-on-surface-variant);
-  --chip-info: var(--md-primary-container);
-  --chip-info-text: var(--md-on-primary-container);
-  --chip-success: var(--md-success-container);
-  --chip-success-text: var(--md-on-success-container);
-  --chip-warning: var(--md-warning-container);
-  --chip-warning-text: var(--md-on-warning-container);
-  --chip-danger: var(--md-error-container);
-  --chip-danger-text: var(--md-on-error-container);
-  --delta-up-bg: var(--md-success-container);
-  --delta-up-text: var(--md-on-success-container);
-  --delta-down-bg: var(--md-error-container);
-  --delta-down-text: var(--md-on-error-container);
+  /* Estados (insignias tintadas: tono/10 de fondo + texto del tono) */
+  --tint-blue: color-mix(in srgb, var(--primary) 6%, var(--card));
+  --tint-green: color-mix(in srgb, var(--success) 6%, var(--card));
+  --tint-amber: color-mix(in srgb, var(--warning) 8%, var(--card));
+  --chip-neutral: color-mix(in srgb, var(--muted) 50%, transparent);
+  --chip-neutral-text: var(--muted-foreground);
+  --chip-info: color-mix(in srgb, var(--info) 10%, transparent);
+  --chip-info-text: var(--info);
+  --chip-success: color-mix(in srgb, var(--success) 10%, transparent);
+  --chip-success-text: color-mix(in srgb, var(--success) 75%, black);
+  --chip-warning: color-mix(in srgb, var(--warning) 15%, transparent);
+  --chip-warning-text: var(--warning-foreground);
+  --chip-danger: color-mix(in srgb, var(--destructive) 10%, transparent);
+  --chip-danger-text: var(--destructive);
+  --delta-up-bg: var(--chip-success);
+  --delta-up-text: var(--chip-success-text);
+  --delta-down-bg: var(--chip-danger);
+  --delta-down-text: var(--chip-danger-text);
 
-  /* Contenedores de icono de las métricas */
-  --icon-blue-bg: var(--md-primary-container);
-  --icon-blue: var(--md-on-primary-container);
-  --icon-green-bg: var(--md-success-container);
-  --icon-green: var(--md-on-success-container);
-  --icon-amber-bg: var(--md-warning-container);
-  --icon-amber: var(--md-on-warning-container);
-  --icon-red-bg: var(--md-error-container);
-  --icon-red: var(--md-on-error-container);
-  --icon-slate-bg: var(--md-surface-container-highest);
-  --icon-slate: var(--md-on-surface-variant);
+  /* Recuadros de icono (Breeze PageHeader: bg-muted text-muted-foreground) */
+  --icon-blue-bg: color-mix(in srgb, var(--primary) 10%, transparent);
+  --icon-blue: var(--primary);
+  --icon-green-bg: color-mix(in srgb, var(--success) 10%, transparent);
+  --icon-green: var(--chip-success-text);
+  --icon-amber-bg: color-mix(in srgb, var(--warning) 15%, transparent);
+  --icon-amber: var(--warning-strong);
+  --icon-red-bg: color-mix(in srgb, var(--destructive) 10%, transparent);
+  --icon-red: var(--destructive);
+  --icon-slate-bg: var(--muted);
+  --icon-slate: var(--muted-foreground);
 
   /* Compatibilidad con estilos en línea existentes */
-  --blue-600: var(--md-primary);
+  --blue-600: var(--primary);
 
   color-scheme: light;
 }
 
+/* Tema oscuro de Breeze (.dark) */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --md-primary: #d0bcff;
-    --md-on-primary: #381e72;
-    --md-primary-container: #4f378b;
-    --md-on-primary-container: #eaddff;
-    --md-secondary-container: #4a3f6b;
-    --md-on-secondary-container: #ebe0ff;
-    --md-surface: #141218;
-    --md-surface-container-lowest: #0f0d13;
-    --md-surface-container-low: #1d1b20;
-    --md-surface-container: #211f26;
-    --md-surface-container-high: #2b2930;
-    --md-surface-container-highest: #36343b;
-    --md-on-surface: #e6e0e9;
-    --md-on-surface-variant: #cac4d0;
-    --md-outline: #938f99;
-    --md-outline-variant: #49454f;
-    --md-inverse-surface: #e6e0e9;
-    --md-inverse-on-surface: #322f35;
-    --md-inverse-primary: #6442d6;
-    --md-success-container: #14532d;
-    --md-on-success-container: #bbf7d0;
-    --md-warning-container: #78350f;
-    --md-on-warning-container: #fde68a;
-    --md-error-text: #fca5a5;
-    --md-error-container: #7f1d1d;
-    --md-on-error-container: #fecaca;
-    --bg: var(--md-surface);
-    --surface: var(--md-surface-container-low);
-    --surface-alt: var(--md-surface-container);
-    --input-bg: var(--md-surface);
+    --background: hsl(224 28% 7%);
+    --foreground: hsl(220 15% 92%);
+    --card: hsl(224 24% 10%);
+    --card-foreground: hsl(220 15% 92%);
+    --popover: hsl(224 24% 10%);
+    --popover-foreground: hsl(220 15% 92%);
+    --primary: hsl(225 70% 62%);
+    --primary-foreground: hsl(224 28% 7%);
+    --secondary: hsl(224 18% 16%);
+    --secondary-foreground: hsl(220 15% 92%);
+    --muted: hsl(224 18% 16%);
+    --muted-foreground: hsl(220 12% 58%);
+    --accent: hsl(224 18% 18%);
+    --accent-foreground: hsl(220 15% 92%);
+    --destructive: hsl(4 80% 64%);
+    --destructive-foreground: hsl(224 28% 7%);
+    --success: hsl(152 52% 44%);
+    --success-foreground: hsl(152 50% 8%);
+    --warning: hsl(40 90% 52%);
+    --warning-foreground: hsl(28 60% 10%);
+    --warning-strong: hsl(40 90% 52%);
+    --info: hsl(205 80% 62%);
+    --info-foreground: hsl(210 60% 10%);
+    --chart-neutral: hsl(224 14% 34%);
+    --border-color: hsl(224 18% 18%);
+    --input-color: hsl(224 18% 18%);
+    --ring: hsl(225 70% 62%);
+    --input-border-strong: hsl(224 12% 40%);
+    --muted-on-muted: hsl(220 12% 58%);
+    --btn-hover: color-mix(in srgb, var(--primary) 88%, white);
+    --chip-success-text: var(--success);
+    --chip-warning-text: var(--warning);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --md-primary: #d0bcff;
-  --md-on-primary: #381e72;
-  --md-primary-container: #4f378b;
-  --md-on-primary-container: #eaddff;
-  --md-secondary-container: #4a3f6b;
-  --md-on-secondary-container: #ebe0ff;
-  --md-surface: #141218;
-  --md-surface-container-lowest: #0f0d13;
-  --md-surface-container-low: #1d1b20;
-  --md-surface-container: #211f26;
-  --md-surface-container-high: #2b2930;
-  --md-surface-container-highest: #36343b;
-  --md-on-surface: #e6e0e9;
-  --md-on-surface-variant: #cac4d0;
-  --md-outline: #938f99;
-  --md-outline-variant: #49454f;
-  --md-inverse-surface: #e6e0e9;
-  --md-inverse-on-surface: #322f35;
-  --md-inverse-primary: #6442d6;
-  --md-success-container: #14532d;
-  --md-on-success-container: #bbf7d0;
-  --md-warning-container: #78350f;
-  --md-on-warning-container: #fde68a;
-  --md-error-text: #fca5a5;
-  --md-error-container: #7f1d1d;
-  --md-on-error-container: #fecaca;
-  --bg: var(--md-surface);
-  --surface: var(--md-surface-container-low);
-  --surface-alt: var(--md-surface-container);
-  --input-bg: var(--md-surface);
+  --background: hsl(224 28% 7%);
+  --foreground: hsl(220 15% 92%);
+  --card: hsl(224 24% 10%);
+  --card-foreground: hsl(220 15% 92%);
+  --popover: hsl(224 24% 10%);
+  --popover-foreground: hsl(220 15% 92%);
+  --primary: hsl(225 70% 62%);
+  --primary-foreground: hsl(224 28% 7%);
+  --secondary: hsl(224 18% 16%);
+  --secondary-foreground: hsl(220 15% 92%);
+  --muted: hsl(224 18% 16%);
+  --muted-foreground: hsl(220 12% 58%);
+  --accent: hsl(224 18% 18%);
+  --accent-foreground: hsl(220 15% 92%);
+  --destructive: hsl(4 80% 64%);
+  --destructive-foreground: hsl(224 28% 7%);
+  --success: hsl(152 52% 44%);
+  --success-foreground: hsl(152 50% 8%);
+  --warning: hsl(40 90% 52%);
+  --warning-foreground: hsl(28 60% 10%);
+  --warning-strong: hsl(40 90% 52%);
+  --info: hsl(205 80% 62%);
+  --info-foreground: hsl(210 60% 10%);
+  --chart-neutral: hsl(224 14% 34%);
+  --border-color: hsl(224 18% 18%);
+  --input-color: hsl(224 18% 18%);
+  --ring: hsl(225 70% 62%);
+  --input-border-strong: hsl(224 12% 40%);
+  --muted-on-muted: hsl(220 12% 58%);
+  --btn-hover: color-mix(in srgb, var(--primary) 88%, white);
+  --chip-success-text: var(--success);
+  --chip-warning-text: var(--warning);
   color-scheme: dark;
 }

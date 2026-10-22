@@ -141,7 +141,7 @@ export class MarketController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const l = await this.own(tx, id, ctx);
       if (!from.includes(l.status)) throw new BadRequestException({ message: 'Transición no permitida', code: 'INVALID_TRANSITION' });
-      const updated = await tx.listing.update({ where: { id }, data: { status: to } });
+      const updated = await tx.listing.update({ where: { id }, data: { status: to, ...(to === 'PENDING_REVIEW' && { submittedAt: new Date() }) } });
       await this.audit.log(tx, ctx, `listing.${to.toLowerCase()}`, 'listing', id);
       return (await this.present([updated], ctx))[0];
     });

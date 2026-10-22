@@ -25,6 +25,12 @@ export class TokensService {
     );
   }
 
+  /** Token «ver como»: caduca con la sesión y no tiene refresh. */
+  impersonationToken(adminId: string, tenantId: string, sessionId: string, expiresAt: Date): Promise<string> {
+    const seconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+    return this.jwt.signAsync({ sub: adminId, tid: tenantId, imp: sessionId }, { secret: env().JWT_ACCESS_SECRET, expiresIn: seconds });
+  }
+
   async issueRefresh(userId: string, tenantId: string | null, familyId: string = randomUUID()): Promise<string> {
     const token = randomToken(48);
     await this.db.system.refreshToken.create({

@@ -17,10 +17,11 @@ import { Tabs, type TabDef } from '../components/Tabs';
 import { date, dateTime } from '../lib/format';
 import { tenantStatus } from '../lib/labels';
 import { StatusChip } from '../components/Chip';
+import { REGIONS } from '../components/admin/support/shared';
 
 function TenantTab() {
   const { reload } = useAuth();
-  const q = useApi<Tenant>('/tenant');
+  const q = useApi<Tenant & { region?: string | null }>('/tenant');
   const save = useApiMutation((body: unknown) => patch('/tenant', body), { success: 'Datos de la banda guardados', invalidate: ['/tenant'], onSuccess: () => reload() });
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
@@ -32,7 +33,7 @@ function TenantTab() {
         onSubmit={(e) => {
           e.preventDefault();
           const v = formValues(e.currentTarget);
-          save.mutate({ name: v.name, legalName: v.legalName ?? null, taxId: v.taxId ?? null, timezone: v.timezone, country: v.country });
+          save.mutate({ name: v.name, legalName: v.legalName ?? null, taxId: v.taxId ?? null, timezone: v.timezone, country: v.country, region: v.region ?? null });
         }}
       >
         <p>
@@ -47,6 +48,7 @@ function TenantTab() {
           <TextField label="País (ISO)" name="country" defaultValue={t.country} maxLength={2} />
           <TextField label="Zona horaria" name="timezone" defaultValue={t.timezone} />
         </div>
+        <SelectField label="Comunidad autónoma" name="region" defaultValue={t.region ?? ''} placeholder="Sin indicar" options={REGIONS.map((r) => ({ value: r, label: r }))} hint="Nos ayuda a avisaros de novedades que afecten a vuestra comunidad." />
         <FormError error={save.error} />
         <div>
           <Button type="submit" loading={save.isPending}>

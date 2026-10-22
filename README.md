@@ -19,13 +19,14 @@ Solfeggio es una plataforma SaaS **multi-tenant** para la gestión integral de b
 | **Bolsa de refuerzos** | Perfiles de músico, necesidades abiertas entre bandas, candidaturas, músicos externos, pagos con retención y datos para los modelos 111 y 190 |
 | **Gobierno** | Asambleas con quórum, delegaciones y votación telemática, libro de actas, junta directiva y encuestas |
 | **BandMarket** | Anuncios entre bandas con moderación, consultas y denuncias |
-| **SaaS** | Planes Free, Basic, Pro y Enterprise; Stripe (Checkout, Portal, Tax, cupones, prueba gratuita); webhooks idempotentes; periodo de gracia; panel global |
+| **SaaS** | Planes Free, Basic, Pro y Enterprise; add-ons por banda (Escuela) con cobro por plaza; Stripe (Checkout, Portal, Tax, cupones, prueba gratuita); webhooks idempotentes; periodo de gracia |
+| **Panel global** | Métricas SaaS (MRR, retención, embudo, cohortes), salud de cada banda y listas de acción, ficha de la banda, «ver como» de solo lectura, pagos fallidos y bonificaciones, soporte con SLA, avisos a las bandas, salud técnica y moderación |
 | **Seguridad** | RBAC configurable por banda (10 roles base), auditoría, MFA TOTP, RLS en PostgreSQL, rate limiting, cifrado de campos |
 
 ## Stack
 
 - **API:** NestJS 10, Prisma 5, PostgreSQL 16 con RLS, Redis 7 y BullMQ (worker), almacenamiento compatible con S3, Stripe y nodemailer.
-- **Web:** React y Vite servidos por nginx, con el sistema «Material» de [DESIGN.md](DESIGN.md) y [SKILL.md](SKILL.md).
+- **Web:** React y Vite servidos por nginx, con el lenguaje visual de [Breeze](https://github.com/lanternops/breeze) (estilo shadcn, Plus Jakarta Sans).
 - **Infraestructura:** Docker Compose, GitHub Actions y GHCR.
 
 ## Puesta en marcha
@@ -77,7 +78,7 @@ docker compose --profile app up -d --build
 
 ## Tests
 
-Tests de la API (208 tests en 15 suites: aislamiento entre tenants, autenticación, RBAC y planes, Stripe, flujos de los módulos, escuela, contrataciones, refuerzos, archivo, gobierno, tesorería y unitarios), con PostgreSQL y Redis reales del compose:
+Tests de la API (290 tests en 23 suites: aislamiento entre tenants, autenticación, RBAC y planes, Stripe, flujos de los módulos, escuela, contrataciones, refuerzos, archivo, gobierno, tesorería, panel global y unitarios), con PostgreSQL y Redis reales del compose:
 
 ```bash
 pnpm --filter @solfeggio/api test
@@ -89,7 +90,7 @@ Sólo los tests de aislamiento:
 pnpm --filter @solfeggio/api test -- tenant-isolation
 ```
 
-Tests de la web (Vitest, 41 tests):
+Tests de la web (Vitest, 55 tests):
 
 ```bash
 pnpm --filter @solfeggio/web test
@@ -108,10 +109,10 @@ Las migraciones de la base de datos de tests (`solfeggio_test`) se aplican solas
 ```
 apps/
   api/            API NestJS + worker
-    prisma/       schema.prisma, migraciones (0001_init … 0005_governance_fixups), seed
+    prisma/       schema.prisma, migraciones (0001_init … 0006_platform_ops), seed
     src/          módulos: auth, tenancy, iam, audit, db, members, archive, events, attendance,
                   treasury, wardrobe, instruments, agenda, notifications, market, billing,
-                  admin, storage, jobs, health, school, performances, reinforcements, governance
+                  admin, storage, jobs, health, school, performances, reinforcements, governance, platform
     test/         e2e (aislamiento de tenants, auth, RBAC y planes, Stripe, módulos)
   web/            SPA React (Vite) + Dockerfile nginx
 docs/             arquitectura, modelo de datos, API, historias, roadmap, seguridad, despliegue

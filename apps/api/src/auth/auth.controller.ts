@@ -98,7 +98,7 @@ export class AuthController {
   @NoTenant()
   @Get('me')
   me(@Ctx() ctx: RequestContext) {
-    return this.sessions.build(ctx.userId, ctx.tenantId || null);
+    return this.sessions.build(ctx.userId, ctx.tenantId || null, ctx.impersonationId);
   }
 
   @ApiBearerAuth()

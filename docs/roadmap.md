@@ -112,7 +112,7 @@ Objetivo: aumentar el ingreso por banda con la escuela y los cobros, y que el m�
 | Escuela · Mensualidades | Descuentos por hermanos, por ser socio de la banda y por varias asignaturas; cobro domiciliado | ⬜ |
 | Escuela · Paso a la banda | Alumno → educando → músico de la banda sin volver a introducir datos | ⬜ |
 | Escuela · Portal de familias | Horario, faltas, notas, recibos y avisos del profesor | ⬜ |
-| Plan o add-on Escuela | Precio por número de alumnos y límites en el control de planes | ⬜ |
+| Plan o add-on Escuela | Plazas de alumno por plan y add-on por banda desde el panel global, con cobro automático en Stripe (cuota fija y precio por plaza) | ✅ |
 | Cobros integrados | Cuotas de socios y mensualidades con SEPA Direct Debit, tarjeta y Bizum; conciliación automática con los recibos; comisión por transacción | ⬜ |
 | App del músico (PWA) · Mi semana | Próximos ensayos, confirmación de asistencia con un toque y repertorio del ensayo | ⬜ |
 | App del músico (PWA) · Mis particellas | Asignación automática por instrumento y atril, disponibles sin conexión | ⬜ |
@@ -146,3 +146,50 @@ Objetivo: cubrir las tareas específicas de las bandas que un software genérico
 **Criterios de salida:**
 - Al menos 5 bandas generan su informe SGAE y la justificación de una subvención desde Solfeggio.
 - La bolsa de refuerzos cubre al menos 50 vacantes con músicos de otras bandas.
+
+## Fase 7 · Panel global de plataforma
+
+Objetivo: que el panel global, hoy centrado en el mantenimiento (planes, estados, moderación e integraciones), sirva para dirigir el negocio: ingresos y bajas, salud de cada banda y estado técnico del sistema.
+
+### Bloque 1 · Negocio y retención (6 semanas)
+
+| Área | Alcance | Estado |
+|---|---|---|
+| Métricas SaaS | Evolución mensual del MRR (altas, mejoras de plan y add-ons, bajadas, bajas), ARR, ingreso medio por banda, retención neta de ingresos y estacionalidad por curso escolar | ✅ |
+| Embudo de prueba | Registro → onboarding completado → prueba → pago, con la conversión de cada paso | ✅ |
+| Cohortes | Porcentaje de bandas activas a los 3, 6 y 12 meses por mes de alta | ✅ |
+| Salud del cliente | Puntuación por banda según su uso real (usuarios activos, ensayos, listas, recibos, mensualidades) y uso de cada módulo | ✅ |
+| Listas de acción | Bandas en riesgo (inactividad, impagos, renovación con uso bajo) y bandas listas para mejorar de plan (80 % de algún límite) | ✅ |
+| Ficha completa de la banda | Cronología (alta, planes, pagos, incidencias, acciones de plataforma), uso frente a límites, notas internas, etiquetas, gestor asignado y contactos | ✅ |
+| «Ver como» la banda | Acceso de solo lectura limitado en el tiempo, con motivo obligatorio, sin datos sensibles (DNI, IBAN), auditado y visible en la auditoría de la banda | ✅ |
+
+**Criterio de salida:** el equipo identifica cada semana las bandas en riesgo y las listas para mejorar de plan sin consultar la base de datos.
+
+### Bloque 2 · Operación y facturación (6 semanas)
+
+| Área | Alcance | Estado |
+|---|---|---|
+| Pagos fallidos | Cola de impagos con reintentos, aviso a la banda y paso a solo lectura con un clic | ✅ |
+| Cupones y bonificaciones | Cupones, créditos, meses gratis, ampliación de la prueba y cuentas bonificadas | ✅ |
+| Cobro del add-on Escuela | Cuota fija y precio por plaza de alumno en la suscripción de Stripe (`STRIPE_PRICE_SCHOOL_ADDON` y `STRIPE_PRICE_SCHOOL_SEAT`), sincronizados al cambiar add-ons o plazas y cada noche | ✅ |
+| Webhooks de Stripe | Historial de eventos con opción de volver a procesarlos | ✅ |
+| Soporte | Prioridad, responsable, SLA con alertas, respuestas predefinidas y conversación por email | ✅ |
+| Avisos a las bandas | Banner de mantenimiento o novedades dentro de la app, por segmento (plan, comunidad, módulos) | ✅ |
+| Salud técnica | Colas de trabajos (fallidos y reintentos), correo enviado, fallido y rebotado (los rebotes llegan por webhook del proveedor), almacenamiento y archivos huérfanos, tareas programadas y latido de las copias de seguridad | ✅ |
+| Moderación ampliada | Bolsa de refuerzos (perfiles, necesidades, denuncias), bloqueo de usuarios y tiempo de moderación frente al objetivo de 24 h | ✅ |
+
+**Criterio de salida:** ningún impago, incidencia ni trabajo fallido queda sin atender más allá de su SLA.
+
+### Bloque 3 · Plataforma y sector
+
+| Área | Alcance | Estado |
+|---|---|---|
+| Roles del equipo de plataforma | Soporte, finanzas, moderación y superadmin en lugar del indicador único de administrador; MFA obligatorio y lista de IPs permitidas | ⬜ |
+| Activación gradual de funciones | Funciones en beta por banda o por porcentaje de bandas, separadas de los planes | ⬜ |
+| Federaciones | Agrupación de bandas, facturación conjunta y estadísticas agregadas | ⬜ |
+| RGPD y DPA | Cola de peticiones (exportación, supresión de cuentas) y registro de la aceptación del DPA por banda | ⬜ |
+| Catálogos maestros del sector | Compositores y obras compartidos sin duplicados, instrumentos estándar, festivos por comunidad y plantillas de documentos (estatutos, actas, certificados) | ⬜ |
+| Campañas y crecimiento | Emails por segmento a propietarios, encuestas NPS, novedades del producto y programa de embajadores | ⬜ |
+| Exportaciones y BI | Exportación de datos de plataforma y conexión con herramientas de análisis | ⬜ |
+
+**Criterio de salida:** una federación gestiona sus bandas desde una cuenta agrupada y el equipo de plataforma trabaja con roles separados y MFA.

@@ -17,6 +17,15 @@ const onboardingSchema = z.object({
   timezone: z.string().max(64).optional(),
 });
 
+/** Comunidades autónomas y ciudades autónomas; se usan para segmentar los avisos de plataforma. */
+export const REGIONS = [
+  'Andalucía', 'Aragón', 'Asturias', 'Illes Balears', 'Canarias', 'Cantabria', 'Castilla y León', 'Castilla-La Mancha', 'Cataluña',
+  'Comunitat Valenciana', 'Extremadura', 'Galicia', 'La Rioja', 'Comunidad de Madrid', 'Región de Murcia', 'Navarra', 'País Vasco', 'Ceuta', 'Melilla',
+] as const;
+
+/** Campos de la banda visibles para sus usuarios (sin contadores internos como el almacenamiento). */
+const TENANT_FIELDS = { id: true, name: true, slug: true, legalName: true, taxId: true, country: true, timezone: true, locale: true, region: true, status: true, createdAt: true } as const;
+
 const tenantPatch = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   legalName: z.string().trim().max(200).nullable().optional(),
@@ -24,6 +33,7 @@ const tenantPatch = z.object({
   country: z.string().length(2).optional(),
   timezone: z.string().max(64).optional(),
   locale: z.string().max(10).optional(),
+  region: z.enum(REGIONS).nullable().optional(),
 });
 
 @ApiTags('tenancy')
@@ -63,10 +73,7 @@ export class TenancyController {
   @Get('tenant')
   tenant(@Ctx() ctx: RequestContext) {
     return this.db.tenant(ctx.tenantId, (tx) =>
-      tx.tenant.findUniqueOrThrow({
-        where: { id: ctx.tenantId },
-        select: { id: true, name: true, slug: true, legalName: true, taxId: true, country: true, timezone: true, locale: true, status: true, createdAt: true },
-      }),
+      tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: TENANT_FIELDS }),
     );
   }
 
@@ -75,7 +82,7 @@ export class TenancyController {
   updateTenant(@Ctx() ctx: RequestContext, @Body(zod(tenantPatch)) body: z.infer<typeof tenantPatch>) {
     // Sólo campos de la lista blanca: estado, plan y uso de almacenamiento los gestiona el sistema.
     return this.db.tenant(ctx.tenantId, async (tx) => {
-      const t = await tx.tenant.update({ where: { id: ctx.tenantId }, data: body });
+      const t = await tx.tenant.update({ where: { id: ctx.tenantId }, data: body, select: TENANT_FIELDS });
       await this.audit.log(tx, ctx, 'tenant.updated', 'tenant', t.id, body);
       return t;
     });

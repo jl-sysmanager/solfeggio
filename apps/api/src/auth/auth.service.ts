@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import * as argon2 from 'argon2';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
@@ -43,6 +43,7 @@ export class AuthService {
       await argon2.verify(await dummyHash, password).catch(() => false);
       throw new UnauthorizedException({ message: 'Credenciales incorrectas', code: 'INVALID_CREDENTIALS' });
     }
+    if (user.blockedAt) throw new ForbiddenException({ message: 'Cuenta bloqueada por el equipo de moderación', code: 'ACCOUNT_BLOCKED' });
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       throw new UnauthorizedException({ message: 'Cuenta bloqueada temporalmente', code: 'ACCOUNT_LOCKED' });
     }
@@ -87,6 +88,11 @@ export class AuthService {
 
   async refresh(token: string) {
     const rotated = await this.tokens.rotate(token);
+    const owner = await this.db.system.user.findUnique({ where: { id: rotated.userId }, select: { blockedAt: true } });
+    if (owner?.blockedAt) {
+      await this.tokens.revokeAllForUser(rotated.userId);
+      throw new UnauthorizedException({ message: 'Cuenta bloqueada', code: 'ACCOUNT_BLOCKED' });
+    }
     const accessToken = await this.tokens.accessToken(rotated.userId, rotated.tenantId).catch(() =>
       this.tokens.accessToken(rotated.userId, null),
     );

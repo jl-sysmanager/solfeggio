@@ -60,6 +60,11 @@ export class FakeStorage extends Storage {
 
 export class FakeStripe {
   subscriptions = new Map<string, any>();
+  openInvoices: any[] = [];
+  coupons: any[] = [];
+  promoCodes: any[] = [];
+  events = new Map<string, any>();
+  payError: string | null = null;
   calls: { method: string; args: any }[] = [];
   isEnabled = true;
   taxEnabled = true;
@@ -73,10 +78,77 @@ export class FakeStripe {
     return this.client;
   }
   client = {
-    customers: { create: async (args: any) => (this.calls.push({ method: 'customers.create', args }), { id: `cus_${args.metadata.tenantId.slice(0, 8)}` }) },
     checkout: { sessions: { create: async (args: any) => (this.calls.push({ method: 'checkout.create', args }), { url: 'https://checkout.stripe.test/s' }) } },
     billingPortal: { sessions: { create: async (args: any) => (this.calls.push({ method: 'portal.create', args }), { url: 'https://billing.stripe.test/p' }) } },
-    subscriptions: { retrieve: async (id: string) => this.subscriptions.get(id) },
+    subscriptions: {
+      retrieve: async (id: string) => this.subscriptions.get(id),
+      update: async (id: string, args: any) => {
+        this.calls.push({ method: 'subscriptions.update', args: { id, ...args } });
+        const sub = this.subscriptions.get(id);
+        if (!sub) throw new Error('No such subscription');
+        if (args.trial_end) sub.trial_end = args.trial_end;
+        return sub;
+      },
+    },
+    invoices: {
+      list: async (args: any) => (this.calls.push({ method: 'invoices.list', args }), { data: this.openInvoices }),
+      pay: async (id: string) => {
+        this.calls.push({ method: 'invoices.pay', args: { id } });
+        if (this.payError) throw new Error(this.payError);
+        const inv = this.openInvoices.find((i) => i.id === id) ?? { id };
+        return { ...inv, status: 'paid', amount_paid: inv.total ?? 0 };
+      },
+    },
+    coupons: {
+      list: async () => ({ data: this.coupons }),
+      create: async (args: any) => {
+        this.calls.push({ method: 'coupons.create', args });
+        const c = { id: `co_${this.coupons.length + 1}`, created: Math.floor(Date.now() / 1000), valid: true, times_redeemed: 0, percent_off: null, amount_off: null, currency: null, duration_in_months: null, max_redemptions: null, ...args };
+        this.coupons.push(c);
+        return c;
+      },
+      del: async (id: string) => {
+        this.calls.push({ method: 'coupons.del', args: { id } });
+        this.coupons = this.coupons.filter((c) => c.id !== id);
+        return { id, deleted: true };
+      },
+    },
+    promotionCodes: {
+      list: async () => ({ data: this.promoCodes }),
+      create: async (args: any) => {
+        this.calls.push({ method: 'promotionCodes.create', args });
+        const p = { id: `promo_${this.promoCodes.length + 1}`, active: true, code: args.code, coupon: { id: args.coupon } };
+        this.promoCodes.push(p);
+        return p;
+      },
+    },
+    customers: {
+      create: async (args: any) => (this.calls.push({ method: 'customers.create', args }), { id: `cus_${args.metadata.tenantId.slice(0, 8)}` }),
+      createBalanceTransaction: async (customer: string, args: any) => (this.calls.push({ method: 'customers.createBalanceTransaction', args: { customer, ...args } }), { id: 'cbtxn_1' }),
+    },
+    subscriptionItems: {
+      create: async (args: any) => {
+        this.calls.push({ method: 'subscriptionItems.create', args });
+        const sub = this.subscriptions.get(args.subscription);
+        const item = { id: `si_${sub.items.data.length + 1}_${args.price}`, price: { id: args.price, recurring: { interval: 'month' } }, quantity: args.quantity, metadata: args.metadata ?? {} };
+        sub.items.data.push(item);
+        return item;
+      },
+      update: async (id: string, args: any) => {
+        this.calls.push({ method: 'subscriptionItems.update', args: { id, ...args } });
+        for (const sub of this.subscriptions.values()) {
+          const item = sub.items.data.find((i: any) => i.id === id);
+          if (item) Object.assign(item, { quantity: args.quantity ?? item.quantity, ...(args.price ? { price: { ...item.price, id: args.price } } : {}) });
+        }
+        return {};
+      },
+      del: async (id: string, args: any) => {
+        this.calls.push({ method: 'subscriptionItems.del', args: { id, ...args } });
+        for (const sub of this.subscriptions.values()) sub.items.data = sub.items.data.filter((i: any) => i.id !== id);
+        return { id, deleted: true };
+      },
+    },
+    events: { retrieve: async (id: string) => (this.calls.push({ method: 'events.retrieve', args: { id } }), this.events.get(id) ?? Promise.reject(new Error('No such event'))) },
   };
   async constructEvent(payload: Buffer, signature: string) {
     if (signature !== 'valid') throw new Error('bad signature');

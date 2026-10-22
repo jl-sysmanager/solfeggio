@@ -8,7 +8,9 @@ import { AttendanceController } from './attendance/attendance.controller';
 import { AuditModule } from './audit/audit.service';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
+import { AdminBillingController } from './billing/admin-billing.controller';
 import { BillingController } from './billing/billing.controller';
+import { BillingOpsService } from './billing/billing-ops.service';
 import { BillingService } from './billing/billing.service';
 import { StripeClient } from './billing/stripe.provider';
 import { AllExceptionsFilter } from './common/http-exception.filter';
@@ -33,6 +35,14 @@ import { OnboardingService } from './tenancy/onboarding.service';
 import { TenancyController } from './tenancy/tenancy.controller';
 import { TreasuryController } from './treasury/treasury.controller';
 import { WardrobeController } from './wardrobe/wardrobe.controller';
+import { AdminInsightsController } from './platform/admin-insights.controller';
+import { AdminOpsController } from './platform/admin-ops.controller';
+import { AdminSupportController } from './platform/admin-support.controller';
+import { AnnouncementsController } from './platform/announcements.controller';
+import { ImpersonationController } from './platform/impersonation.controller';
+import { InsightsService } from './platform/insights.service';
+import { OpsService } from './platform/ops.service';
+import { SupportService } from './platform/support.service';
 import { ArchiveExtrasController } from './archive/archive-extras.controller';
 import { GovernanceController } from './governance/governance.controller';
 import { PerformancesController } from './performances/performances.controller';
@@ -87,6 +97,12 @@ import { TreasuryExtrasController } from './treasury/treasury-extras.controller'
     ArchiveExtrasController,
     GovernanceController,
     TreasuryExtrasController,
+    AdminInsightsController,
+    ImpersonationController,
+    AdminBillingController,
+    AdminSupportController,
+    AnnouncementsController,
+    AdminOpsController,
   ],
   providers: [
     LimitsService,
@@ -94,6 +110,10 @@ import { TreasuryExtrasController } from './treasury/treasury-extras.controller'
     Uploads,
     StripeClient,
     BillingService,
+    BillingOpsService,
+    InsightsService,
+    SupportService,
+    OpsService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

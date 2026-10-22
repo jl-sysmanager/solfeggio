@@ -230,48 +230,35 @@ El equipo de plataforma configura Stripe y el envío de correo desde **Panel glo
 
 ## 9. Interfaz
 
-La SPA (`apps/web`) sigue el sistema «Material» de [DESIGN.md](../DESIGN.md) (tokens) y [SKILL.md](../SKILL.md) (reglas): interfaz moderna, mínima y limpia, con superficies en capas, capas de estado explícitas, movimiento breve y tematización clara y oscura. Los tokens están en `apps/web/src/styles/tokens.css`.
+La SPA (`apps/web`) replica el lenguaje visual de [Breeze](https://github.com/lanternops/breeze) (`apps/web`, estilo shadcn sobre Tailwind 4). Sus tokens están copiados de `apps/web/src/styles/globals.css` de ese proyecto, en `:root` y `.dark`, y en Solfeggio viven en `apps/web/src/styles/tokens.css`.
 
-**Tokens y roles**
+**Tokens**
+- **Superficies:** cálidas, nunca blanco ni negro puros (`hsl(220 20% 98%)` de fondo y `hsl(220 20% 99%)` en tarjetas).
+- **Texto:** `hsl(224 28% 14%)`.
+- **Primario:** azul pizarra `hsl(225 62% 48%)`.
+- **Neutros:** con tinte cálido; `muted` es `hsl(220 16% 94%)` y los bordes `hsl(220 16% 90%)`.
+- **Semánticos:** tonos distintos entre sí (destructive, success, warning, info).
+- **Radio:** 0,5rem.
+- **Tipografía:** Plus Jakarta Sans.
 
-- **Tokens de DESIGN.md:**
-  - colores: primario `#6442D6`, secundario `#C8B3FD`, success `#16A34A`, warning `#D97706`, danger `#DC2626`, superficie blanca y texto `#111827`;
-  - tipografía: Inter para el texto, Roboto para los titulares y Fira Code para las etiquetas en mayúsculas;
-  - escalas: tipográfica 12/14/16/20/24/32, espaciado 4/8/12/16/24/32 y radios de 4 y 8px.
-- **Roles de Material 3:** a partir de esos tokens se derivan `primary`/`on-primary`, `primary-container`, `secondary-container`, `surface-container-*`, `on-surface(-variant)`, `outline(-variant)`, `inverse-*` y los contenedores de success, warning y error. Los componentes sólo usan estos roles semánticos.
-- **Estados:**
+**Componentes y sus clases equivalentes en Breeze**
+- **Barra lateral:** `bg-card border-r`, 256px de ancho y cabecera de 64px con borde inferior. Los grupos se titulan en `text-xs uppercase tracking-wide`. Los elementos son `rounded-md px-3 py-2 text-sm font-medium` con icono de 20px, y el activo va en **`bg-primary text-primary-foreground`**. Los contadores son píldoras ámbar.
+- **Cabecera:** `h-16 border-b bg-card` con buscador, botones de icono `rounded-md p-2 hover:bg-muted`, campana con un punto primario, separador vertical y menú de usuario con avatar redondo. Los menús son `rounded-lg border bg-popover py-1 shadow-lg`.
+- **Cabecera de página:** icono de sección en un recuadro de 36px `bg-muted`, título `text-xl font-semibold tracking-tight`, descripción atenuada y acciones a la derecha.
+- **Tarjetas:** `rounded-lg border bg-card`, sin sombra. Las tarjetas de métricas son compactas: etiqueta de 12px atenuada y cifra en seminegrita.
+- **Tablas:** `divide-y`, con `thead bg-muted/30`, `th` de 12px en seminegrita y mayúsculas, y filas `hover:bg-muted/60`.
+- **Insignias:** `rounded-full border px-2 py-0.5 text-xs font-medium`, con tinte del tono.
+- **Botones:** `rounded-md px-4 py-2 text-sm font-medium`, con `scale(0.98)` al pulsar.
+- **Campos:** `h-9 rounded-md border shadow-sm`, con anillo de foco.
+- **Pestañas:** subrayadas en el primario.
+- **Filtros:** grupo sobre `bg-muted`, con el activo sobre `bg-card` y una sombra ligera.
+- **Movimiento:** `fade-up` de 8px al entrar y pulso en los esqueletos de carga.
+- **Foco:** `outline: 2px solid ring` con 2px de separación.
 
-  | Estado | Tratamiento |
-  |---|---|
-  | Hover | Capa del 8% del color de contenido |
-  | Pulsado y foco | Capa del 10% |
-  | Foco visible | Anillo de 2px en el primario |
-  | Deshabilitado | Contenedor al 12% y contenido al 38% |
-  | Cargando | `aria-busy` |
-  | Error | Borde de 2px en error y etiqueta en rojo |
-
-- **Elevación:** niveles 1 a 3; el fondo es `surface-container-low` y el contenido va sobre `surface`.
-- **Movimiento:** 150–250 ms con la curva estándar, y entradas de diálogo y menú con la curva enfatizada. Se desactiva con `prefers-reduced-motion`.
-
-**Componentes**
-
-- **Cajón de navegación:** elementos de 48px con un indicador activo tonal (`secondary-container`).
-- **Barra superior:** buscador en `surface-container-high` que abre la paleta.
-- **Botones:** relleno, tonal, con contorno y de icono.
-- **Campos de texto:** con contorno, 48px de alto y foco de 2px en el primario.
-- **Filtros y pestañas:** los filtros son botones segmentados (el seleccionado en `secondary-container` con ✓); las pestañas primarias llevan un indicador inferior de 3px.
-- **Chips:** filtros con contorno que, seleccionados, pasan a tonales.
-- **Tarjetas:** con contorno, rellenas o elevadas.
-- **Diálogos y menús:** sobre `surface-container-high` con elevación.
-- **Avisos:** *snackbars* sobre `inverse-surface`.
-- **Indicadores de progreso:** lineales.
-
-**Conflictos con la accesibilidad.** SKILL.md pide priorizar la accesibilidad (WCAG 2.2 AA):
-
-1. **Secundario:** `#C8B3FD` sólo se usa como relleno con texto oscuro (9,6:1). Como borde sobre blanco da 1,85:1.
-2. **Colores de estado:** success (3,3:1) y warning (3,2:1) no se usan como texto. El texto de estado va en `on-*-container` (8:1 o más) y el color vivo queda en iconos y puntos.
-3. **Bordes de los campos:** usan `outline` (`#79747E`, 4,6:1), por encima del 3:1 de WCAG 1.4.11.
-4. **Tema oscuro:** DESIGN.md sólo define el claro. Se usan los roles oscuros de Material 3, comprobados en AA.
+**Ajustes de accesibilidad.** El requisito del proyecto es WCAG 2.2 AA, por eso:
+1. **Borde de los campos:** el de Breeze (`hsl(220 16% 90%)`) da 1,2:1 y no llega al 3:1 de WCAG 1.4.11. Los campos usan `hsl(220 10% 58%)` (3,05:1), y `hsl(224 12% 40%)` en oscuro. El resto de bordes no cambia.
+2. **Texto atenuado sobre `muted`:** `muted-foreground` da 4,2:1, así que en filtros inactivos, teclas y la cabecera del calendario se usa `hsl(220 12% 40%)` (5,3:1).
+3. **Insignia de éxito:** el texto se oscurece (5,4:1).
 
 Los patrones de interacción —paleta de comandos ⌘K, menús de acciones por fila, menú de usuario, avatares, esqueletos de carga, estados vacíos, títulos de pestaña y foco tras navegar— están en [docs/ux-guidelines.md](ux-guidelines.md).
 

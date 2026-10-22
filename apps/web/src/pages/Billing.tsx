@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
 import type { Billing, Plan, PlanCode } from '../api/types';
+import type { BillingAddons } from '../api/types-admin-billing';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, StatCard } from '../components/Card';
@@ -81,7 +82,7 @@ export default function BillingPage() {
   const { reload } = useAuth();
   const [params, setParams] = useSearchParams();
   const [interval, setInterval] = useState<'MONTH' | 'YEAR'>('YEAR');
-  const billing = useApi<Billing>('/billing');
+  const billing = useApi<Billing & BillingAddons>('/billing');
   const plans = useApi<Plan[]>('/plans');
 
   useEffect(() => {
@@ -148,6 +149,14 @@ export default function BillingPage() {
         </Card>
       )}
 
+      {b.complimentaryUntil && (
+        <Card tone="cream" title="Cuenta bonificada">
+          <p>
+            Tu banda disfruta del plan {b.plan.name} sin coste hasta el <strong>{date(b.complimentaryUntil)}</strong>. Después pasará al plan Free salvo que contrates un plan de pago.
+          </p>
+        </Card>
+      )}
+
       <div className="grid grid--stats">
         <StatCard label="Usuarios" value={`${b.usage.users} / ${limit(b.plan.maxUsers)}`} meter={b.plan.maxUsers > 0 ? b.usage.users / b.plan.maxUsers : undefined} />
         <StatCard label="Socios" value={`${b.usage.members} / ${limit(b.plan.maxMembers)}`} meter={b.plan.maxMembers > 0 ? b.usage.members / b.plan.maxMembers : undefined} />
@@ -166,6 +175,23 @@ export default function BillingPage() {
           />
         )}
       </div>
+
+      {!!b.addons?.length && (
+        <Card title="Add-on Escuela">
+          <ul className="list-plain stack" style={{ gap: 6 }}>
+            {b.addons.map((l) => (
+              <li key={l.key} className="row between">
+                <span>
+                  {l.label}
+                  {l.quantity > 1 && ` × ${l.quantity}`}
+                </span>
+                <span className="nowrap">{l.unitCents > 0 ? `${money(l.unitCents * l.quantity)} / mes + IVA` : 'Precio según tu contrato'}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="small muted">Se cobran junto al plan en cada factura. Los cambios de plazas se prorratean.</p>
+        </Card>
+      )}
 
       <section aria-labelledby="plans-title" className="stack" style={{ gap: 16 }}>
         <div className="row between">

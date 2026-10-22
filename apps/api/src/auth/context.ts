@@ -13,6 +13,8 @@ export interface RequestContext {
   permissions: Set<string>;
   features: Set<string>;
   ip?: string;
+  /** Sesión «ver como» de plataforma: acceso de sólo lectura a la banda. */
+  impersonationId?: string;
 }
 
 export interface AccessTokenPayload {
@@ -20,6 +22,8 @@ export interface AccessTokenPayload {
   tid?: string;
   /** Versión: el token sólo es válido mientras la membresía siga existiendo. */
   mid?: string;
+  /** Id de la ImpersonationSession (token «ver como»). */
+  imp?: string;
 }
 
 export type AuthedRequest = Request & { ctx: RequestContext };

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   api,
@@ -6,9 +6,12 @@ import {
   post,
   refreshAccessToken,
   setAccessToken,
+  setImpersonationLostHandler,
+  setRefreshDisabled,
   setSessionExpiredHandler,
 } from '../api/client';
 import type { Membership, Session } from '../api/types';
+import type { ImpersonationInfo } from '../api/types-admin-insights';
 
 interface LoginResult {
   accessToken: string;
@@ -27,6 +30,10 @@ interface AuthContextValue {
   logout(): Promise<void>;
   switchTenant(tenantId: string): Promise<Session>;
   applyTokenSession(result: TokenSession): void;
+  /** Sesión «ver como» activa (sólo lectura), o null. */
+  impersonation: ImpersonationInfo | null;
+  startImpersonation(accessToken: string): Promise<void>;
+  endImpersonation(): Promise<void>;
   reload(): Promise<void>;
   can(permission: string | string[]): boolean;
   hasFeature(feature: string): boolean;
@@ -40,6 +47,9 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
     initialSession !== undefined ? (initialSession ? 'authenticated' : 'anonymous') : 'loading',
   );
   const queryClient = useQueryClient();
+  // Sesión del administrador guardada mientras dura «ver como», para restaurarla al salir.
+  const adminSession = useRef<Session | null>(null);
+  const impersonation = (session as (Session & { impersonation?: ImpersonationInfo }) | null)?.impersonation ?? null;
 
   const reload = useCallback(async () => {
     try {
@@ -110,8 +120,61 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
     [applyTokenSession],
   );
 
+  const endImpersonation = useCallback(async () => {
+    if (!adminSession.current) return;
+    const saved = adminSession.current;
+    adminSession.current = null;
+    try {
+      await api('/impersonation/end', { method: 'POST', body: {}, noRefresh: true });
+    } catch {
+      /* ya caducada o terminada: se restaura igualmente */
+    }
+    setRefreshDisabled(false);
+    setAccessToken(null);
+    queryClient.clear();
+    const token = await refreshAccessToken();
+    if (token) {
+      setSession(saved);
+      setStatus('authenticated');
+    } else {
+      setSession(null);
+      setStatus('anonymous');
+    }
+  }, [queryClient]);
+
+  const startImpersonation = useCallback(
+    async (accessToken: string) => {
+      if (!adminSession.current) adminSession.current = session;
+      setRefreshDisabled(true);
+      setAccessToken(accessToken);
+      try {
+        const me = await get<Session>('/auth/me');
+        queryClient.clear();
+        setSession(me);
+        setStatus('authenticated');
+      } catch (e) {
+        adminSession.current = null;
+        setRefreshDisabled(false);
+        await refreshAccessToken();
+        throw e;
+      }
+    },
+    [queryClient, session],
+  );
+
+  // Un 401 durante «ver como» (sesión terminada o caducada) devuelve al administrador a su cuenta.
+  useEffect(() => {
+    setImpersonationLostHandler(() => void endImpersonation());
+    return () => setImpersonationLostHandler(null);
+  }, [endImpersonation]);
+
   const logout = useCallback(async () => {
     try {
+      if (adminSession.current) {
+        adminSession.current = null;
+        await api('/impersonation/end', { method: 'POST', body: {}, noRefresh: true }).catch(() => undefined);
+        setRefreshDisabled(false);
+      }
       await api('/auth/logout', { method: 'POST', body: {}, noRefresh: true });
     } finally {
       setAccessToken(null);
@@ -129,6 +192,9 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
       logout,
       switchTenant,
       applyTokenSession,
+      impersonation,
+      startImpersonation,
+      endImpersonation,
       reload,
       can: (perm) => {
         if (!session) return false;
@@ -137,7 +203,7 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
       },
       hasFeature: (feature) => !!session?.plan?.features.includes(feature),
     }),
-    [session, status, login, logout, switchTenant, applyTokenSession, reload],
+    [session, status, login, logout, switchTenant, applyTokenSession, impersonation, startImpersonation, endImpersonation, reload],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

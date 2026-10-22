@@ -68,26 +68,33 @@ model Plan {
 }
 
 model Tenant {
-  id               String       @id @default(uuid()) @db.Uuid
-  slug             String       @unique
-  name             String
-  legalName        String?
-  taxId            String?
-  country          String       @default("ES")
-  timezone         String       @default("Europe/Madrid")
-  locale           String       @default("es-ES")
-  status           TenantStatus @default(TRIALING)
-  planId           String       @db.Uuid
-  plan             Plan         @relation(fields: [planId], references: [id])
-  storageUsedBytes BigInt       @default(0)
+  id                  String       @id @default(uuid()) @db.Uuid
+  slug                String       @unique
+  name                String
+  legalName           String?
+  taxId               String?
+  country             String       @default("ES")
+  timezone            String       @default("Europe/Madrid")
+  locale              String       @default("es-ES")
+  status              TenantStatus @default(TRIALING)
+  planId              String       @db.Uuid
+  plan                Plan         @relation(fields: [planId], references: [id])
+  storageUsedBytes    BigInt       @default(0)
   /// Funcionalidades contratadas aparte del plan (p. ej. `school`), gestionadas desde el panel global.
-  addons           String[]     @default([])
+  addons              String[]     @default([])
   /// Plazas de alumno adicionales del add-on Escuela, que se suman a `plan.maxStudents`.
-  studentSeats     Int          @default(0)
-  onboardedAt      DateTime?
-  deletedAt        DateTime?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  studentSeats        Int          @default(0)
+  /// Gestión de cuenta (panel global): etiquetas, gestor asignado y comunidad autónoma para segmentar.
+  tags                String[]     @default([])
+  accountManagerId    String?      @db.Uuid
+  region              String?
+  /// Cuenta bonificada: sin cobro en Stripe hasta esa fecha (pilotos, bandas benéficas).
+  complimentaryUntil  DateTime?
+  complimentaryReason String?
+  onboardedAt         DateTime?
+  deletedAt           DateTime?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   subscription Subscription?
   memberships  Membership[]
@@ -153,16 +160,23 @@ enum IncidentStatus {
 
 /// Incidencias de soporte: visibles para el tenant que las abre y para el panel global.
 model Incident {
-  id         String         @id @default(uuid()) @db.Uuid
-  tenantId   String         @map("tenant_id") @db.Uuid
-  openedById String?        @db.Uuid
-  subject    String
-  body       String
-  priority   Int            @default(3)
-  status     IncidentStatus @default(OPEN)
-  resolution String?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
+  id              String            @id @default(uuid()) @db.Uuid
+  tenantId        String            @map("tenant_id") @db.Uuid
+  openedById      String?           @db.Uuid
+  subject         String
+  body            String
+  priority        Int               @default(3)
+  status          IncidentStatus    @default(OPEN)
+  resolution      String?
+  /// Usuario del equipo de plataforma responsable.
+  assigneeId      String?           @db.Uuid
+  /// Vencimiento de la primera respuesta según la prioridad.
+  slaDueAt        DateTime?
+  firstResponseAt DateTime?
+  slaAlertedAt    DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  messages        IncidentMessage[]
 
   @@index([tenantId, status])
   @@map("incidents")
@@ -182,6 +196,9 @@ model User {
   failedLogins    Int       @default(0)
   lockedUntil     DateTime?
   lastLoginAt     DateTime?
+  /// Bloqueo por moderación: no puede iniciar sesión ni usar tokens emitidos.
+  blockedAt       DateTime?
+  blockedReason   String?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -240,6 +257,8 @@ model Membership {
   guardianId    String?          @unique @db.Uuid
   status        MembershipStatus @default(ACTIVE)
   calendarToken String           @unique @default(uuid()) @db.Uuid
+  /// Última petición autenticada en esta banda (como mucho se actualiza una vez por hora).
+  lastSeenAt    DateTime?
   createdAt     DateTime         @default(now())
 
   @@unique([tenantId, userId])
@@ -841,6 +860,7 @@ model Listing {
   imageKeys      String[]
   status         ListingStatus @default(DRAFT)
   moderationNote String?
+  submittedAt    DateTime?
   moderatedAt    DateTime?
   publishedAt    DateTime?
   createdAt      DateTime      @default(now())
@@ -1832,4 +1852,165 @@ model Donation {
 
   @@index([tenantId, date])
   @@map("donations")
+}
+
+// ───────────────────────────── Panel global: negocio, soporte y operación ─────────────────────────────
+// Tablas de plataforma. Salvo `incident_messages` (visible para la banda sin las notas internas),
+// sólo las usa el cliente de sistema desde el panel global y el worker.
+
+/// Foto diaria de cada banda: base de las métricas SaaS (MRR, cohortes) y de la salud del cliente.
+model TenantSnapshot {
+  id             String       @id @default(uuid()) @db.Uuid
+  tenantId       String       @map("tenant_id") @db.Uuid
+  date           DateTime     @db.Date
+  planCode       PlanCode
+  status         TenantStatus
+  /// Ingreso mensual recurrente normalizado (anual / 12), incluidos add-ons.
+  mrrCents       Int
+  activeUsers7d  Int
+  activeUsers30d Int
+  members        Int
+  students       Int
+  storageBytes   BigInt
+  /// Actividad de los últimos 30 días por módulo, p. ej. { events: 12, attendance: 40, treasury: 9 }.
+  usage          Json
+  healthScore    Int
+  createdAt      DateTime     @default(now())
+
+  @@unique([tenantId, date])
+  @@index([date])
+  @@map("tenant_snapshots")
+}
+
+model TenantNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  authorId  String   @db.Uuid
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("tenant_notes")
+}
+
+/// Acceso de solo lectura del equipo de plataforma a una banda («ver como»).
+model ImpersonationSession {
+  id        String    @id @default(uuid()) @db.Uuid
+  tenantId  String    @map("tenant_id") @db.Uuid
+  adminId   String    @db.Uuid
+  reason    String
+  expiresAt DateTime
+  endedAt   DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, createdAt])
+  @@map("impersonation_sessions")
+}
+
+/// Conversación de una incidencia. Las notas internas no son visibles para la banda.
+model IncidentMessage {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  incidentId String   @db.Uuid
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  /// PLATFORM o TENANT.
+  authorType String
+  authorId   String?  @db.Uuid
+  body       String
+  internal   Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([incidentId, createdAt])
+  @@map("incident_messages")
+}
+
+model CannedReply {
+  id        String   @id @default(uuid()) @db.Uuid
+  title     String   @unique
+  body      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("canned_replies")
+}
+
+enum AnnouncementLevel {
+  INFO
+  WARNING
+  MAINTENANCE
+}
+
+/// Aviso dentro de la app para las bandas de un segmento.
+model Announcement {
+  id          String                  @id @default(uuid()) @db.Uuid
+  title       String
+  body        String
+  level       AnnouncementLevel       @default(INFO)
+  link        String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  /// { plans?: PlanCode[], regions?: string[], features?: string[], tenantIds?: uuid[] }; vacío = todas.
+  segment     Json                    @default("{}")
+  dismissible Boolean                 @default(true)
+  createdById String                  @db.Uuid
+  createdAt   DateTime                @default(now())
+  dismissals  AnnouncementDismissal[]
+
+  @@index([startsAt])
+  @@map("announcements")
+}
+
+model AnnouncementDismissal {
+  id             String       @id @default(uuid()) @db.Uuid
+  announcementId String       @db.Uuid
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  userId         String       @db.Uuid
+  dismissedAt    DateTime     @default(now())
+
+  @@unique([announcementId, userId])
+  @@map("announcement_dismissals")
+}
+
+/// Envíos de correo (resultado del worker y rebotes notificados por el proveedor).
+model EmailLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String?  @map("tenant_id") @db.Uuid
+  to        String
+  subject   String
+  /// SENT, FAILED, BOUNCED o COMPLAINED.
+  status    String
+  error     String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([status, createdAt])
+  @@map("email_logs")
+}
+
+/// Latido de procesos externos o periódicos (copias de seguridad, tareas programadas).
+model OpsHeartbeat {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  status    String
+  detail    Json?
+  lastRunAt DateTime
+  updatedAt DateTime @updatedAt
+
+  @@map("ops_heartbeats")
+}
+
+/// Denuncia de una necesidad o un perfil de la bolsa de refuerzos.
+model ReinforcementReport {
+  id               String    @id @default(uuid()) @db.Uuid
+  requestId        String?   @db.Uuid
+  profileId        String?   @db.Uuid
+  reporterTenantId String    @db.Uuid
+  reporterUserId   String    @db.Uuid
+  reason           String
+  resolvedAt       DateTime?
+  resolution       String?
+  createdAt        DateTime  @default(now())
+
+  @@index([resolvedAt])
+  @@map("reinforcement_reports")
 }
