@@ -6,7 +6,7 @@ import { env } from './config/env';
 async function main() {
   const app = await NestFactory.create(AppModule, { rawBody: true, bufferLogs: true });
   configureApp(app);
-  await app.listen(env().PORT, '0.0.0.0');
+  await app.listen(env().PORT, env().HOST);
 }
 
 void main();

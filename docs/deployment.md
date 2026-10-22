@@ -90,6 +90,8 @@ docker compose --profile app up -d --build
 
 ## 3. Producción en un cloud gestionado (recomendado)
 
+> **Railway:** el repositorio está preparado para desplegarse en Railway sin configuración adicional más que variables de entorno. Consulta la guía paso a paso en [railway.md](railway.md).
+
 | Pieza | Opción gestionada (región de la UE) |
 |---|---|
 | Contenedores `api`, `worker`, `web` | ECS Fargate, Cloud Run, Fly.io, Render o Kubernetes |

@@ -7,6 +7,10 @@ const bool = z
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
+  /** Dirección de escucha. `::` en redes privadas sólo IPv6 (entornos antiguos de Railway). */
+  HOST: z.string().default('0.0.0.0'),
+  /** Proxies de confianza delante de la API (nginx = 1; Railway + nginx = 2) para obtener la IP real. */
+  TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
   APP_URL: z.string().url().default('http://localhost:5173'),
   API_URL: z.string().url().default('http://localhost:3000'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),

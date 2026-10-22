@@ -10,7 +10,7 @@ import { metricsMiddleware } from './health/metrics';
 export function configureApp(app: INestApplication) {
   const e = env();
   const express = app.getHttpAdapter().getInstance();
-  express.set('trust proxy', 1);
+  express.set('trust proxy', e.TRUST_PROXY);
   express.disable('x-powered-by');
 
   app.useLogger(app.get(Logger));

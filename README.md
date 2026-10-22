@@ -135,6 +135,7 @@ DESIGN.md         referencia visual de la interfaz
 - [Seguridad y RGPD](docs/security-gdpr.md): autenticación, cifrado, logs, RGPD, copias de seguridad y monitorización.
 - [Despliegue](docs/deployment.md): entorno local, producción, Stripe y rollback.
 - [Operación](docs/operations.md): tareas programadas y runbook de incidencias.
+- [Despliegue en Railway](docs/railway.md): servicios, variables, primer despliegue, bucket, dominio y operación.
 
 ## Licencia
 
