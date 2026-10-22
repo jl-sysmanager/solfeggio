@@ -1,0 +1,24 @@
+{
+  "name": "solfeggio",
+  "private": true,
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @solfeggio/api db:migrate",
+    "db:seed": "pnpm --filter @solfeggio/api db:seed"
+  },
+  "pnpm": {
+    "overrides": {
+      "multer": ">=2.3.0",
+      "js-yaml": ">=4.3.2 <5",
+      "lodash": ">=4.18.0"
+    }
+  }
+}

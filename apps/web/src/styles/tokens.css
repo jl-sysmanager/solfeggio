@@ -1,0 +1,256 @@
+/* Sistema «Material» (DESIGN.md + SKILL.md) para Solfeggio.
+   Intención: interfaz moderna, mínima y limpia con superficies en capas (tonos de superficie +
+   elevación), capas de estado explícitas y movimiento breve, cumpliendo WCAG 2.2 AA.
+
+   Tokens base de DESIGN.md: primary #6442D6, secondary #C8B3FD, success #16A34A, warning #D97706,
+   danger #DC2626, surface/neutral #FFFFFF, text #111827. Los roles (on-*, *-container,
+   surface-container-*, outline) se derivan de ellos siguiendo el modelo de color de Material 3.
+
+   Conflictos estética ↔ accesibilidad (SKILL.md: se prioriza accesibilidad):
+   - secondary (#C8B3FD) sólo como relleno con texto oscuro (9.56:1); como borde sobre blanco da 1.85:1.
+   - success (3.30:1) y warning (3.19:1) no sirven como texto: se usan en iconos/indicadores; el
+     texto de estado usa tonos oscuros (on-*-container).
+   - Bordes de campos con outline #79747E (4.55:1 ≥ 3:1, WCAG 1.4.11).
+   - Tema oscuro derivado con los roles oscuros de Material 3 (DESIGN.md sólo define el claro). */
+:root {
+  /* Tokens de DESIGN.md */
+  --color-primary-token: #6442d6;
+  --color-secondary-token: #c8b3fd;
+  --color-success-token: #16a34a;
+  --color-warning-token: #d97706;
+  --color-danger-token: #dc2626;
+  --color-surface-token: #ffffff;
+  --color-text-token: #111827;
+
+  /* Tipografía: escala 12/14/16/20/24/32 */
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Roboto', 'Inter', system-ui, sans-serif;
+  --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 32px;
+  /* Alias usados por los componentes */
+  --text-2xs: 12px;
+  --text-3xl: 32px;
+  --leading-body: 1.5;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* Espaciado: escala 4/8/12/16/24/32 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px; /* sólo para compatibilidad; preferir 16 o 24 */
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Layout */
+  --sidebar-width: 256px;
+  --topbar-height: 64px;
+  --page-max-width: 1400px;
+  --section-gap: var(--space-6);
+  --card-padding: var(--space-6);
+  --element-gap: var(--space-4);
+
+  /* Forma: DESIGN.md sm 4px / md 8px */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --radius-xl: 8px;
+  --radius-full: 9999px;
+
+  /* Movimiento (Material): estándar y enfatizado */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --duration-short: 150ms;
+  --duration-medium: 250ms;
+
+  /* Capas de estado (opacidad del color de contenido sobre el contenedor) */
+  --state-hover: 8%;
+  --state-focus: 10%;
+  --state-pressed: 10%;
+
+  /* Elevación */
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --elevation-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --elevation-3: 0 1px 3px rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+
+  /* Roles de color — tema claro */
+  --md-primary: var(--color-primary-token);
+  --md-on-primary: #ffffff;
+  --md-primary-container: #e8deff;
+  --md-on-primary-container: #21005d;
+  --md-secondary-container: var(--color-secondary-token);
+  --md-on-secondary-container: var(--color-text-token);
+  --md-surface: var(--color-surface-token);
+  --md-surface-container-lowest: #ffffff;
+  --md-surface-container-low: #f8f5fc;
+  --md-surface-container: #f3effa;
+  --md-surface-container-high: #ede8f5;
+  --md-surface-container-highest: #e7e1f0;
+  --md-on-surface: var(--color-text-token);
+  --md-on-surface-variant: #49454f;
+  --md-outline: #79747e;
+  --md-outline-variant: #cac4d0;
+  --md-inverse-surface: #322f35;
+  --md-inverse-on-surface: #f5eff7;
+  --md-inverse-primary: #d0bcff;
+
+  /* Semánticos (contenedor tonal + texto oscuro; el token vivo va en iconos/puntos) */
+  --md-success: var(--color-success-token);
+  --md-success-container: #dcfce7;
+  --md-on-success-container: #14532d;
+  --md-warning: var(--color-warning-token);
+  --md-warning-container: #fef3c7;
+  --md-on-warning-container: #78350f;
+  --md-error: var(--color-danger-token);
+  --md-error-text: #b91c1c;
+  --md-error-container: #fee2e2;
+  --md-on-error-container: #7f1d1d;
+
+  /* ── Roles de la aplicación (los consumen los componentes) ── */
+  --bg: var(--md-surface-container-low);
+  --surface: var(--md-surface);
+  --surface-alt: var(--md-surface-container);
+  --surface-hover: color-mix(in srgb, var(--md-on-surface) var(--state-hover), transparent);
+  --text: var(--md-on-surface);
+  --text-strong: var(--md-on-surface);
+  --text-muted: var(--md-on-surface-variant);
+  --border: var(--md-outline-variant);
+  --border-soft: var(--md-surface-container-high);
+  --input-border: var(--md-outline);
+  --input-bg: var(--md-surface);
+  --link: var(--md-primary);
+  --focus: var(--md-primary);
+  --btn-bg: var(--md-primary);
+  --btn-text: var(--md-on-primary);
+  --btn-hover: color-mix(in srgb, var(--md-on-primary) var(--state-hover), var(--md-primary));
+  --pill-active-bg: var(--md-secondary-container);
+  --pill-active-text: var(--md-on-secondary-container);
+  --danger: var(--md-error-text);
+  --chart-bar: var(--md-primary);
+  --chart-bar-alt: var(--md-outline-variant);
+
+  /* Cajón de navegación (Material navigation drawer) */
+  --sidebar-bg: var(--md-surface-container-low);
+  --sidebar-text: var(--md-on-surface-variant);
+  --sidebar-text-active: var(--md-on-secondary-container);
+  --sidebar-hover: color-mix(in srgb, var(--md-on-surface) var(--state-hover), transparent);
+  --sidebar-active: var(--md-secondary-container);
+  --sidebar-label: var(--md-on-surface-variant);
+  --sidebar-border: var(--md-outline-variant);
+
+  /* Tintes y estados */
+  --tint-blue: var(--md-primary-container);
+  --tint-green: var(--md-success-container);
+  --tint-amber: var(--md-warning-container);
+  --chip-neutral: var(--md-surface-container-high);
+  --chip-neutral-text: var(--md-on-surface-variant);
+  --chip-info: var(--md-primary-container);
+  --chip-info-text: var(--md-on-primary-container);
+  --chip-success: var(--md-success-container);
+  --chip-success-text: var(--md-on-success-container);
+  --chip-warning: var(--md-warning-container);
+  --chip-warning-text: var(--md-on-warning-container);
+  --chip-danger: var(--md-error-container);
+  --chip-danger-text: var(--md-on-error-container);
+  --delta-up-bg: var(--md-success-container);
+  --delta-up-text: var(--md-on-success-container);
+  --delta-down-bg: var(--md-error-container);
+  --delta-down-text: var(--md-on-error-container);
+
+  /* Contenedores de icono de las métricas */
+  --icon-blue-bg: var(--md-primary-container);
+  --icon-blue: var(--md-on-primary-container);
+  --icon-green-bg: var(--md-success-container);
+  --icon-green: var(--md-on-success-container);
+  --icon-amber-bg: var(--md-warning-container);
+  --icon-amber: var(--md-on-warning-container);
+  --icon-red-bg: var(--md-error-container);
+  --icon-red: var(--md-on-error-container);
+  --icon-slate-bg: var(--md-surface-container-highest);
+  --icon-slate: var(--md-on-surface-variant);
+
+  /* Compatibilidad con estilos en línea existentes */
+  --blue-600: var(--md-primary);
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --md-primary: #d0bcff;
+    --md-on-primary: #381e72;
+    --md-primary-container: #4f378b;
+    --md-on-primary-container: #eaddff;
+    --md-secondary-container: #4a3f6b;
+    --md-on-secondary-container: #ebe0ff;
+    --md-surface: #141218;
+    --md-surface-container-lowest: #0f0d13;
+    --md-surface-container-low: #1d1b20;
+    --md-surface-container: #211f26;
+    --md-surface-container-high: #2b2930;
+    --md-surface-container-highest: #36343b;
+    --md-on-surface: #e6e0e9;
+    --md-on-surface-variant: #cac4d0;
+    --md-outline: #938f99;
+    --md-outline-variant: #49454f;
+    --md-inverse-surface: #e6e0e9;
+    --md-inverse-on-surface: #322f35;
+    --md-inverse-primary: #6442d6;
+    --md-success-container: #14532d;
+    --md-on-success-container: #bbf7d0;
+    --md-warning-container: #78350f;
+    --md-on-warning-container: #fde68a;
+    --md-error-text: #fca5a5;
+    --md-error-container: #7f1d1d;
+    --md-on-error-container: #fecaca;
+    --bg: var(--md-surface);
+    --surface: var(--md-surface-container-low);
+    --surface-alt: var(--md-surface-container);
+    --input-bg: var(--md-surface);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --md-primary: #d0bcff;
+  --md-on-primary: #381e72;
+  --md-primary-container: #4f378b;
+  --md-on-primary-container: #eaddff;
+  --md-secondary-container: #4a3f6b;
+  --md-on-secondary-container: #ebe0ff;
+  --md-surface: #141218;
+  --md-surface-container-lowest: #0f0d13;
+  --md-surface-container-low: #1d1b20;
+  --md-surface-container: #211f26;
+  --md-surface-container-high: #2b2930;
+  --md-surface-container-highest: #36343b;
+  --md-on-surface: #e6e0e9;
+  --md-on-surface-variant: #cac4d0;
+  --md-outline: #938f99;
+  --md-outline-variant: #49454f;
+  --md-inverse-surface: #e6e0e9;
+  --md-inverse-on-surface: #322f35;
+  --md-inverse-primary: #6442d6;
+  --md-success-container: #14532d;
+  --md-on-success-container: #bbf7d0;
+  --md-warning-container: #78350f;
+  --md-on-warning-container: #fde68a;
+  --md-error-text: #fca5a5;
+  --md-error-container: #7f1d1d;
+  --md-on-error-container: #fecaca;
+  --bg: var(--md-surface);
+  --surface: var(--md-surface-container-low);
+  --surface-alt: var(--md-surface-container);
+  --input-bg: var(--md-surface);
+  color-scheme: dark;
+}

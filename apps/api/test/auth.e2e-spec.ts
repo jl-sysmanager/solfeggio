@@ -1,0 +1,119 @@
+import { authenticator } from 'otplib';
+import { auth, createTestApp, PASSWORD, resetDb, signupBand, TestCtx } from './helpers';
+
+const cookieOf = (res: { headers: Record<string, unknown> }) =>
+  ((res.headers['set-cookie'] as string[]) ?? []).find((c) => c.startsWith('sf_rt='))!.split(';')[0];
+
+describe('Autenticación', () => {
+  let ctx: TestCtx;
+
+  beforeAll(async () => {
+    ctx = await createTestApp();
+    await resetDb(ctx.db);
+  });
+  afterAll(() => ctx.app.close());
+
+  it('rechaza contraseñas débiles y emails duplicados', async () => {
+    await ctx.http().post('/api/v1/auth/register').send({ email: 'debil@test.local', password: 'corta', name: 'Débil' }).expect(400);
+    await ctx.http().post('/api/v1/auth/register').send({ email: 'dup@test.local', password: PASSWORD, name: 'Dup' }).expect(201);
+    const dup = await ctx.http().post('/api/v1/auth/register').send({ email: 'DUP@test.local', password: PASSWORD, name: 'Dup' }).expect(409);
+    expect(dup.body.code).toBe('EMAIL_TAKEN');
+  });
+
+  it('la contraseña se guarda con argon2id', async () => {
+    const u = await ctx.db.system.user.findUniqueOrThrow({ where: { email: 'dup@test.local' } });
+    expect(u.passwordHash).toMatch(/^\$argon2id\$/);
+  });
+
+  it('el refresh token es httpOnly, rota y detecta reutilización', async () => {
+    const login = await ctx.http().post('/api/v1/auth/login').send({ email: 'dup@test.local', password: PASSWORD }).expect(200);
+    const raw = (login.headers['set-cookie'] as unknown as string[])[0];
+    expect(raw).toMatch(/HttpOnly/);
+    expect(raw).toMatch(/SameSite=Strict/);
+    expect(raw).toMatch(/Path=\/api\/v1\/auth/);
+
+    const first = cookieOf(login);
+    const r1 = await ctx.http().post('/api/v1/auth/refresh').set('Cookie', first).expect(200);
+    const second = cookieOf(r1);
+    expect(second).not.toBe(first);
+
+    // Reutilizar el token ya rotado revoca toda la familia, incluido el nuevo.
+    const reuse = await ctx.http().post('/api/v1/auth/refresh').set('Cookie', first).expect(401);
+    expect(reuse.body.code).toBe('REFRESH_REUSED');
+    await ctx.http().post('/api/v1/auth/refresh').set('Cookie', second).expect(401);
+  });
+
+  it('logout revoca el refresh token', async () => {
+    const login = await ctx.http().post('/api/v1/auth/login').send({ email: 'dup@test.local', password: PASSWORD }).expect(200);
+    const cookie = cookieOf(login);
+    await ctx.http().post('/api/v1/auth/logout').set('Cookie', cookie).expect(204);
+    await ctx.http().post('/api/v1/auth/refresh').set('Cookie', cookie).expect(401);
+  });
+
+  it('bloquea la cuenta tras 5 intentos fallidos', async () => {
+    await ctx.http().post('/api/v1/auth/register').send({ email: 'lock@test.local', password: PASSWORD, name: 'Lock' }).expect(201);
+    for (let i = 0; i < 5; i++) {
+      await ctx.http().post('/api/v1/auth/login').send({ email: 'lock@test.local', password: 'incorrecta-123' }).expect(401);
+    }
+    const res = await ctx.http().post('/api/v1/auth/login').send({ email: 'lock@test.local', password: PASSWORD }).expect(401);
+    expect(res.body.code).toBe('ACCOUNT_LOCKED');
+  });
+
+  it('no revela si el email existe', async () => {
+    const a = await ctx.http().post('/api/v1/auth/login').send({ email: 'noexiste@test.local', password: 'x' }).expect(401);
+    const b = await ctx.http().post('/api/v1/auth/login').send({ email: 'dup@test.local', password: 'x' }).expect(401);
+    expect(a.body.code).toBe(b.body.code);
+    expect(a.body.message).toBe(b.body.message);
+  });
+
+  it('MFA TOTP: activación y login en dos pasos', async () => {
+    const band = await signupBand(ctx, 'mfa-band');
+    const setup = await ctx.http().post('/api/v1/auth/mfa/setup').set(auth(band.token)).expect(201);
+    expect(setup.body.qrDataUrl).toMatch(/^data:image\/png;base64,/);
+    const secret = new URL(setup.body.otpauthUrl).searchParams.get('secret')!;
+    await ctx.http().post('/api/v1/auth/mfa/enable').set(auth(band.token)).send({ code: '000000' }).expect(400);
+    await ctx.http().post('/api/v1/auth/mfa/enable').set(auth(band.token)).send({ code: authenticator.generate(secret) }).expect(204);
+
+    const user = await ctx.db.system.user.findUniqueOrThrow({ where: { email: band.email } });
+    expect(user.mfaSecretEnc).toMatch(/^v1:/);
+
+    const step1 = await ctx.http().post('/api/v1/auth/login').send({ email: band.email, password: PASSWORD }).expect(401);
+    expect(step1.body.code).toBe('MFA_REQUIRED');
+    const bad = await ctx.http().post('/api/v1/auth/login').send({ email: band.email, password: PASSWORD, mfaCode: '123456' }).expect(401);
+    expect(bad.body.code).toBe('MFA_INVALID');
+    const ok = await ctx.http().post('/api/v1/auth/login').send({ email: band.email, password: PASSWORD, mfaCode: authenticator.generate(secret) }).expect(200);
+    expect(ok.body.session.tenant.slug).toBe('mfa-band');
+  });
+
+  it('invitación: crea usuario, membresía con el rol y caduca tras usarse', async () => {
+    const band = await signupBand(ctx, 'inv-band');
+    const roles = await ctx.http().get('/api/v1/roles').set(auth(band.token)).expect(200);
+    const musician = roles.body.find((r: { key: string }) => r.key === 'musician');
+    await ctx.http().post('/api/v1/invitations').set(auth(band.token)).send({ email: 'nuevo@test.local', roleId: musician.id }).expect(201);
+    const mail = ctx.jobs.of('email.send').find((j) => j.data.to === 'nuevo@test.local')!;
+    const token = /invite\/([\w-]+)/.exec(mail.data.text)![1];
+
+    const accepted = await ctx.http().post('/api/v1/auth/invitations/accept').send({ token, name: 'Nuevo Músico', password: PASSWORD }).expect(200);
+    expect(accepted.body.session.role.key).toBe('musician');
+    expect(accepted.body.session.permissions).not.toContain('members:write');
+    await ctx.http().post('/api/v1/auth/invitations/accept').send({ token, name: 'Otra', password: PASSWORD }).expect(400);
+  });
+
+  it('switch-tenant entre bandas del mismo usuario', async () => {
+    const one = await signupBand(ctx, 'multi-uno');
+    const two = await ctx.http().post('/api/v1/onboarding').set(auth(one.token)).send({ bandName: 'Multi Dos', slug: 'multi-dos' }).expect(201);
+    const login = await ctx.http().post('/api/v1/auth/login').send({ email: one.email, password: PASSWORD }).expect(200);
+    expect(login.body.memberships).toHaveLength(2);
+    expect(login.body.session.tenant).toBeNull();
+    await ctx.http().get('/api/v1/members').set(auth(login.body.accessToken)).expect(403);
+    const sw = await ctx.http().post('/api/v1/auth/switch-tenant').set(auth(login.body.accessToken)).send({ tenantId: two.body.session.tenant.id }).expect(200);
+    expect(sw.body.session.tenant.slug).toBe('multi-dos');
+  });
+
+  it('el slug de banda es único y no admite reservados', async () => {
+    const band = await signupBand(ctx, 'slug-band');
+    await ctx.http().post('/api/v1/onboarding').set(auth(band.token)).send({ bandName: 'Banda X', slug: 'slug-band' }).expect(409);
+    await ctx.http().post('/api/v1/onboarding').set(auth(band.token)).send({ bandName: 'Banda X', slug: 'admin' }).expect(409);
+    await ctx.http().post('/api/v1/onboarding').set(auth(band.token)).send({ bandName: 'Banda X', slug: 'Mal Slug!' }).expect(400);
+  });
+});

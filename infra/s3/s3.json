@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "solfeggio-dev",
+      "credentials": [{ "accessKey": "solfeggio-dev", "secretKey": "solfeggio-dev-secret" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

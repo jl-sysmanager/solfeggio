@@ -1,0 +1,100 @@
+# Entorno de desarrollo local. NO usar estas credenciales en producción.
+name: solfeggio
+
+x-api-env: &api-env
+  NODE_ENV: development
+  DATABASE_URL: postgresql://solfeggio_app:solfeggio_app@postgres:5432/solfeggio
+  DATABASE_MIGRATION_URL: postgresql://solfeggio:solfeggio@postgres:5432/solfeggio
+  SYSTEM_DATABASE_URL: postgresql://solfeggio:solfeggio@postgres:5432/solfeggio
+  PORT: "3000"
+  CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+  REDIS_URL: redis://redis:6379
+  S3_ENDPOINT: http://s3:8333
+  S3_PUBLIC_ENDPOINT: http://localhost:8333
+  S3_REGION: eu-west-1
+  S3_BUCKET: solfeggio
+  S3_ACCESS_KEY_ID: solfeggio-dev
+  S3_SECRET_ACCESS_KEY: solfeggio-dev-secret
+  S3_FORCE_PATH_STYLE: "true"
+  SMTP_URL: smtp://mailpit:1025
+  MAIL_FROM: "Solfeggio <no-reply@solfeggio.local>"
+  APP_URL: ${APP_URL:-http://localhost:5173}
+  API_URL: http://localhost:3000
+  JWT_ACCESS_SECRET: dev-only-access-secret-change-me-0000000000
+  JWT_REFRESH_SECRET: dev-only-refresh-secret-change-me-000000000
+  DATA_ENCRYPTION_KEY: ZGV2LW9ubHkta2V5LTMyLWJ5dGVzLWxvbmctMDAwMDA=
+  LOG_HASH_SALT: dev-only-salt
+  STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+  STRIPE_TAX_ENABLED: "false"
+  TRIAL_DAYS: "14"
+  GRACE_PERIOD_DAYS: "7"
+  PLATFORM_ADMIN_EMAIL: admin@solfeggio.local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: solfeggio
+      POSTGRES_PASSWORD: solfeggio
+      POSTGRES_DB: solfeggio
+      APP_DB_USER: solfeggio_app
+      APP_DB_PASSWORD: solfeggio_app
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U solfeggio -d solfeggio"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+
+  # Almacenamiento S3-compatible local (SeaweedFS). En producción: S3, R2, Scaleway, etc.
+  s3:
+    image: chrislusf/seaweedfs:3.85
+    command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+    ports: ["8333:8333"]
+    volumes:
+      - s3data:/data
+      - ./infra/s3/s3.json:/etc/seaweedfs/s3.json:ro
+
+  mailpit:
+    image: axllent/mailpit:v1.24
+    ports: ["8025:8025", "1025:1025"]
+
+  api:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    profiles: [app]
+    environment: *api-env
+    command: sh -c "npx prisma migrate deploy && node dist/main.js"
+    ports: ["3000:3000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+
+  worker:
+    build: { context: ., dockerfile: apps/api/Dockerfile }
+    profiles: [app]
+    environment: *api-env
+    command: node dist/worker.js
+    healthcheck: { disable: true }
+    depends_on: [api]
+
+  web:
+    build: { context: ., dockerfile: apps/web/Dockerfile }
+    profiles: [app]
+    environment:
+      S3_ORIGIN: http://localhost:8333
+    ports: ["8080:80"]
+    depends_on: [api]
+
+volumes:
+  pgdata:
+  s3data:
