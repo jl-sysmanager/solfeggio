@@ -101,8 +101,9 @@ export const assetKind: Record<string, string> = {
   OTHER: 'Otro',
 };
 
+/** Etiquetas de funcionalidades implementadas (alineadas con el catálogo del API). */
 export const featureLabels: Record<string, string> = {
-  members: 'Secretaría',
+  members: 'Socios y documentos',
   archive: 'Archivo musical',
   events: 'Ensayos y agenda',
   attendance: 'Asistencia',
@@ -111,13 +112,9 @@ export const featureLabels: Record<string, string> = {
   instruments: 'Instrumentación',
   communications: 'Comunicaciones',
   market: 'BandMarket',
-  calendar_sync: 'Sincronización de calendario',
-  advanced_reports: 'Informes avanzados',
-  sso: 'Inicio de sesión único (SSO)',
-  priority_support: 'Soporte prioritario',
-  api_access: 'Acceso al API',
+  calendar_sync: 'Calendario externo',
   school: 'Escuela de música',
-  performances: 'Actuaciones y contrataciones',
+  performances: 'Contrataciones',
   reinforcements: 'Bolsa de refuerzos',
   governance: 'Gobierno de la asociación',
   archive_ai: 'Particellas automáticas',
@@ -135,10 +132,6 @@ export const featureMinPlan: Record<string, string> = {
   communications: 'Basic',
   market: 'Pro',
   calendar_sync: 'Pro',
-  advanced_reports: 'Pro',
-  sso: 'Enterprise',
-  priority_support: 'Enterprise',
-  api_access: 'Enterprise',
   school: 'Pro (o add-on Escuela)',
   performances: 'Basic',
   reinforcements: 'Pro',

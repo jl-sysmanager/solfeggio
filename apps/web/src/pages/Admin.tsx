@@ -1,12 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { patch } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { Plan } from '../api/types';
+import type { FeatureModule, Plan } from '../api/types';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
-import { FormError, TextField, formValues } from '../components/Field';
+import { Checkbox, FormError, TextField, formValues } from '../components/Field';
 import { Modal } from '../components/Modal';
 import { Navigate, useParams } from 'react-router-dom';
 import { Page, PageHeader } from '../components/PageHeader';
@@ -21,16 +21,42 @@ import { ModerationTab } from '../components/admin/ModerationTab';
 import { OpsTab } from '../components/admin/OpsTab';
 import { TenantsTab } from '../components/admin/TenantsTab';
 
+/** Cierra dependencias al marcar una funcionalidad (misma regla que el API). */
+function withDeps(catalog: FeatureModule[], selected: Set<string>, key: string, on: boolean): Set<string> {
+  const next = new Set(selected);
+  if (!on) {
+    next.delete(key);
+    return next;
+  }
+  next.add(key);
+  const defs = catalog.flatMap((m) => m.features);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const d of defs) {
+      if (next.has(d.key)) for (const r of d.requires) if (!next.has(r)) (next.add(r), (changed = true));
+    }
+  }
+  return next;
+}
+
 function PlansTab() {
   const q = useApi<Plan[]>('/admin/plans');
+  const catalog = useApi<FeatureModule[]>('/admin/feature-catalog');
   const [editing, setEditing] = useState<Plan | null>(null);
+  const [features, setFeatures] = useState<Set<string>>(new Set());
   const save = useApiMutation((v: { id: string; body: unknown }) => patch(`/admin/plans/${v.id}`, v.body), {
     success: 'Plan actualizado',
     invalidate: ['/admin/plans', '/plans'],
     onSuccess: () => setEditing(null),
   });
-  if (q.isLoading) return <Loading />;
+  useEffect(() => {
+    if (editing) setFeatures(new Set(editing.features));
+  }, [editing]);
+  if (q.isLoading || catalog.isLoading) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
+  if (catalog.error) return <ErrorNote error={catalog.error} />;
+  const modules = catalog.data ?? [];
   return (
     <>
       <Card>
@@ -45,6 +71,7 @@ function PlansTab() {
             { key: 'u', header: 'Usuarios', render: (p) => (p.maxUsers < 0 ? '∞' : p.maxUsers), numeric: true },
             { key: 'mb', header: 'Socios', render: (p) => (p.maxMembers < 0 ? '∞' : p.maxMembers), numeric: true },
             { key: 's', header: 'Almacenamiento', render: (p) => `${p.storageMb} MB`, numeric: true, nowrap: true },
+            { key: 'f', header: 'Módulos', render: (p) => p.features.length, numeric: true },
             { key: 't', header: 'Prueba', render: (p) => `${p.trialDays} d`, numeric: true, nowrap: true },
             {
               key: 'a',
@@ -75,6 +102,7 @@ function PlansTab() {
                   maxMembers: Number(v.maxMembers),
                   storageMb: Number(v.storageMb),
                   trialDays: Number(v.trialDays),
+                  features: [...features],
                 },
               });
           }}
@@ -92,6 +120,27 @@ function PlansTab() {
             <TextField label="Almacenamiento (MB)" name="storageMb" type="number" defaultValue={editing?.storageMb} />
             <TextField label="Días de prueba" name="trialDays" type="number" min={0} defaultValue={editing?.trialDays} />
           </div>
+          <fieldset className="stack" style={{ gap: 12, border: 0, padding: 0 }}>
+            <legend className="label-caps">Funcionalidades por módulo</legend>
+            <p className="small muted">Sólo aparecen módulos implementados. En planes de pago se habilitan al cliente cuando la suscripción está pagada (o la cuenta bonificada).</p>
+            {modules.map((mod) => (
+              <div key={mod.key} className="stack" style={{ gap: 6 }}>
+                <strong>{mod.label}</strong>
+                <p className="small muted">{mod.description}</p>
+                <div className="form-row" style={{ flexWrap: 'wrap' }}>
+                  {mod.features.map((f) => (
+                    <Checkbox
+                      key={f.key}
+                      label={f.label}
+                      checked={features.has(f.key)}
+                      title={f.description}
+                      onChange={(e) => setFeatures((prev) => withDeps(modules, prev, f.key, e.target.checked))}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </fieldset>
           <FormError error={save.error} />
           <div className="modal__footer">
             <Button variant="ghost" onClick={() => setEditing(null)}>

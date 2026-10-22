@@ -93,6 +93,18 @@ describe('RBAC, planes y estado del tenant', () => {
       await ctx.http().get('/api/v1/members').set(auth(free.token)).expect(200);
     });
 
+    it('un plan de pago sin suscripción ni bonificación sólo habilita el Free', async () => {
+      const b = await signupBand(ctx, 'unpaid-basic', 'BASIC');
+      await ctx.db.system.subscription.deleteMany({ where: { tenantId: b.tenantId } });
+      const res = await ctx.http().get('/api/v1/finance/transactions').set(auth(b.token)).expect(403);
+      expect(res.body).toMatchObject({ code: 'FEATURE_NOT_IN_PLAN', details: { feature: 'treasury' } });
+      await ctx.http().get('/api/v1/members').set(auth(b.token)).expect(200);
+      await ctx.db.system.subscription.create({
+        data: { tenantId: b.tenantId, stripeCustomerId: 'cus_unpaid', stripeSubscriptionId: 'sub_unpaid', stripeStatus: 'active' },
+      });
+      await ctx.http().get('/api/v1/finance/transactions').set(auth(b.token)).expect(200);
+    });
+
     it('se respeta el límite de socios del plan', async () => {
       const small = await signupBand(ctx, 'small-band', 'FREE');
       await ctx.db.system.plan.update({ where: { code: 'FREE' }, data: { maxMembers: 2 } });

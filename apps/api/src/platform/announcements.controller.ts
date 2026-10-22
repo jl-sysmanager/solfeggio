@@ -4,6 +4,7 @@ import { Announcement } from '@prisma/client';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, NoTenant, PlatformAdmin } from '../auth/decorators';
+import { computeFeatures, freeFeatures } from '../billing/entitlements';
 import { found } from '../common/errors';
 import { idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
@@ -40,11 +41,26 @@ export class AnnouncementsController {
   constructor(private readonly db: Db) {}
 
   private async tenantFacts() {
+    const free = await freeFeatures(this.db);
     const tenants = await this.db.system.tenant.findMany({
       where: { deletedAt: null },
-      select: { id: true, region: true, addons: true, plan: { select: { code: true, features: true } }, _count: { select: { memberships: { where: { status: 'ACTIVE' } } } } },
+      select: {
+        id: true,
+        region: true,
+        addons: true,
+        complimentaryUntil: true,
+        plan: { select: { code: true, features: true, priceMonthlyCents: true, priceYearlyCents: true } },
+        subscription: { select: { stripeSubscriptionId: true, stripeStatus: true } },
+        _count: { select: { memberships: { where: { status: 'ACTIVE' } } } },
+      },
     });
-    return tenants.map((t) => ({ id: t.id, planCode: t.plan.code as string, region: t.region, features: new Set([...t.plan.features, ...t.addons]), users: t._count.memberships }));
+    return tenants.map((t) => ({
+      id: t.id,
+      planCode: t.plan.code as string,
+      region: t.region,
+      features: computeFeatures(t, free),
+      users: t._count.memberships,
+    }));
   }
 
   /** Cuántas bandas y usuarios (membresías activas) alcanza un segmento. */
@@ -130,8 +146,18 @@ export class AnnouncementsController {
     if (!rows.length) return [];
     let facts: Awaited<ReturnType<AnnouncementsController['tenantFacts']>>[number] | undefined;
     if (ctx.tenantId && rows.some((a) => a.level !== 'MAINTENANCE')) {
-      const t = await this.db.system.tenant.findUnique({ where: { id: ctx.tenantId }, select: { id: true, region: true, addons: true, plan: { select: { code: true, features: true } } } });
-      if (t) facts = { id: t.id, planCode: t.plan.code, region: t.region, features: new Set([...t.plan.features, ...t.addons]), users: 0 };
+      const t = await this.db.system.tenant.findUnique({
+        where: { id: ctx.tenantId },
+        select: {
+          id: true,
+          region: true,
+          addons: true,
+          complimentaryUntil: true,
+          plan: { select: { code: true, features: true, priceMonthlyCents: true, priceYearlyCents: true } },
+          subscription: { select: { stripeSubscriptionId: true, stripeStatus: true } },
+        },
+      });
+      if (t) facts = { id: t.id, planCode: t.plan.code, region: t.region, features: computeFeatures(t, await freeFeatures(this.db)), users: 0 };
     }
     return rows
       .filter((a) => a.level === 'MAINTENANCE' || (facts && matchesSegment(a.segment as Segment, facts)))

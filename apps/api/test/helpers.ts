@@ -214,7 +214,19 @@ export async function signupBand(ctx: TestCtx, slug: string, plan: PlanCode = 'P
 
 export async function setPlan(db: Db, tenantId: string, code: PlanCode) {
   const plan = await db.system.plan.findUniqueOrThrow({ where: { code } });
-  await db.system.tenant.update({ where: { id: tenantId }, data: { planId: plan.id } });
+  const paid = plan.priceMonthlyCents > 0 || plan.priceYearlyCents > 0;
+  await db.system.tenant.update({ where: { id: tenantId }, data: { planId: plan.id, complimentaryUntil: null } });
+  // * Suscripción viva de prueba: el gating de entitlements exige pago (sin usar complimentary, que bloquea dunning).
+  if (paid) {
+    const id = `test_${tenantId.replace(/-/g, '').slice(0, 14)}`;
+    await db.system.subscription.upsert({
+      where: { tenantId },
+      create: { tenantId, stripeCustomerId: `cus_${id}`, stripeSubscriptionId: `sub_${id}`, stripeStatus: 'active' },
+      update: { stripeSubscriptionId: `sub_${id}`, stripeStatus: 'active' },
+    });
+  } else {
+    await db.system.subscription.deleteMany({ where: { tenantId } });
+  }
 }
 
 /** Crea un usuario con un rol dado en la banda y devuelve su token con tenant activo. */

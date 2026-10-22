@@ -1,12 +1,18 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { featuresFor } from '../billing/entitlements';
 import { Db } from '../db/db.service';
 import { FeatureNotInPlanException } from '../common/errors';
 import { env } from '../config/env';
 import { AccessTokenPayload, AuthedRequest, RequestContext } from './context';
 import { ALLOW_IMPERSONATION, IMPERSONATION_PERMISSIONS } from '../platform/impersonation.util';
 import { ALLOW_READ_ONLY, FEATURE, IS_PUBLIC, NO_TENANT, PERMS, PLATFORM_ADMIN } from './decorators';
+
+const tenantEntitlement = {
+  plan: true,
+  subscription: { select: { stripeSubscriptionId: true, stripeStatus: true } },
+} as const;
 
 const SEEN_EVERY_MS = 3_600_000;
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -68,7 +74,7 @@ export class AuthGuard implements CanActivate {
     if (payload.tid) {
       const membership = await this.db.system.membership.findFirst({
         where: { id: payload.mid, tenantId: payload.tid, userId: user.id, status: 'ACTIVE' },
-        include: { role: true, tenant: { include: { plan: true } } },
+        include: { role: true, tenant: { include: tenantEntitlement } },
       });
       if (!membership || membership.tenant.deletedAt || membership.tenant.status === 'SUSPENDED') {
         throw new UnauthorizedException({ message: 'Sin acceso a esta banda', code: 'TENANT_ACCESS_REVOKED' });
@@ -80,7 +86,7 @@ export class AuthGuard implements CanActivate {
         memberId: membership.memberId,
         tenantStatus: membership.tenant.status,
         permissions: new Set(membership.role.permissions),
-        features: new Set([...membership.tenant.plan.features, ...membership.tenant.addons]),
+        features: await featuresFor(this.db, membership.tenant),
       });
       this.touch(membership.id, membership.lastSeenAt);
     }
@@ -125,7 +131,7 @@ export class AuthGuard implements CanActivate {
     const revoked = () => new UnauthorizedException({ message: 'La sesión «ver como» ha terminado', code: 'IMPERSONATION_ENDED' });
     const imp = await this.db.system.impersonationSession.findUnique({ where: { id: payload.imp! } });
     if (!imp || imp.endedAt || imp.expiresAt <= new Date() || imp.adminId !== user.id || imp.tenantId !== payload.tid || !user.isPlatformAdmin) throw revoked();
-    const tenant = await this.db.system.tenant.findUnique({ where: { id: imp.tenantId }, include: { plan: true } });
+    const tenant = await this.db.system.tenant.findUnique({ where: { id: imp.tenantId }, include: tenantEntitlement });
     if (!tenant || tenant.deletedAt) throw revoked();
 
     if (meta<boolean>(PLATFORM_ADMIN)) {
@@ -137,7 +143,7 @@ export class AuthGuard implements CanActivate {
       roleKey: 'impersonation',
       tenantStatus: tenant.status,
       permissions: new Set(IMPERSONATION_PERMISSIONS),
-      features: new Set([...tenant.plan.features, ...tenant.addons]),
+      features: await featuresFor(this.db, tenant),
       impersonationId: imp.id,
     });
     if (WRITE_METHODS.has(req.method) && !meta<boolean>(ALLOW_IMPERSONATION)) {

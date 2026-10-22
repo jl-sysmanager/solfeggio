@@ -3,6 +3,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { z } from 'zod';
 import { Public } from '../auth/decorators';
+import { featuresFor } from '../billing/entitlements';
 import { notFound } from '../common/errors';
 import { isoDate, optionalText, toDate } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
@@ -33,10 +34,13 @@ export class SchoolPublicController {
     private readonly audit: Audit,
   ) {}
 
-  /** Sólo bandas activas con la Escuela contratada (plan o add-on). */
+  /** Sólo bandas activas con la Escuela contratada (plan o add-on) y plan pagado. */
   private async tenantBySlug(slug: string) {
-    const t = await this.db.system.tenant.findUnique({ where: { slug }, include: { plan: true } });
-    if (!t || t.deletedAt || ['SUSPENDED', 'CANCELLED'].includes(t.status) || ![...t.plan.features, ...t.addons].includes('school')) throw notFound('Escuela');
+    const t = await this.db.system.tenant.findUnique({
+      where: { slug },
+      include: { plan: true, subscription: { select: { stripeSubscriptionId: true, stripeStatus: true } } },
+    });
+    if (!t || t.deletedAt || ['SUSPENDED', 'CANCELLED'].includes(t.status) || !(await featuresFor(this.db, t)).has('school')) throw notFound('Escuela');
     return t;
   }
 

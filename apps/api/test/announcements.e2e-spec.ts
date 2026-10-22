@@ -51,7 +51,11 @@ describe('Avisos a las bandas', () => {
     expect((await http().get('/api/v1/tenant').set(auth(pro.token)).expect(200)).body.region).toBe('Comunitat Valenciana');
     expect(await titles(pro)).toEqual(['Con escuela', 'Para todos', 'Sólo PRO', 'Sólo valencianas']);
 
-    await ctx.db.system.tenant.update({ where: { id: free.tenantId }, data: { addons: ['school'] } });
+    // Add-ons sólo cuentan con pago (bonificación o suscripción viva).
+    await ctx.db.system.tenant.update({
+      where: { id: free.tenantId },
+      data: { addons: ['school'], complimentaryUntil: new Date(Date.now() + 86_400_000) },
+    });
     expect(await titles(free)).toEqual(['Con escuela', 'Para todos', 'Sólo FREE concreta']);
   });
 

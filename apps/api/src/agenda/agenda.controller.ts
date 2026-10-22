@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, Public, RequireFeature } from '../auth/decorators';
+import { featuresFor } from '../billing/entitlements';
 import { notFound } from '../common/errors';
 import { isoDateTime } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
@@ -71,8 +72,11 @@ export class AgendaController {
   @Get('calendar/:token.ics')
   async ics(@Param('token') token: string) {
     if (!z.string().uuid().safeParse(token).success) throw notFound('Calendario');
-    const m = await this.db.system.membership.findUnique({ where: { calendarToken: token }, include: { tenant: { include: { plan: true } } } });
-    if (!m || m.status !== 'ACTIVE' || !m.tenant.plan.features.includes('calendar_sync')) throw notFound('Calendario');
+    const m = await this.db.system.membership.findUnique({
+      where: { calendarToken: token },
+      include: { tenant: { include: { plan: true, subscription: { select: { stripeSubscriptionId: true, stripeStatus: true } } } } },
+    });
+    if (!m || m.status !== 'ACTIVE' || !(await featuresFor(this.db, m.tenant)).has('calendar_sync')) throw notFound('Calendario');
     const events = await this.db.tenant(m.tenantId, (tx) =>
       tx.event.findMany({
         where: {

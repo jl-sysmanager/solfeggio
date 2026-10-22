@@ -10,6 +10,8 @@ import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
 import { BillingOpsService } from '../billing/billing-ops.service';
+import { resetEntitlementsCache } from '../billing/entitlements';
+import { FEATURE_MODULES, withDependencies } from '../billing/feature-catalog';
 import { Db } from '../db/db.service';
 import { FEATURES } from '../iam/permissions';
 
@@ -162,13 +164,22 @@ export class AdminController {
     return { ...t, storageUsedBytes: Number(t.storageUsedBytes) };
   }
 
+  /** Catálogo de funcionalidades implementadas, agrupadas por módulo (configuración de planes). */
+  @Get('feature-catalog')
+  featureCatalog() {
+    return FEATURE_MODULES;
+  }
+
   @Get('plans')
   plans() {
     return this.db.system.plan.findMany({ orderBy: { priceMonthlyCents: 'asc' }, include: { _count: { select: { tenants: true } } } });
   }
 
   @Patch('plans/:id')
-  updatePlan(@Param('id', zod(idParam)) id: string, @Body(zod(planPatch)) body: z.infer<typeof planPatch>) {
-    return this.db.system.plan.update({ where: { id }, data: body });
+  async updatePlan(@Param('id', zod(idParam)) id: string, @Body(zod(planPatch)) body: z.infer<typeof planPatch>) {
+    const data = body.features ? { ...body, features: withDependencies(body.features) } : body;
+    const plan = await this.db.system.plan.update({ where: { id }, data });
+    if (plan.code === 'FREE' && body.features) resetEntitlementsCache();
+    return plan;
   }
 }

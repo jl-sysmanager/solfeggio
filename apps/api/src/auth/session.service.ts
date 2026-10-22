@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { featuresFor } from '../billing/entitlements';
 import { Db } from '../db/db.service';
 import { IMPERSONATION_PERMISSIONS, IMPERSONATION_ROLE } from '../platform/impersonation.util';
 
@@ -13,6 +14,11 @@ export interface Session {
   impersonation?: { sessionId: string; tenantName: string; expiresAt: string; reason: string };
 }
 
+const tenantEntitlement = {
+  plan: true,
+  subscription: { select: { stripeSubscriptionId: true, stripeStatus: true } },
+} as const;
+
 @Injectable()
 export class SessionService {
   constructor(private readonly db: Db) {}
@@ -24,12 +30,13 @@ export class SessionService {
       include: {
         memberships: {
           where: { status: 'ACTIVE', tenant: { deletedAt: null } },
-          include: { role: true, tenant: { include: { plan: true } } },
+          include: { role: true, tenant: { include: tenantEntitlement } },
           orderBy: { createdAt: 'asc' },
         },
       },
     });
     const active = tenantId ? user.memberships.find((m) => m.tenantId === tenantId) : undefined;
+    const features = active ? [...(await featuresFor(this.db, active.tenant))] : [];
     return {
       user: {
         id: user.id,
@@ -53,7 +60,7 @@ export class SessionService {
         ? {
             code: active.tenant.plan.code,
             name: active.tenant.plan.name,
-            features: [...new Set([...active.tenant.plan.features, ...active.tenant.addons])],
+            features,
             maxUsers: active.tenant.plan.maxUsers,
             maxMembers: active.tenant.plan.maxMembers,
             storageMb: active.tenant.plan.storageMb,
@@ -75,7 +82,7 @@ export class SessionService {
     const imp = await this.db.system.impersonationSession.findUniqueOrThrow({ where: { id: impersonationId } });
     const [user, tenant] = await Promise.all([
       this.db.system.user.findUniqueOrThrow({ where: { id: userId } }),
-      this.db.system.tenant.findUniqueOrThrow({ where: { id: imp.tenantId }, include: { plan: true } }),
+      this.db.system.tenant.findUniqueOrThrow({ where: { id: imp.tenantId }, include: tenantEntitlement }),
     ]);
     return {
       user: { id: user.id, email: user.email, name: user.name, mfaEnabled: user.mfaEnabled, isPlatformAdmin: user.isPlatformAdmin },
@@ -85,7 +92,7 @@ export class SessionService {
       plan: {
         code: tenant.plan.code,
         name: tenant.plan.name,
-        features: [...new Set([...tenant.plan.features, ...tenant.addons])],
+        features: [...(await featuresFor(this.db, tenant))],
         maxUsers: tenant.plan.maxUsers,
         maxMembers: tenant.plan.maxMembers,
         storageMb: tenant.plan.storageMb,

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { Billing, Plan, PlanCode } from '../api/types';
+import type { Billing, FeatureModule, Plan, PlanCode } from '../api/types';
 import type { BillingAddons } from '../api/types-admin-billing';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
@@ -32,21 +32,36 @@ function limit(n: number, unit = '') {
   return n < 0 ? 'Ilimitado' : `${n.toLocaleString('es-ES')}${unit}`;
 }
 
+function featureLines(plan: Plan, catalog: FeatureModule[] | undefined) {
+  const set = new Set(plan.features);
+  if (!catalog?.length) return plan.features.map((f) => ({ key: f, label: featureLabels[f] ?? f }));
+  const lines: { key: string; label: string }[] = [];
+  for (const mod of catalog) {
+    for (const f of mod.features) {
+      if (set.has(f.key)) lines.push({ key: f.key, label: f.label });
+    }
+  }
+  return lines;
+}
+
 export function PlanCard({
   plan,
   interval,
   current,
   onChoose,
   loading,
+  catalog,
 }: {
   plan: Plan;
   interval: 'MONTH' | 'YEAR';
   current: boolean;
   onChoose?: () => void;
   loading?: boolean;
+  catalog?: FeatureModule[];
 }) {
   const price = interval === 'MONTH' ? plan.priceMonthlyCents : plan.priceYearlyCents;
   const featured = plan.code === FEATURED;
+  const features = useMemo(() => featureLines(plan, catalog), [plan, catalog]);
   return (
     <article className={`card pricing-card${featured ? ' pricing-card--featured' : ''}`} aria-label={`Plan ${plan.name}`}>
       <div className="row between">
@@ -62,8 +77,8 @@ export function PlanCard({
         <li>{plan.maxUsers < 0 ? 'Usuarios ilimitados' : `${plan.maxUsers} usuarios`}</li>
         <li>{plan.maxMembers < 0 ? 'Socios ilimitados' : `${plan.maxMembers} socios`}</li>
         <li>{plan.storageMb < 0 ? 'Almacenamiento ilimitado' : `${bytes(plan.storageMb * 1024 * 1024)} de almacenamiento`}</li>
-        {plan.features.map((f) => (
-          <li key={f}>✓ {featureLabels[f] ?? f}</li>
+        {features.map((f) => (
+          <li key={f.key}>✓ {f.label}</li>
         ))}
       </ul>
       {onChoose && !current && (
@@ -84,6 +99,7 @@ export default function BillingPage() {
   const [interval, setInterval] = useState<'MONTH' | 'YEAR'>('YEAR');
   const billing = useApi<Billing & BillingAddons>('/billing');
   const plans = useApi<Plan[]>('/plans');
+  const catalog = useApi<FeatureModule[]>('/feature-catalog');
 
   useEffect(() => {
     const result = params.get('checkout');
@@ -110,6 +126,7 @@ export default function BillingPage() {
   const sorted = [...(plans.data ?? [])].sort((a, c) => ORDER.indexOf(a.code) - ORDER.indexOf(c.code));
   const hasStripe = !!sub?.status;
   const payments = b.billingEnabled !== false;
+  const modules = catalog.data;
 
   return (
     <Page
@@ -212,6 +229,7 @@ export default function BillingPage() {
               plan={p}
               interval={interval}
               current={p.code === b.plan.code}
+              catalog={modules}
               loading={checkout.isPending && checkout.variables === p.code}
               onChoose={
                 !payments

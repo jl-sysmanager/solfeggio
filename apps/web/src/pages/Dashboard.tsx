@@ -10,7 +10,7 @@ import { Page, PageHeader } from '../components/PageHeader';
 import { bytes, date, money, percent, time } from '../lib/format';
 import { eventStatus, eventType, featureLabels, featureMinPlan } from '../lib/labels';
 
-const PAID_FEATURES = ['treasury', 'wardrobe', 'instruments', 'communications', 'market', 'calendar_sync'];
+const PAID_FEATURES = ['treasury', 'wardrobe', 'instruments', 'communications', 'performances', 'governance', 'market', 'calendar_sync', 'school', 'reinforcements', 'archive_ai'];
 
 export function DashboardPage() {
   const { session, can, hasFeature } = useAuth();

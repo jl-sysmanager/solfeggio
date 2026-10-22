@@ -6,6 +6,7 @@ import type { RequestContext } from '../auth/context';
 import { Ctx, NoTenant, Perm, Public } from '../auth/decorators';
 import { zod } from '../common/zod.pipe';
 import { env } from '../config/env';
+import { FEATURE_MODULES } from '../billing/feature-catalog';
 import { Db } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { OnboardingService } from './onboarding.service';
@@ -57,6 +58,13 @@ export class TenancyController {
         maxUsers: true, maxMembers: true, storageMb: true, features: true, trialDays: true,
       },
     });
+  }
+
+  /** Catálogo público de funcionalidades implementadas (etiquetas de planes y comparación). */
+  @Public()
+  @Get('feature-catalog')
+  featureCatalog() {
+    return FEATURE_MODULES;
   }
 
   @NoTenant()

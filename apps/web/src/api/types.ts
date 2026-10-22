@@ -42,6 +42,14 @@ export interface Plan {
   trialDays: number;
 }
 
+/** Catálogo de funcionalidades implementadas (`GET /feature-catalog` o `/admin/feature-catalog`). */
+export interface FeatureModule {
+  key: string;
+  label: string;
+  description: string;
+  features: { key: string; label: string; description: string; requires: string[] }[];
+}
+
 /** Pendientes del menú del panel global (`GET /admin/summary`). */
 export interface AdminSummary {
   support: { open: number; overdue: number };

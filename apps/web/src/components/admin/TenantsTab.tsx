@@ -15,10 +15,9 @@ import { bytes, date } from '../../lib/format';
 import { tenantStatus } from '../../lib/labels';
 
 const ADDON_FEATURES: [string, string][] = [
-  ['school', 'Escuela de música'], ['performances', 'Actuaciones'], ['reinforcements', 'Bolsa de refuerzos'], ['governance', 'Gobierno'],
-  ['treasury', 'Tesorería'], ['wardrobe', 'Uniformes'], ['instruments', 'Instrumentos'], ['communications', 'Comunicaciones'],
-  ['market', 'BandMarket'], ['calendar_sync', 'Sincronización de calendario'], ['advanced_reports', 'Informes avanzados'], ['archive_ai', 'Archivo con IA'],
-  ['sso', 'SSO'], ['priority_support', 'Soporte prioritario'], ['api_access', 'Acceso API'],
+  ['school', 'Escuela de música'], ['performances', 'Contrataciones'], ['reinforcements', 'Bolsa de refuerzos'], ['governance', 'Gobierno'],
+  ['treasury', 'Tesorería'], ['wardrobe', 'Mayordomía'], ['instruments', 'Instrumentación'], ['communications', 'Comunicaciones'],
+  ['market', 'BandMarket'], ['calendar_sync', 'Calendario externo'], ['archive_ai', 'Particellas automáticas'],
 ];
 
 type TenantDetail = AdminTenant & { addons: string[]; studentSeats: number; activeStudents: number; plan?: AdminTenant['plan'] & { features?: string[]; maxStudents?: number } };

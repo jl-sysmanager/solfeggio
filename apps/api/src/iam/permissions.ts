@@ -101,7 +101,6 @@ export const SYSTEM_ROLES: { key: string; name: string; permissions: Permission[
 
 export const FEATURES = [
   'members', 'archive', 'events', 'attendance', 'treasury', 'wardrobe', 'instruments', 'communications',
-  'market', 'calendar_sync', 'advanced_reports', 'sso', 'priority_support', 'api_access',
-  'school', 'performances', 'reinforcements', 'governance', 'archive_ai',
+  'market', 'calendar_sync', 'school', 'performances', 'reinforcements', 'governance', 'archive_ai',
 ] as const;
 export type Feature = (typeof FEATURES)[number];
