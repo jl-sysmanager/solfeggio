@@ -104,14 +104,14 @@ Objetivo: aumentar el ingreso por banda con la escuela y los cobros, y que el m�
 
 | Área | Alcance | Estado |
 |---|---|---|
-| Escuela · Alumnos y tutores | Alumnos menores con varios tutores, autorizaciones de imagen y de recogida, hermanos vinculados | ⬜ |
-| Escuela · Matrícula online | Formulario público con precios por curso, lista de espera, renovación con un clic, pruebas de acceso | ⬜ |
-| Escuela · Oferta educativa | Asignaturas (instrumento, lenguaje musical, conjunto), niveles, grupos y profesores | ⬜ |
-| Escuela · Horarios y aulas | Detección de conflictos de aula, profesor y alumno; recuperación de clases; calendario escolar con festivos | ⬜ |
-| Escuela · Asistencia y evaluación | Asistencia a clase (reutilizando `Attendance`), notas por trimestre y boletines en PDF | ⬜ |
-| Escuela · Mensualidades | Descuentos por hermanos, por ser socio de la banda y por varias asignaturas; cobro domiciliado | ⬜ |
-| Escuela · Paso a la banda | Alumno → educando → músico de la banda sin volver a introducir datos | ⬜ |
-| Escuela · Portal de familias | Horario, faltas, notas, recibos y avisos del profesor | ⬜ |
+| Escuela · Alumnos y tutores | Alumnos menores con varios tutores, autorizaciones de imagen y de recogida, hermanos vinculados | ✅ |
+| Escuela · Matrícula online | Formulario público con precios por curso, lista de espera, renovación con un clic, pruebas de acceso | ✅ |
+| Escuela · Oferta educativa | Asignaturas (instrumento, lenguaje musical, conjunto), niveles, grupos y profesores | ✅ |
+| Escuela · Horarios y aulas | Detección de conflictos de aula, profesor y alumno; recuperación de clases; calendario escolar con festivos | ✅ |
+| Escuela · Asistencia y evaluación | Asistencia a clase (`ClassAttendance`, con los mismos estados que la de la banda), notas por trimestre y boletines imprimibles desde el navegador | ✅ |
+| Escuela · Mensualidades | Descuentos por hermanos, por ser socio de la banda y por varias asignaturas; emisión, cobro y exportación CSV con el IBAN de cada familia para domiciliar (falta generar la remesa SEPA pain.008) | 🟡 |
+| Escuela · Paso a la banda | Alumno → educando → músico de la banda sin volver a introducir datos | ✅ |
+| Escuela · Portal de familias | Horario, faltas, notas, recibos y avisos del profesor | ✅ |
 | Plan o add-on Escuela | Plazas de alumno por plan y add-on por banda desde el panel global, con cobro automático en Stripe (cuota fija y precio por plaza) | ✅ |
 | Cobros integrados | Cuotas de socios y mensualidades con SEPA Direct Debit, tarjeta y Bizum; conciliación automática con los recibos; comisión por transacción | ⬜ |
 | App del músico (PWA) · Mi semana | Próximos ensayos, confirmación de asistencia con un toque y repertorio del ensayo | ⬜ |
@@ -130,18 +130,18 @@ Objetivo: cubrir las tareas específicas de las bandas que un software genérico
 
 | Área | Alcance | Estado |
 |---|---|---|
-| Actuaciones · Presupuestos y contratos | Clientes (ayuntamientos, cofradías, comisiones de fiestas), presupuestos, contratos y facturación, preparada para VeriFactu y la factura electrónica | ⬜ |
-| Actuaciones · Plantilla mínima | Plantilla requerida por evento y avisos de vacantes por instrumento | ⬜ |
-| Actuaciones · Logística | Transporte, horarios de salida, recorrido y uniforme del día (enlazado con Mayordomía) | ⬜ |
-| Bolsa de refuerzos | Ofertas de músicos por instrumento y zona, necesidades de las bandas, liquidación de pagos por actuación y datos para retenciones y certificados | ⬜ |
-| Archivo · Informe SGAE | Repertorio interpretado generado a partir de los eventos | ⬜ |
-| Archivo · Particellas con IA | División de PDFs escaneados en particellas con OCR y asignación por instrumento | ⬜ |
-| Archivo · Libretos y préstamos | Libretos de marchas y pasacalles; préstamo de partituras entre bandas | ⬜ |
-| Gobierno · Asambleas | Convocatoria, orden del día, quórum, votación telemática y libro de actas con borrador por IA | ⬜ |
-| Gobierno · Junta y encuestas | Junta directiva y mandatos; encuestas internas | ⬜ |
-| Tesorería · Subvenciones | Seguimiento y justificación de subvenciones, con gastos vinculados | ⬜ |
-| Tesorería · Lotería | Talonarios, participaciones por socio y liquidación | ⬜ |
-| Tesorería · Socios protectores y patrocinadores | Certificados de donación y modelo 182 para entidades acogidas a la Ley 49/2002 | ⬜ |
+| Actuaciones · Presupuestos y contratos | Clientes (ayuntamientos, cofradías, comisiones de fiestas), presupuestos, contratos y facturación con registros encadenados e inalterables, preparada para VeriFactu (falta el envío a la AEAT y la factura electrónica) | ✅ |
+| Actuaciones · Plantilla mínima | Plantilla requerida por evento y avisos de vacantes por instrumento | ✅ |
+| Actuaciones · Logística | Transporte, horarios de salida, recorrido y uniforme del día (enlazado con Mayordomía) | ✅ |
+| Bolsa de refuerzos | Ofertas de músicos por instrumento y zona, necesidades de las bandas, liquidación de pagos por actuación y datos para retenciones y certificados | ✅ |
+| Archivo · Informe SGAE | Repertorio interpretado generado a partir de los eventos | ✅ |
+| Archivo · Particellas con IA | División de PDFs en particellas con detección del instrumento por el texto de cada página; falta el OCR de partituras escaneadas | 🟡 |
+| Archivo · Libretos y préstamos | Libretos de marchas y pasacalles; préstamo de partituras entre bandas | ✅ |
+| Gobierno · Asambleas | Convocatoria, orden del día, quórum, delegaciones, votación telemática y libro de actas con borrador automático por plantilla (falta el borrador por IA) | 🟡 |
+| Gobierno · Junta y encuestas | Junta directiva y mandatos; encuestas internas | ✅ |
+| Tesorería · Subvenciones | Seguimiento y justificación de subvenciones, con gastos vinculados | ✅ |
+| Tesorería · Lotería | Talonarios, participaciones por socio y liquidación | ✅ |
+| Tesorería · Socios protectores y patrocinadores | Certificados de donación y modelo 182 para entidades acogidas a la Ley 49/2002 | ✅ |
 
 **Criterios de salida:**
 - Al menos 5 bandas generan su informe SGAE y la justificación de una subvención desde Solfeggio.
