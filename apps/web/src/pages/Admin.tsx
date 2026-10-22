@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { patch } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
 import type { Plan } from '../api/types';
@@ -8,8 +8,8 @@ import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { FormError, TextField, formValues } from '../components/Field';
 import { Modal } from '../components/Modal';
+import { Navigate, useParams } from 'react-router-dom';
 import { Page, PageHeader } from '../components/PageHeader';
-import { Tabs } from '../components/Tabs';
 import { money, parseMoney } from '../lib/format';
 import { IntegrationsTab } from './AdminIntegrations';
 import { AnnouncementsTab } from '../components/admin/AnnouncementsTab';
@@ -107,24 +107,35 @@ function PlansTab() {
   );
 }
 
+interface Section {
+  title: string;
+  description: string;
+  eyebrow: string;
+  content: () => ReactNode;
+}
+
+/** Secciones del panel global; `ADMIN_NAV` (nav.ts) enlaza a cada una con `/admin/<clave>`. */
+const SECTIONS: Record<string, Section> = {
+  metrics: { eyebrow: 'Resumen', title: 'Métricas', description: 'Ingresos recurrentes, retención, embudo de prueba y cohortes. Se calculan a partir de las fotos diarias de cada banda.', content: () => <MetricsTab /> },
+  health: { eyebrow: 'Resumen', title: 'Salud de clientes', description: 'Uso real de cada banda, bandas en riesgo y bandas listas para mejorar de plan.', content: () => <HealthTab /> },
+  tenants: { eyebrow: 'Clientes', title: 'Bandas', description: 'Todas las bandas de la plataforma: estado, plan, add-ons y acceso a su ficha.', content: () => <TenantsTab /> },
+  billing: { eyebrow: 'Clientes', title: 'Facturación', description: 'Pagos fallidos, cupones y bonificaciones, add-on Escuela y eventos de Stripe.', content: () => <BillingOpsTab /> },
+  support: { eyebrow: 'Atención', title: 'Soporte', description: 'Incidencias de todas las bandas, con responsable, plazo de respuesta y conversación.', content: () => <IncidentsTab /> },
+  moderation: { eyebrow: 'Atención', title: 'Moderación', description: 'Anuncios de BandMarket, denuncias de la bolsa de refuerzos y bloqueo de usuarios.', content: () => <ModerationTab /> },
+  announcements: { eyebrow: 'Atención', title: 'Avisos', description: 'Avisos dentro de la aplicación para todas las bandas o para un segmento.', content: () => <AnnouncementsTab /> },
+  ops: { eyebrow: 'Plataforma', title: 'Sistema', description: 'Colas de trabajos, correo, almacenamiento, tareas programadas y copias de seguridad.', content: () => <OpsTab /> },
+  plans: { eyebrow: 'Plataforma', title: 'Planes', description: 'Precios, límites y funcionalidades de cada plan.', content: () => <PlansTab /> },
+  integrations: { eyebrow: 'Plataforma', title: 'Integraciones', description: 'Pagos (Stripe) y correo: credenciales, estado y prueba de conexión.', content: () => <IntegrationsTab /> },
+};
+
+/** Panel global: una pantalla por sección, elegida con la ruta `/admin/:section`. */
 export default function AdminPage() {
+  const { section = '' } = useParams();
+  const def = SECTIONS[section];
+  if (!def) return <Navigate to="/admin/metrics" replace />;
   return (
-    <Page header={<PageHeader tone="warm" eyebrow="Plataforma" title="Panel global" description="Negocio y salud de las bandas, facturación, soporte, avisos, sistema, moderación, planes e integraciones." />}>
-      <Tabs
-        label="Panel global"
-        tabs={[
-          { id: 'metrics', label: 'Métricas', content: <MetricsTab /> },
-          { id: 'health', label: 'Salud de clientes', content: <HealthTab /> },
-          { id: 'tenants', label: 'Bandas', content: <TenantsTab /> },
-          { id: 'billing', label: 'Facturación', content: <BillingOpsTab /> },
-          { id: 'incidents', label: 'Soporte', content: <IncidentsTab /> },
-          { id: 'announcements', label: 'Avisos', content: <AnnouncementsTab /> },
-          { id: 'ops', label: 'Sistema', content: <OpsTab /> },
-          { id: 'moderation', label: 'Moderación', content: <ModerationTab /> },
-          { id: 'plans', label: 'Planes', content: <PlansTab /> },
-          { id: 'integrations', label: 'Integraciones', content: <IntegrationsTab /> },
-        ]}
-      />
+    <Page header={<PageHeader tone="warm" eyebrow={def.eyebrow} title={def.title} description={def.description} />}>
+      {def.content()}
     </Page>
   );
 }

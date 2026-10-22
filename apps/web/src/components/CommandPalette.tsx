@@ -2,7 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import { visibleItems } from '../nav';
+import { ADMIN_NAV, visibleItems } from '../nav';
 import { Icon, type IconName } from './Icon';
 
 interface Command {
@@ -48,10 +48,13 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const nav = visibleItems(can, hasFeature, !!session?.user.isPlatformAdmin).flatMap((g) =>
       g.items.map((i) => ({ id: `nav:${i.to}`, label: i.label, group: 'Ir a', icon: i.icon, to: i.to, keywords: g.label })),
     );
+    const panel = session?.user.isPlatformAdmin
+      ? ADMIN_NAV.flatMap((g) => g.items.map((i) => ({ id: `admin:${i.to}`, label: `Panel global · ${i.label}`, group: 'Ir a', icon: i.icon, to: i.to, keywords: `${g.label} plataforma admin` })))
+      : [];
     const actions: Command[] = [];
     if (can(['members:write']) && hasFeature('members')) actions.push({ id: 'new-member', label: 'Dar de alta a un socio', group: 'Acciones', icon: 'plus', to: '/members?new=1', keywords: 'nuevo socio alta' });
     if (can(['events:write']) && hasFeature('events')) actions.push({ id: 'new-event', label: 'Planificar ensayo o actuación', group: 'Acciones', icon: 'plus', to: '/events?new=1', keywords: 'nuevo ensayo concierto' });
-    return [...actions, ...nav];
+    return [...actions, ...nav, ...panel];
   }, [can, hasFeature, session?.user.isPlatformAdmin]);
 
   const results = useMemo<Command[]>(() => {

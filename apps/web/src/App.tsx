@@ -104,7 +104,8 @@ export function App() {
       <Route path="/settings" element={<Shell><Guard perm={['tenant:manage', 'roles:manage', 'users:manage', 'audit:read']}><Settings /></Guard></Shell>} />
       <Route path="/billing" element={<Shell><Guard perm={['billing:manage']}><Billing /></Guard></Shell>} />
       <Route path="/incidents" element={<Shell><Guard perm={['incidents:write']}><Incidents /></Guard></Shell>} />
-      <Route path="/admin" element={<Shell tenant={false}><Guard admin><Admin /></Guard></Shell>} />
+      <Route path="/admin" element={<Navigate to="/admin/metrics" replace />} />
+      <Route path="/admin/:section" element={<Shell tenant={false}><Guard admin><Admin /></Guard></Shell>} />
       <Route path="/admin/tenants/:id" element={<Shell tenant={false}><Guard admin><AdminTenant /></Guard></Shell>} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

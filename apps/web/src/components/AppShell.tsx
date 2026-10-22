@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import { visibleItems } from '../nav';
+import { adminMenu, visibleItems, type NavItem } from '../nav';
 import { useApi } from '../api/hooks';
-import type { NotificationItem } from '../api/types';
+import type { AdminSummary, NotificationItem } from '../api/types';
 import { AnnouncementBanner } from './admin/AnnouncementBanner';
 import { ImpersonationBanner } from './admin/ImpersonationBanner';
 import { Avatar } from './Avatar';
@@ -11,6 +11,7 @@ import { CommandPalette, useCommandPaletteShortcut } from './CommandPalette';
 import { Icon } from './Icon';
 import { Wordmark } from './Logo';
 import { Menu, type MenuItem } from './Menu';
+import { useNavSections } from './useNavSections';
 import { tenantStatus } from '../lib/labels';
 
 type Theme = 'system' | 'light' | 'dark';
@@ -68,9 +69,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const theme = useTheme();
-  const groups = visibleItems(can, hasFeature, !!session?.user.isPlatformAdmin);
-  const unread = useApi<NotificationItem[]>(session?.tenant ? '/notifications' : null, { unread: true });
+  // Panel global: su propio menú lateral. Sin banda activa es el único, porque «Inicio» y «Avisos» de una banda
+  // no existen para el administrador de plataforma (el acceso redirigía de vuelta al panel).
+  const isAdmin = !!session?.user.isPlatformAdmin;
+  const adminMode = isAdmin && (location.pathname.startsWith('/admin') || !session?.tenant);
+  const groups = adminMode
+    ? adminMenu({ hasTenant: !!session?.tenant, hasMemberships: (session?.memberships.length ?? 0) > 0 })
+    : visibleItems(can, hasFeature, isAdmin);
+  const sections = useNavSections(groups, location.pathname);
+  const unread = useApi<NotificationItem[]>(session?.tenant && !adminMode ? '/notifications' : null, { unread: true });
   const unreadCount = unread.data?.length ?? 0;
+  const summary = useApi<AdminSummary>(adminMode ? '/admin/summary' : null);
+  /** Pendientes que se muestran junto a cada entrada del menú. */
+  const countFor = (i: NavItem) =>
+    i.to === '/notifications' ? unreadCount : i.badge === 'support' ? summary.data?.support.open ?? 0 : i.badge === 'moderation' ? summary.data?.moderation.pending ?? 0 : 0;
+  const homeTo = adminMode ? '/admin/metrics' : '/';
   const openPalette = useCallback(() => setPalette(true), []);
   useCommandPaletteShortcut(openPalette);
   useRouteFocus(location.pathname);
@@ -81,7 +94,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Aviso sólo cuando hay algo que hacer (el nombre de la banda ya está en la barra lateral).
   const status = session?.tenant?.status;
   const alert =
-    status === 'PAST_DUE'
+    adminMode
+      ? null
+      : status === 'PAST_DUE'
       ? { tone: 'warning', text: 'Pago pendiente: actualiza tu método de pago para evitar el modo sólo lectura.', to: '/billing' }
       : status === 'READ_ONLY'
         ? { tone: 'danger', text: 'Cuenta en modo sólo lectura por impago. Regulariza la suscripción para editar.', to: '/billing' }
@@ -103,31 +118,68 @@ export function AppShell({ children }: { children: ReactNode }) {
         Saltar al contenido
       </a>
       <div className="layout">
-        {/* Barra lateral oscura con el logotipo arriba (DESIGN.md: Dashboard Style). */}
+        {/* Barra lateral (estilo Breeze) con secciones plegables. */}
         <nav id="sidenav" className={`sidenav${open ? ' is-open' : ''}`} aria-label="Navegación principal">
           <div className="sidenav__brand">
-            <Link to="/" className="brand brand--on-dark" aria-label="Solfeggio, inicio">
+            <Link to={homeTo} className="brand brand--on-dark" aria-label="Solfeggio, inicio">
               <Wordmark />
             </Link>
+            <button
+              type="button"
+              className="btn btn--icon btn--sm sidenav__toggle-all"
+              onClick={sections.toggleAll}
+              aria-label={sections.allCollapsed ? 'Desplegar todas las secciones' : 'Contraer las demás secciones'}
+              title={sections.allCollapsed ? 'Desplegar todas las secciones' : 'Contraer las demás secciones'}
+            >
+              <Icon name={sections.allCollapsed ? 'chevronsUpDown' : 'chevronsDownUp'} size={16} />
+            </button>
           </div>
-          {session?.tenant && (
+          {adminMode && (
+            <div className="sidenav__tenant">
+              <p className="sidenav__tenant-name">Panel global</p>
+              <span className="chip chip--info">Plataforma</span>
+            </div>
+          )}
+          {!adminMode && session?.tenant && (
             <div className="sidenav__tenant">
               <p className="sidenav__tenant-name">{session.tenant.name}</p>
               {status && <span className={`chip chip--${tenantStatus[status]?.tone ?? 'neutral'}`}>{tenantStatus[status]?.label ?? status}</span>}
             </div>
           )}
-          {groups.map((g) => (
+          {groups.map((g) => {
+            const expanded = sections.isOpen(g.label);
+            const listId = `nav-${g.label.normalize('NFD').replace(/[^\w]/g, '').toLowerCase()}`;
+            const hiddenCount = expanded ? 0 : g.items.reduce((n, i) => n + countFor(i), 0);
+            return (
             <div key={g.label} className="sidenav__group">
-              <p className="sidenav__label">{g.label}</p>
-              <ul>
+              {/* Cabecera de sección plegable (patrón disclosure: botón + aria-expanded) */}
+              <button
+                type="button"
+                className="sidenav__label sidenav__section"
+                aria-expanded={expanded}
+                aria-controls={listId}
+                onClick={() => sections.toggle(g.label)}
+              >
+                <span>{g.label}</span>
+                {hiddenCount > 0 && (
+                  <span className="sidenav__count" aria-label={`${hiddenCount} pendientes`}>
+                    {hiddenCount}
+                  </span>
+                )}
+                <Icon name="chevronDown" size={14} className="sidenav__chevron" />
+              </button>
+              <ul id={listId} hidden={!expanded} className={sections.opened === g.label ? 'is-opening' : undefined}>
                 {g.items.map((i) => (
                   <li key={i.to}>
                     <NavLink to={i.to} end={i.to === '/'}>
                       <Icon name={i.icon} size={18} />
                       <span>{i.label}</span>
-                      {i.to === '/notifications' && unreadCount > 0 && (
-                        <span className="sidenav__count" aria-label={`${unreadCount} sin leer`}>
-                          {unreadCount}
+                      {countFor(i) > 0 && (
+                        <span
+                          className={`sidenav__count${i.badge === 'support' && (summary.data?.support.overdue ?? 0) > 0 ? ' sidenav__count--alert' : ''}`}
+                          aria-label={`${countFor(i)} ${i.to === '/notifications' ? 'sin leer' : i.badge === 'support' && (summary.data?.support.overdue ?? 0) > 0 ? `abiertas, ${summary.data?.support.overdue} fuera de plazo` : 'pendientes'}`}
+                        >
+                          {countFor(i)}
                         </span>
                       )}
                     </NavLink>
@@ -135,7 +187,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ))}
               </ul>
             </div>
-          ))}
+            );
+          })}
         </nav>
         <div className="layout__main">
           <header className="topbar">
@@ -149,7 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Icon name={open ? 'close' : 'menu'} size={20} />
               </button>
-              <Link to="/" className="brand topbar__brand" aria-label="Solfeggio, inicio">
+              <Link to={homeTo} className="brand topbar__brand" aria-label="Solfeggio, inicio">
                 <Wordmark />
               </Link>
               <button type="button" className="search-trigger" onClick={openPalette} aria-label="Buscar y navegar (Ctrl+K)" aria-keyshortcuts="Control+K Meta+K">
@@ -158,7 +211,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <kbd className="kbd search-trigger__kbd">⌘K</kbd>
               </button>
               <div className="topbar__actions">
-                {session?.tenant && (
+                {session?.tenant && !adminMode && (
                   <Link to="/notifications" className="btn btn--ghost btn--icon icon-badge" aria-label={`Avisos: ${unreadCount} sin leer`}>
                     <Icon name="bell" size={18} />
                     {/* Breeze: punto primario; el número va en el nombre accesible */}

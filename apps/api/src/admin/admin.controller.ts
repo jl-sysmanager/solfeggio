@@ -61,6 +61,23 @@ export class AdminController {
     });
   }
 
+  /** Contadores ligeros para los avisos del menú lateral del panel (se consultan al cambiar de pantalla). */
+  @Get('summary')
+  async summary() {
+    const now = new Date();
+    const [openIncidents, overdueIncidents, pendingListings, listingReports, reinforcementReports] = await Promise.all([
+      this.db.system.incident.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] } } }),
+      this.db.system.incident.count({ where: { status: { in: ['OPEN', 'IN_PROGRESS'] }, firstResponseAt: null, slaDueAt: { lt: now } } }),
+      this.db.system.listing.count({ where: { status: 'PENDING_REVIEW' } }),
+      this.db.system.listingReport.count({ where: { resolvedAt: null } }),
+      this.db.system.reinforcementReport.count({ where: { resolvedAt: null } }),
+    ]);
+    return {
+      support: { open: openIncidents, overdue: overdueIncidents },
+      moderation: { pending: pendingListings + listingReports + reinforcementReports },
+    };
+  }
+
   @Get('metrics')
   async metrics() {
     const [byStatus, byPlan, openIncidents, pendingListings] = await Promise.all([

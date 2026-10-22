@@ -217,6 +217,7 @@ Lectura [finance:read], escritura [finance:write].
 - Checkout vuelve a `${APP_URL}/billing?checkout=success|cancel`; el portal, a `${APP_URL}/billing`.
 
 ## Panel global (`isPlatformAdmin`, sin tenant)
+- `GET /admin/summary` → `{ support: { open, overdue }, moderation: { pending } }`: pendientes para los avisos del menú lateral (incidencias abiertas y fuera de plazo; anuncios por revisar y denuncias sin resolver)
 - `GET /admin/metrics` → `{ tenants: { total, byStatus }, mrrCents, openIncidents, pendingListings }`
 - `GET /admin/tenants?q&status&page` · `GET /admin/tenants/:id` · `PATCH /admin/tenants/:id { status?, planCode?, addons?, studentSeats? }` (add-ons y plazas de alumno del add-on Escuela)
 - `GET /admin/plans` · `PATCH /admin/plans/:id`

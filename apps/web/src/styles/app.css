@@ -914,3 +914,44 @@ main h1:focus { outline: none; }
   *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   button:active:not(:disabled) { transform: none; }
 }
+
+/* ── Secciones plegables del menú lateral (Breeze: cabecera de sección como botón) ──
+   flex items-center justify-between w-full px-2 py-1.5 text-xs font-medium uppercase
+   tracking-wide text-muted-foreground hover:text-foreground */
+.sidenav__brand { justify-content: space-between; gap: var(--space-2); }
+.sidenav__toggle-all { color: var(--muted-foreground); }
+.sidenav__section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 32px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: color var(--duration-short) var(--ease-standard), background-color var(--duration-short) var(--ease-standard);
+}
+.sidenav__section:hover { color: var(--text-strong); background: color-mix(in srgb, var(--muted) 50%, transparent); }
+.sidenav__section:active:not(:disabled) { transform: none; }
+.sidenav__section > span:first-child { flex: 1; }
+.sidenav__chevron { transition: transform var(--duration-medium) var(--ease-standard); }
+.sidenav__section[aria-expanded='false'] .sidenav__chevron { transform: rotate(-90deg); }
+.sidenav__section .sidenav__count { margin-left: auto; }
+.sidenav ul[hidden] { display: none; }
+.sidenav ul.is-opening { animation: nav-open var(--duration-medium) var(--ease-standard); }
+@keyframes nav-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sidenav__chevron,
+  .sidenav ul.is-opening { transition: none; animation: none; }
+}
+
+/* Contador de pendientes fuera de plazo (soporte con SLA vencido) */
+.sidenav__count--alert { background: var(--destructive, #c0392b); color: var(--destructive-foreground, #fff); }
+.sidenav a[aria-current='page'] .sidenav__count--alert { background: var(--destructive, #c0392b); color: var(--destructive-foreground, #fff); }

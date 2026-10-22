@@ -66,12 +66,12 @@ export default function AdminTenantPage() {
   const delNote = useApiMutation((noteId: string) => del(`/admin/insights/tenants/${id}/notes/${noteId}`), { success: 'Nota eliminada', invalidate: refresh });
 
   const back = (
-    <Link to="/admin" className="link-arrow">
-      Volver al panel global
+    <Link to="/admin/tenants" className="link-arrow">
+      Volver a las bandas
     </Link>
   );
-  if (q.isLoading) return <Page header={<PageHeader tone="warm" eyebrow="Plataforma" title="Ficha de la banda" />}><Loading /></Page>;
-  if (q.error || !q.data) return <Page header={<PageHeader tone="warm" eyebrow="Plataforma" title="Ficha de la banda" />}><ErrorNote error={q.error} />{back}</Page>;
+  if (q.isLoading) return <Page header={<PageHeader tone="warm" eyebrow="Clientes" title="Ficha de la banda" />}><Loading /></Page>;
+  if (q.error || !q.data) return <Page header={<PageHeader tone="warm" eyebrow="Clientes" title="Ficha de la banda" />}><ErrorNote error={q.error} />{back}</Page>;
   const d = q.data;
   const t = d.tenant;
   const trend = (k: 'healthScore' | 'activeUsers30d' | 'mrrCents') => d.trend.map((p) => p[k]);
@@ -81,7 +81,7 @@ export default function AdminTenantPage() {
       header={
         <PageHeader
           tone="warm"
-          eyebrow="Plataforma"
+          eyebrow="Clientes"
           title={t.name}
           description={
             <span className="row" style={{ gap: 8, flexWrap: 'wrap' }}>

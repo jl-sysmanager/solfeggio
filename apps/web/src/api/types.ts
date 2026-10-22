@@ -42,6 +42,12 @@ export interface Plan {
   trialDays: number;
 }
 
+/** Pendientes del menú del panel global (`GET /admin/summary`). */
+export interface AdminSummary {
+  support: { open: number; overdue: number };
+  moderation: { pending: number };
+}
+
 /** Cada indicador llega sólo si el rol tiene el permiso del módulo que lo origina; si no, `null`. */
 export interface Dashboard {
   members: { active: number; total: number } | null;

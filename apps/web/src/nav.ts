@@ -8,6 +8,8 @@ export interface NavItem {
   perm?: string[];
   feature?: string;
   platformAdmin?: boolean;
+  /** Contador de pendientes que se muestra junto a la entrada (panel global). */
+  badge?: 'support' | 'moderation';
 }
 export interface NavGroup {
   label: string;
@@ -89,3 +91,60 @@ export function visibleItems(
     }),
   })).filter((g) => g.items.length > 0);
 }
+
+/**
+ * Menú del panel global de plataforma. Cada sección es una ruta propia (`/admin/<sección>`), de modo que
+ * se puede enlazar, recargar y volver atrás con el navegador.
+ */
+export const ADMIN_NAV: NavGroup[] = [
+  {
+    label: 'Resumen',
+    items: [
+      { to: '/admin/metrics', icon: 'chart', label: 'Métricas' },
+      { to: '/admin/health', icon: 'checkCircle', label: 'Salud de clientes' },
+    ],
+  },
+  {
+    label: 'Clientes',
+    items: [
+      { to: '/admin/tenants', icon: 'users', label: 'Bandas' },
+      { to: '/admin/billing', icon: 'card', label: 'Facturación' },
+    ],
+  },
+  {
+    label: 'Atención',
+    items: [
+      { to: '/admin/support', icon: 'lifebuoy', label: 'Soporte', badge: 'support' },
+      { to: '/admin/moderation', icon: 'alert', label: 'Moderación', badge: 'moderation' },
+      { to: '/admin/announcements', icon: 'megaphone', label: 'Avisos' },
+    ],
+  },
+  {
+    label: 'Plataforma',
+    items: [
+      { to: '/admin/ops', icon: 'storage', label: 'Sistema' },
+      { to: '/admin/plans', icon: 'euro', label: 'Planes' },
+      { to: '/admin/integrations', icon: 'settings', label: 'Integraciones' },
+    ],
+  },
+];
+
+/**
+ * Menú de la barra lateral dentro del panel global: las secciones del panel, más el acceso a la propia
+ * banda (si el administrador pertenece a alguna) y la seguridad de la cuenta.
+ */
+export function adminMenu(opts: { hasTenant: boolean; hasMemberships: boolean }): NavGroup[] {
+  const back: NavItem[] = [];
+  if (opts.hasTenant) back.push({ to: '/', icon: 'home', label: 'Volver a mi banda' });
+  else if (opts.hasMemberships) back.push({ to: '/select-band', icon: 'swap', label: 'Elegir una banda' });
+  return [
+    ...ADMIN_NAV,
+    {
+      label: 'Cuenta',
+      items: [...back, { to: '/security', icon: 'shield', label: 'Seguridad de la cuenta' }],
+    },
+  ];
+}
+
+/** Todas las entradas conocidas (banda y panel) para resolver el icono de la sección actual. */
+export const ALL_NAV_ITEMS: NavItem[] = [...NAV, ...ADMIN_NAV].flatMap((g) => g.items);
