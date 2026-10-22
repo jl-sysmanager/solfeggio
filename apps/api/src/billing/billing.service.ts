@@ -39,7 +39,6 @@ export class BillingService {
           ? { status: s.stripeStatus, interval: s.interval, currentPeriodEnd: s.currentPeriodEnd, trialEndsAt: s.trialEndsAt, cancelAtPeriodEnd: s.cancelAtPeriodEnd, graceUntil: s.graceUntil }
           : null,
         usage: { users, members, storageBytes: Number(tenant.storageUsedBytes) },
-        // Conceptos del add-on Escuela que se cobran aparte del plan (importes orientativos sin IVA).
         addons: addonLines(tenant, prices).map(({ priceId: _p, ...l }) => l),
         studentSeats: tenant.studentSeats,
         complimentaryUntil: isComplimentary(tenant) ? tenant.complimentaryUntil : null,
@@ -78,21 +77,12 @@ export class BillingService {
     // La prueba gratuita sólo se ofrece a bandas que nunca han tenido suscripción.
     const hadSubscription = !!(await this.db.system.invoice.findFirst({ where: { tenantId } })) || !!tenant.subscription?.stripeSubscriptionId;
     const trialDays = hadSubscription ? undefined : plan.trialDays || env().TRIAL_DAYS;
-    // Add-on Escuela: precios mensuales, así que sólo se añaden a suscripciones mensuales (en anual se
-    // regularizan desde el panel global). Un concepto sin precio configurado se omite.
-    const addonItems =
-      interval === 'MONTH'
-        ? addonLines({ ...tenant, plan }, await addonPrices(this.integrations))
-            .filter((l) => l.priceId)
-            .map((l) => ({ price: l.priceId!, quantity: l.quantity }))
-        : [];
-
     const session = await (await this.stripe.api()).checkout.sessions.create(
       {
         mode: 'subscription',
         customer: customerId,
         client_reference_id: tenantId,
-        line_items: [{ price, quantity: 1 }, ...addonItems],
+        line_items: [{ price, quantity: 1 }],
         subscription_data: { metadata: { tenantId, planCode }, ...(trialDays ? { trial_period_days: trialDays } : {}) },
         metadata: { tenantId, planCode },
         allow_promotion_codes: true,

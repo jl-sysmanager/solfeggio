@@ -1,11 +1,9 @@
 import type { IntegrationsService } from '../integrations/integrations.service';
 
 /**
- * Cobro del add-on Escuela. Dos conceptos en la suscripción de Stripe, además del precio del plan:
- * - `school_addon`: cuota fija mensual si la banda tiene `school` en `addons` y su plan no lo incluye.
- * - `school_seats`: precio por plaza de alumno adicional (cantidad = `tenant.studentSeats`).
- * Los Price IDs salen de la integración de pagos (o de STRIPE_PRICE_SCHOOL_ADDON / STRIPE_PRICE_SCHOOL_SEAT).
- * Los importes (para métricas) salen de la misma configuración; si no se conocen cuentan como 0.
+ * Antiguo cobro del «add-on Escuela» (cuota fija + plazas). La escuela es una funcionalidad del
+ * plan; estos conceptos ya no se facturan. `addonLines` devuelve vacío para que `syncAddons`
+ * retire de Stripe cualquier ítem residual `school_addon` / `school_seats`.
  */
 export interface AddonPrices {
   addonPrice: string | null;
@@ -33,6 +31,7 @@ export interface AddonLine {
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : 0);
 
+/** Precios legacy (sólo para reconocer y retirar ítems viejos en Stripe). */
 export async function addonPrices(integrations: IntegrationsService): Promise<AddonPrices> {
   const cfg = (await integrations.get('payments')).config;
   return {
@@ -43,21 +42,13 @@ export async function addonPrices(integrations: IntegrationsService): Promise<Ad
   };
 }
 
-/** Conceptos del add-on que corresponden a la banda (sin los que tienen cantidad 0). */
-export function addonLines(tenant: AddonTenant, prices: AddonPrices): AddonLine[] {
-  const lines: AddonLine[] = [];
-  if (tenant.addons.includes('school') && !tenant.plan.features.includes('school')) {
-    lines.push({ key: 'school_addon', label: 'Add-on Escuela', quantity: 1, unitCents: prices.addonCents, priceId: prices.addonPrice });
-  }
-  if (tenant.studentSeats > 0) {
-    lines.push({ key: 'school_seats', label: 'Plazas de alumno adicionales', quantity: tenant.studentSeats, unitCents: prices.seatCents, priceId: prices.seatPrice });
-  }
-  return lines;
+/** Sin conceptos facturables: la escuela va en el plan. */
+export function addonLines(_tenant: AddonTenant, _prices: AddonPrices): AddonLine[] {
+  return [];
 }
 
-/** MRR del add-on Escuela en céntimos. Función pura para las métricas de plataforma. */
-export function addonMrrCents(tenant: AddonTenant, prices: Pick<AddonPrices, 'addonCents' | 'seatCents'>): number {
-  return addonLines(tenant, { addonPrice: null, seatPrice: null, ...prices }).reduce((s, l) => s + l.quantity * l.unitCents, 0);
+export function addonMrrCents(_tenant: AddonTenant, _prices: Pick<AddonPrices, 'addonCents' | 'seatCents'>): number {
+  return 0;
 }
 
 /** Cuenta bonificada vigente. */

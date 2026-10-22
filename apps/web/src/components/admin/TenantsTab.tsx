@@ -14,33 +14,29 @@ import { Modal } from '../Modal';
 import { bytes, date } from '../../lib/format';
 import { tenantStatus } from '../../lib/labels';
 
-const ADDON_FEATURES: [string, string][] = [
-  ['school', 'Escuela de música'], ['performances', 'Contrataciones'], ['reinforcements', 'Bolsa de refuerzos'], ['governance', 'Gobierno'],
+/** Funcionalidades extra (fuera del plan) que soporte puede activar a mano. La escuela va en el plan. */
+const EXTRA_FEATURES: [string, string][] = [
+  ['performances', 'Contrataciones'], ['reinforcements', 'Bolsa de refuerzos'], ['governance', 'Gobierno'],
   ['treasury', 'Tesorería'], ['wardrobe', 'Mayordomía'], ['instruments', 'Instrumentación'], ['communications', 'Comunicaciones'],
   ['market', 'BandMarket'], ['calendar_sync', 'Calendario externo'], ['archive_ai', 'Particellas automáticas'],
 ];
 
-type TenantDetail = AdminTenant & { addons: string[]; studentSeats: number; activeStudents: number; plan?: AdminTenant['plan'] & { features?: string[]; maxStudents?: number } };
+type TenantDetail = AdminTenant & { addons: string[]; activeStudents: number; plan?: AdminTenant['plan'] & { features?: string[] } };
 
-/** Add-ons y plazas de alumno de la banda (ficha de detalle). */
-function TenantAddons({ detail }: { detail: TenantDetail }) {
+function TenantExtras({ detail }: { detail: TenantDetail }) {
   const inPlan = new Set(detail.plan?.features ?? []);
-  const maxStudents = detail.plan?.maxStudents ?? 0;
   return (
     <fieldset className="stack" style={{ gap: 8, border: 0, padding: 0 }}>
-      <legend className="label-caps">Add-ons contratados</legend>
+      <legend className="label-caps">Funcionalidades extra</legend>
+      <p className="small muted">La escuela se habilita en el plan (Admin → Planes). Familias y profesores con acceso cuentan como usuarios del plan.</p>
       <div className="form-row">
-        {ADDON_FEATURES.map(([key, label]) => (
+        {EXTRA_FEATURES.map(([key, label]) => (
           <Checkbox key={key} name="addons" value={key} defaultChecked={detail.addons.includes(key)} label={`${label}${inPlan.has(key) ? ' (incluido en el plan)' : ''}`} />
         ))}
       </div>
-      <div className="form-row">
-        <TextField label="Plazas de alumno adicionales" name="studentSeats" type="number" min={0} defaultValue={detail.studentSeats} hint={`El plan incluye ${maxStudents < 0 ? 'alumnos ilimitados' : `${maxStudents} alumnos`}.`} />
-        <p className="small">
-          Alumnos activos: <strong>{detail.activeStudents}</strong>
-          {maxStudents >= 0 && ` de ${maxStudents + detail.studentSeats}`}
-        </p>
-      </div>
+      <p className="small">
+        Alumnos activos: <strong>{detail.activeStudents}</strong>
+      </p>
     </fieldset>
   );
 }
@@ -109,7 +105,7 @@ export function TenantsTab() {
             const form = e.currentTarget;
             const v = formValues(form);
             const extras = detail.data
-              ? { addons: Array.from(form.querySelectorAll<HTMLInputElement>('input[name="addons"]:checked')).map((i) => i.value), studentSeats: Number(v.studentSeats ?? 0) }
+              ? { addons: Array.from(form.querySelectorAll<HTMLInputElement>('input[name="addons"]:checked')).map((i) => i.value) }
               : {};
             if (editing) update.mutate({ id: editing.id, body: { status: v.status, planCode: v.planCode as PlanCode, ...extras } });
           }}
@@ -122,7 +118,7 @@ export function TenantsTab() {
             options={['FREE', 'BASIC', 'PRO', 'ENTERPRISE'].map((c) => ({ value: c, label: c }))}
           />
           {detail.isLoading && <Loading rows={2} />}
-          {detail.data && <TenantAddons key={detail.dataUpdatedAt} detail={detail.data} />}
+          {detail.data && <TenantExtras key={detail.dataUpdatedAt} detail={detail.data} />}
           <p className="small muted">Suspender bloquea el acceso de todos los usuarios de la banda. Queda registrado en auditoría.</p>
           <FormError error={update.error} />
           <div className="modal__footer">

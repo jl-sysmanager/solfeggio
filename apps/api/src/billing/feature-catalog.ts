@@ -56,7 +56,7 @@ export const FEATURE_MODULES: ModuleDef[] = [
     label: 'Escuela de música',
     description: 'Gestión completa de la escuela.',
     features: [
-      { key: 'school', label: 'Escuela de música', description: 'Alumnos y familias, matrícula online, grupos y horarios, clases, notas, mensualidades y portal de familias.', requires: ['members'] },
+      { key: 'school', label: 'Escuela de música', description: 'Alumnos y familias, matrícula online, grupos y horarios, clases, notas, mensualidades y portal de familias. Quien accede (familia o profesor) cuenta como usuario del plan.', requires: ['members'] },
     ],
   },
   {

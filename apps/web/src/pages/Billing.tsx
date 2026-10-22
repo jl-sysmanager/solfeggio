@@ -175,7 +175,12 @@ export default function BillingPage() {
       )}
 
       <div className="grid grid--stats">
-        <StatCard label="Usuarios" value={`${b.usage.users} / ${limit(b.plan.maxUsers)}`} meter={b.plan.maxUsers > 0 ? b.usage.users / b.plan.maxUsers : undefined} />
+        <StatCard
+          label="Usuarios"
+          value={`${b.usage.users} / ${limit(b.plan.maxUsers)}`}
+          hint="Incluye familias y profesores con acceso"
+          meter={b.plan.maxUsers > 0 ? b.usage.users / b.plan.maxUsers : undefined}
+        />
         <StatCard label="Socios" value={`${b.usage.members} / ${limit(b.plan.maxMembers)}`} meter={b.plan.maxMembers > 0 ? b.usage.members / b.plan.maxMembers : undefined} />
         <StatCard
           label="Almacenamiento"
@@ -192,23 +197,6 @@ export default function BillingPage() {
           />
         )}
       </div>
-
-      {!!b.addons?.length && (
-        <Card title="Add-on Escuela">
-          <ul className="list-plain stack" style={{ gap: 6 }}>
-            {b.addons.map((l) => (
-              <li key={l.key} className="row between">
-                <span>
-                  {l.label}
-                  {l.quantity > 1 && ` × ${l.quantity}`}
-                </span>
-                <span className="nowrap">{l.unitCents > 0 ? `${money(l.unitCents * l.quantity)} / mes + IVA` : 'Precio según tu contrato'}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="small muted">Se cobran junto al plan en cada factura. Los cambios de plazas se prorratean.</p>
-        </Card>
-      )}
 
       <section aria-labelledby="plans-title" className="stack" style={{ gap: 16 }}>
         <div className="row between">

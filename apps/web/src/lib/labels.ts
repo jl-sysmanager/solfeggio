@@ -132,7 +132,7 @@ export const featureMinPlan: Record<string, string> = {
   communications: 'Basic',
   market: 'Pro',
   calendar_sync: 'Pro',
-  school: 'Pro (o add-on Escuela)',
+  school: 'Pro',
   performances: 'Basic',
   reinforcements: 'Pro',
   governance: 'Basic',

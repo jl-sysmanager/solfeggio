@@ -394,8 +394,7 @@ export class InsightsService {
       for (const l of r.limits) {
         if (l.ratio === null || l.ratio < 0.8) continue;
         reasons.push({ code: `limit_${l.key}`, label: `${l.label}: ${Math.round(l.ratio * 100)} % del límite` });
-        if (l.key === 'students') addon = 'studentSeats';
-        else upgrade = true;
+        upgrade = true;
       }
       if (r.planCode === 'FREE' && (r.activeUsers30d >= 4 || r.modulesUsed >= 3)) {
         reasons.push({ code: 'free_heavy_use', label: `Uso intenso del plan gratuito (${r.activeUsers30d} usuarios activos, ${r.modulesUsed} módulos)` });

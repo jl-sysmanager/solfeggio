@@ -11,6 +11,7 @@ export class LimitsService {
     return this.db.system.tenant.findUniqueOrThrow({ where: { id: tenantId }, include: { plan: true } });
   }
 
+  /** Cupo de accesos a la plataforma (junta, músicos, profesores, familias del portal, etc.). */
   async assertCanAddUser(tx: Tx, tenantId: string) {
     const { plan } = await this.plan(tenantId);
     if (plan.maxUsers < 0) return;
@@ -19,7 +20,7 @@ export class LimitsService {
       tx.invitation.count({ where: { acceptedAt: null, expiresAt: { gt: new Date() } } }),
     ]);
     if (users + pending >= plan.maxUsers) {
-      throw new PlanLimitException(`Tu plan permite ${plan.maxUsers} usuarios. Mejora el plan para invitar a más.`);
+      throw new PlanLimitException(`Tu plan permite ${plan.maxUsers} usuarios (incluye familias y profesores con acceso). Mejora el plan para invitar a más.`);
     }
   }
 
@@ -32,15 +33,12 @@ export class LimitsService {
     }
   }
 
-  /** Alumnos activos: plazas del plan más las del add-on Escuela. */
-  async assertCanAddStudent(tx: Tx, tenantId: string) {
-    const tenant = await this.plan(tenantId);
-    if (tenant.plan.maxStudents < 0) return;
-    const limit = tenant.plan.maxStudents + tenant.studentSeats;
-    const count = await tx.student.count({ where: { status: { not: 'LEFT' } } });
-    if (count >= limit) {
-      throw new PlanLimitException(`Tu plan permite ${limit} alumnos. Amplía las plazas del add-on Escuela para matricular a más.`);
-    }
+  /**
+   * Los alumnos como ficha no consumen cupo. Quien accede a la plataforma (familia, profesor,
+   * músico…) es un usuario y se limita con `assertCanAddUser`.
+   */
+  async assertCanAddStudent(_tx: Tx, _tenantId: string) {
+    return;
   }
 
   /** Reserva almacenamiento de forma atómica; falla si supera la cuota. */

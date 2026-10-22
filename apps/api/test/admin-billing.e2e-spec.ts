@@ -201,83 +201,41 @@ describe('Operación de facturación (panel global)', () => {
     });
   });
 
-  describe('add-on Escuela', () => {
+  describe('escuela como feature del plan (sin add-on)', () => {
     beforeAll(async () => {
       await ctx.db.system.plan.update({ where: { code: 'BASIC' }, data: { stripePriceMonthly: 'price_basic_m' } });
       const basic = await ctx.db.system.plan.findUniqueOrThrow({ where: { code: 'BASIC' } });
-      await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { planId: basic.id, status: 'ACTIVE', addons: ['school'], studentSeats: 20 } });
+      await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { planId: basic.id, status: 'ACTIVE', addons: [], studentSeats: 0 } });
       await ctx.db.system.subscription.update({ where: { tenantId: band.tenantId }, data: { stripeSubscriptionId: subId, stripeStatus: 'active' } });
-      ctx.stripe.subscriptions.set(subId, { ...subscription('active'), items: { data: [{ id: 'si_plan', price: { id: 'price_basic_m', recurring: { interval: 'month' } }, quantity: 1, metadata: {} }] } });
+      ctx.stripe.subscriptions.set(subId, {
+        ...subscription('active'),
+        items: { data: [{ id: 'si_plan', price: { id: 'price_basic_m', recurring: { interval: 'month' } }, quantity: 1, metadata: {} }, seat(10)] },
+      });
     });
 
-    it('añade, actualiza y retira los conceptos de forma idempotente', async () => {
+    it('syncAddons retira ítems residuales de escuela en Stripe', async () => {
       const first = await post(`/tenants/${band.tenantId}/sync-addons`).expect(200);
-      expect(first.body).toMatchObject({ status: 'synced', changes: ['school_addon:add:1', 'school_seats:add:20'] });
-      expect(call('subscriptionItems.create').map((c) => c.args)).toEqual([
-        expect.objectContaining({ price: 'price_addon', quantity: 1, proration_behavior: 'create_prorations' }),
-        expect.objectContaining({ price: 'price_seat', quantity: 20, proration_behavior: 'create_prorations' }),
-      ]);
-      expect((await post(`/tenants/${band.tenantId}/sync-addons`).expect(200)).body.status).toBe('unchanged');
-      expect(call('subscriptionItems.create')).toHaveLength(2);
-
-      await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { studentSeats: 35 } });
-      expect((await ctx.app.get(BillingOpsService).syncAddons(band.tenantId)).changes).toEqual(['school_seats:update:35']);
-
-      await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { addons: [], studentSeats: 0 } });
-      expect((await ctx.app.get(BillingOpsService).syncAddons(band.tenantId)).changes).toEqual(['school_addon:remove', 'school_seats:remove']);
+      expect(first.body).toMatchObject({ status: 'synced', changes: ['school_seats:remove'] });
       expect(ctx.stripe.subscriptions.get(subId).items.data).toHaveLength(1);
+      expect((await post(`/tenants/${band.tenantId}/sync-addons`).expect(200)).body.status).toBe('unchanged');
     });
 
-    it('el webhook mantiene el plan aunque haya conceptos del add-on y reconcile los sincroniza', async () => {
-      ctx.stripe.subscriptions.set(subId, { ...subscription('active'), items: { data: [seat(10), { id: 'si_plan', price: { id: 'price_basic_m', recurring: { interval: 'month' } }, quantity: 1, metadata: {} }] } });
-      await webhook(ctx, { id: 'evt_ad1', type: 'customer.subscription.updated', data: { object: { id: subId } } }).expect(200);
-      expect((await tenant()).plan.code).toBe('BASIC');
-
-      await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { studentSeats: 12 } });
-      const r = await ctx.app.get(BillingOpsService).reconcileAddons();
-      expect(r.addons.synced).toBe(1);
-      expect(ctx.stripe.subscriptions.get(subId).items.data.find((i: any) => i.id === 'si_seat').quantity).toBe(12);
-    });
-
-    it('un plan que incluye la escuela no cobra la cuota fija; sin precio el error queda registrado', async () => {
-      const pro = await ctx.db.system.plan.findUniqueOrThrow({ where: { code: 'PRO' } });
-      await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { planId: pro.id, addons: ['school'], studentSeats: 0 } });
-      ctx.stripe.subscriptions.set(subId, { ...subscription('active'), items: items() });
-      expect((await ctx.app.get(BillingOpsService).syncAddons(band.tenantId)).status).toBe('unchanged');
-
-      delete process.env.STRIPE_PRICE_SCHOOL_SEAT;
-      await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { studentSeats: 5 } });
-      const bad = await post(`/tenants/${band.tenantId}/sync-addons`).expect(200);
-      expect(bad.body.status).toBe('error');
-      process.env.STRIPE_PRICE_SCHOOL_SEAT = 'price_seat';
-
-      const ov = await ctx.http().get(`${base}/addons`).set(auth(admin.token)).expect(200);
-      expect(ov.body.tenants.find((t: any) => t.tenant.id === band.tenantId)).toMatchObject({ studentSeats: 5, lastSync: { status: 'error' } });
-    });
-
-    it('el checkout incluye los conceptos del add-on y el resumen de la banda los muestra', async () => {
+    it('el checkout sólo cobra el plan', async () => {
       const free = await ctx.db.system.plan.findUniqueOrThrow({ where: { code: 'FREE' } });
       await ctx.db.system.tenant.update({ where: { id: band.tenantId }, data: { planId: free.id, addons: ['school'], studentSeats: 8 } });
       await ctx.db.system.subscription.update({ where: { tenantId: band.tenantId }, data: { stripeSubscriptionId: null, stripeStatus: 'canceled' } });
       await ctx.db.system.plan.update({ where: { code: 'BASIC' }, data: { stripePriceMonthly: 'price_basic_m' } });
       ctx.stripe.calls.length = 0;
       await ctx.http().post('/api/v1/billing/checkout').set(auth(band.token)).send({ planCode: 'BASIC', interval: 'MONTH' }).expect(200);
-      expect(call('checkout.create')[0].args.line_items).toEqual([
-        { price: 'price_basic_m', quantity: 1 },
-        { price: 'price_addon', quantity: 1 },
-        { price: 'price_seat', quantity: 8 },
-      ]);
+      expect(call('checkout.create')[0].args.line_items).toEqual([{ price: 'price_basic_m', quantity: 1 }]);
       const ov = await ctx.http().get('/api/v1/billing').set(auth(band.token)).expect(200);
-      expect(ov.body.addons.map((l: any) => [l.key, l.quantity])).toEqual([['school_addon', 1], ['school_seats', 8]]);
-      expect(ov.body.addons[0].priceId).toBeUndefined();
+      expect(ov.body.addons).toEqual([]);
     });
 
-    it('addonMrrCents suma cuota y plazas, y es 0 si el plan ya incluye la escuela', () => {
+    it('addonMrrCents es siempre 0', () => {
       const prices = { addonCents: 1500, seatCents: 100 };
-      expect(addonMrrCents({ addons: ['school'], studentSeats: 20, plan: { features: [] } }, prices)).toBe(3500);
-      expect(addonMrrCents({ addons: ['school'], studentSeats: 20, plan: { features: ['school'] } }, prices)).toBe(2000);
+      expect(addonMrrCents({ addons: ['school'], studentSeats: 20, plan: { features: [] } }, prices)).toBe(0);
       expect(addonMrrCents({ addons: [], studentSeats: 0, plan: { features: [] } }, prices)).toBe(0);
-      expect(addonMrrCents({ addons: ['school'], studentSeats: 3, plan: { features: [] } }, { addonCents: 0, seatCents: 0 })).toBe(0);
     });
   });
 

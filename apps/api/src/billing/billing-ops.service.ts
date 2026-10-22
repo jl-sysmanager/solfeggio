@@ -302,11 +302,11 @@ export class BillingOpsService {
     return { reminded: soon.length, expired: expired.length };
   }
 
-  // ── Add-on Escuela ─────────────────────────────────────────
+  // ── Residuos del antiguo add-on Escuela ─────────────────────
 
   /**
-   * Ajusta los conceptos del add-on en la suscripción de Stripe al estado de la banda (con prorrateo).
-   * Idempotente: si ya coinciden no hace nada. Debe llamarse tras cambiar `addons` o `studentSeats`.
+   * Retira de Stripe ítems legacy `school_addon` / `school_seats` (la escuela ya no se factura aparte).
+   * Idempotente.
    */
   async syncAddons(tenantId: string, actor: Actor | null = null): Promise<SyncResult> {
     const t = await this.tenant(tenantId);
@@ -351,7 +351,7 @@ export class BillingOpsService {
     return result;
   }
 
-  /** Trabajo diario `billing.reconcile-addons`: sincroniza el add-on y gestiona las bonificaciones. */
+  /** Trabajo diario `billing.reconcile-addons`: limpia ítems legacy de escuela y gestiona bonificaciones. */
   async reconcileAddons(now = new Date()) {
     const complimentary = await this.complimentarySweep(now);
     const tenants = await this.db.system.tenant.findMany({
@@ -359,11 +359,7 @@ export class BillingOpsService {
       select: { id: true },
     });
     const counts: Record<SyncResult['status'], number> = { synced: 0, unchanged: 0, skipped: 0, error: 0 };
-    // Sin precios configurados no hay nada que cobrar ni que quitar.
-    const prices = await addonPrices(this.integrations);
-    if (prices.addonPrice || prices.seatPrice) {
-      for (const t of tenants) counts[(await this.syncAddons(t.id)).status]++;
-    }
+    for (const t of tenants) counts[(await this.syncAddons(t.id)).status]++;
     return { complimentary, addons: counts };
   }
 

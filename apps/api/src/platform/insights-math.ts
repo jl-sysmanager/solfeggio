@@ -98,7 +98,8 @@ export function limitsOf(i: LimitInput): Limit[] {
   return [
     lim('users', 'Usuarios', i.users, i.plan.maxUsers),
     lim('members', 'Socios', i.members, i.plan.maxMembers),
-    lim('students', 'Alumnos', i.students, i.plan.maxStudents < 0 ? -1 : i.plan.maxStudents + i.studentSeats),
+    // * Alumnos como ficha no tienen cupo; el acceso al portal cuenta en usuarios.
+    lim('students', 'Alumnos', i.students, -1),
     lim('storage', 'Almacenamiento', i.storageBytes, i.plan.storageMb * 1024 * 1024),
   ];
 }

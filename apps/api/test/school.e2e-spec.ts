@@ -36,8 +36,8 @@ describe('Escuela de música', () => {
   });
   afterAll(() => ctx.app.close());
 
-  describe('plan y add-on', () => {
-    it('FREE no incluye la escuela; BASIC con add-on sí, con límite de plazas', async () => {
+  describe('plan', () => {
+    it('FREE no incluye la escuela; BASIC con la feature en el plan sí, sin cupo de fichas', async () => {
       const free = await signupBand(ctx, 'escuela-free', 'FREE');
       const denied = await get('/school/students', free.token).expect(403);
       expect(denied.body.code).toBe('FEATURE_NOT_IN_PLAN');
@@ -45,11 +45,11 @@ describe('Escuela de música', () => {
 
       const basic = await signupBand(ctx, 'escuela-basic', 'BASIC');
       await get('/school/students', basic.token).expect(403);
-      await ctx.db.system.tenant.update({ where: { id: basic.tenantId }, data: { addons: ['school'], studentSeats: 1 } });
+      const plan = await ctx.db.system.plan.findUniqueOrThrow({ where: { code: 'BASIC' } });
+      await ctx.db.system.plan.update({ where: { code: 'BASIC' }, data: { features: [...new Set([...plan.features, 'school'])] } });
       await get('/school/students', basic.token).expect(200);
       await post('/school/students', { firstName: 'Uno', lastName: 'Solo' }, basic.token).expect(201);
-      const limit = await post('/school/students', { firstName: 'Dos', lastName: 'Más' }, basic.token).expect(403);
-      expect(limit.body.code).toBe('PLAN_LIMIT');
+      await post('/school/students', { firstName: 'Dos', lastName: 'Más' }, basic.token).expect(201);
     });
   });
 

@@ -24,11 +24,40 @@ async function user(email: string, name: string, isPlatformAdmin = false) {
   });
 }
 
+const DEMO_COMPLIMENTARY_MS = 10 * 365 * 86_400_000;
+
+/** Activa el plan Pro de la demo sin Stripe (si no, el entitlements deja sólo Free y el menú pierde Escuela, etc.). */
+async function ensureDemoPaid() {
+  const demo = await db.tenant.findUnique({ where: { slug: 'banda-demo' } });
+  if (!demo) return;
+  const until = new Date(Date.now() + DEMO_COMPLIMENTARY_MS);
+  if (!demo.complimentaryUntil || demo.complimentaryUntil < new Date()) {
+    await db.tenant.update({
+      where: { id: demo.id },
+      data: { complimentaryUntil: until, complimentaryReason: demo.complimentaryReason ?? 'Banda de demostración' },
+    });
+  }
+}
+
 async function seedDemo() {
-  if (await db.tenant.findUnique({ where: { slug: 'banda-demo' } })) return;
+  const existing = await db.tenant.findUnique({ where: { slug: 'banda-demo' } });
+  if (existing) {
+    await ensureDemoPaid();
+    return;
+  }
   const pro = await db.plan.findUniqueOrThrow({ where: { code: 'PRO' } });
+  const complimentaryUntil = new Date(Date.now() + DEMO_COMPLIMENTARY_MS);
   const tenant = await db.tenant.create({
-    data: { name: 'Banda Sinfónica Demo', slug: 'banda-demo', planId: pro.id, status: 'ACTIVE', onboardedAt: new Date(), subscription: { create: {} } },
+    data: {
+      name: 'Banda Sinfónica Demo',
+      slug: 'banda-demo',
+      planId: pro.id,
+      status: 'ACTIVE',
+      onboardedAt: new Date(),
+      complimentaryUntil,
+      complimentaryReason: 'Banda de demostración',
+      subscription: { create: {} },
+    },
   });
   const t = tenant.id;
   await db.role.createMany({ data: SYSTEM_ROLES.map((r) => ({ tenantId: t, key: r.key, name: r.name, permissions: r.permissions, isSystem: true })) });
