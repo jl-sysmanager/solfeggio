@@ -311,12 +311,12 @@ Cada entrada del menú aparece sólo si el rol tiene el permiso del módulo y el
 
 ## Funcionalidades por plan
 
-| Plan | Usuarios | Socios | Alumnos | Almacenamiento | Funcionalidades |
-|---|---|---|---|---|---|
-| Free | 5 | 40 | 0 | 500 MB | members, archive, events, attendance |
-| Basic (9 €/mes · 90 €/año) | 15 | 100 | 0 | 5 GB | + treasury, wardrobe, instruments, communications, performances, governance |
-| Pro (24 €/mes · 240 €/año) | 50 | 300 | 150 | 50 GB | + market, calendar_sync, advanced_reports, school, reinforcements, archive_ai |
-| Enterprise (79 €/mes · 790 €/año) | ilimitado | ilimitado | ilimitado | 500 GB | + sso, priority_support, api_access |
+| Plan | Usuarios | Socios | Almacenamiento | Funcionalidades |
+|---|---|---|---|---|
+| Free | 5 | 40 | 500 MB | members, archive, events, attendance |
+| Basic (15 €/mes · 150 €/año) | 20 | 150 | 10 GB | + treasury, wardrobe, instruments, communications, performances, governance |
+| Pro (35 €/mes · 350 €/año) | 80 | 400 | 100 GB | + market, calendar_sync, school, reinforcements, archive_ai |
+| Enterprise (79 €/mes · 790 €/año) | ilimitado | ilimitado | 500 GB | mismas que Pro |
 
 **Add-ons:** el panel global puede activar funcionalidades sueltas por banda (`tenants.addons`, p. ej. `school` en Basic) y sumar plazas de alumno (`tenants.studentSeats`). El cobro del add-on en Stripe no está automatizado.
 

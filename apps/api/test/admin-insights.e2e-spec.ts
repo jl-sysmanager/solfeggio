@@ -65,15 +65,15 @@ describe('Panel global · negocio y retención', () => {
       expect(await ctx.db.system.tenantSnapshot.count()).toBe(total);
 
       const s1 = (await snaps(t1.tenantId))[0];
-      expect(s1).toMatchObject({ planCode: 'PRO', status: 'ACTIVE', mrrCents: 2400, activeUsers7d: 1, activeUsers30d: 1 });
+      expect(s1).toMatchObject({ planCode: 'PRO', status: 'ACTIVE', mrrCents: 3500, activeUsers7d: 1, activeUsers30d: 1 });
       expect((s1.usage as any).events).toBe(1);
       // breadth 7 + usuarios 30 + recencia (2 días) 28
       expect(s1.healthScore).toBe(65);
-      expect((await snaps(t2.tenantId))[0].mrrCents).toBe(Math.round(9000 / 12));
+      expect((await snaps(t2.tenantId))[0].mrrCents).toBe(Math.round(15000 / 12));
       expect((await snaps(t3.tenantId))[0].mrrCents).toBe(0);
       expect((await snaps(t4.tenantId))[0].mrrCents).toBe(0);
       expect((await snaps(t5.tenantId))[0]).toMatchObject({ status: 'TRIALING', mrrCents: 0 });
-      expect((await snaps(t7.tenantId))[0]).toMatchObject({ status: 'PAST_DUE', mrrCents: 2400 });
+      expect((await snaps(t7.tenantId))[0]).toMatchObject({ status: 'PAST_DUE', mrrCents: 3500 });
       expect((await snaps(t7.tenantId))[0].healthScore).toBeLessThan(15);
     });
 

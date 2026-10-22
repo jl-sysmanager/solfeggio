@@ -38,10 +38,26 @@ describe('gating de navegación', () => {
   it('un tesorero en plan Basic ve tesorería', () => {
     const session = makeSession({
       permissions: ['finance:read', 'finance:write', 'members:read'],
-      plan: { code: 'BASIC', name: 'Basic', features: ['members', 'archive', 'events', 'attendance', 'treasury'], maxUsers: 15, maxMembers: 100, storageMb: 5120 },
+      plan: { code: 'BASIC', name: 'Basic', features: ['members', 'archive', 'events', 'attendance', 'treasury'], maxUsers: 20, maxMembers: 150, storageMb: 10 * 1024 },
     });
     renderWithProviders(<AppShell>x</AppShell>, { session });
     expect(navLinks()).toEqual(expect.arrayContaining(['Tesorería', 'Socios']));
+  });
+
+  it('con Escuela activa en el plan, el propietario ve la entrada Escuela de música', () => {
+    const session = makeSession({
+      permissions: ['school:read', 'school:write', 'members:read', 'archive:read', 'events:read'],
+      plan: {
+        code: 'PRO',
+        name: 'Pro',
+        features: ['members', 'archive', 'events', 'attendance', 'school', 'treasury', 'market'],
+        maxUsers: 80,
+        maxMembers: 400,
+        storageMb: 100 * 1024,
+      },
+    });
+    renderWithProviders(<AppShell>x</AppShell>, { session });
+    expect(navLinks()).toEqual(expect.arrayContaining(['Escuela de música', 'Socios', 'Archivo musical']));
   });
 
   describe('menú por rol', () => {
