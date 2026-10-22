@@ -32,6 +32,8 @@ export function serializeFamily<T extends Family>(f: T, ctx: RequestContext) {
 
 export function serializeGuardian<T extends Guardian>(g: T, ctx: RequestContext) {
   const { nationalIdEnc, ...rest } = g;
+  // El profesorado ve el nombre y el teléfono de los tutores; el email y el DNI quedan para la secretaría.
+  if (!ctx.permissions.has('school:write')) rest.email = null;
   return { ...rest, nationalId: ctx.permissions.has('members:sensitive') ? decrypt(nationalIdEnc) : undefined, hasNationalId: !!nationalIdEnc };
 }
 

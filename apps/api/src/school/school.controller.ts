@@ -190,7 +190,7 @@ export class SchoolController {
 
   // ── Familias y tutores ─────────────────────────────────────────────────────
 
-  @Perm('school:read')
+  @Perm('school:write')
   @Get('families')
   families(@Ctx() ctx: RequestContext, @Query(zod(familiesQuery)) q: z.infer<typeof familiesQuery>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
@@ -226,7 +226,7 @@ export class SchoolController {
     });
   }
 
-  @Perm('school:read')
+  @Perm('school:write')
   @Get('families/:id')
   family(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
@@ -837,7 +837,7 @@ export class SchoolController {
     });
   }
 
-  @Perm('school:read')
+  @Perm('school:write')
   @Get('applications')
   applications(@Ctx() ctx: RequestContext, @Query(zod(applicationsQuery)) q: z.infer<typeof applicationsQuery>) {
     return this.db.tenant(ctx.tenantId, (tx) =>

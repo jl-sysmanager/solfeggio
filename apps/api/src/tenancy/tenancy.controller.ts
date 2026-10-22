@@ -93,24 +93,30 @@ export class TenancyController {
     const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, include: { plan: true } });
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const since = new Date(Date.now() - 30 * 86_400_000);
+      // Cada indicador sólo se calcula y se devuelve a quien tiene el permiso del módulo que lo origina.
+      const can = (p: string) => ctx.permissions.has(p);
+      const showMembers = can('members:read');
+      const showFinance = can('finance:read') && ctx.features.has('treasury');
+      const showAttendance = can('attendance:read');
+      const showAccount = can('tenant:manage') || can('billing:manage') || can('users:manage');
       const [active, total, nextEvents, pending, att, users] = await Promise.all([
-        tx.member.count({ where: { status: 'ACTIVE' } }),
-        tx.member.count(),
-        tx.event.findMany({ where: { startsAt: { gte: new Date() }, status: 'SCHEDULED' }, orderBy: { startsAt: 'asc' }, take: 5 }),
-        tx.feeCharge.aggregate({ where: { status: { in: ['PENDING', 'OVERDUE'] } }, _count: true, _sum: { amountCents: true } }),
-        tx.attendance.groupBy({ by: ['status'], where: { recordedAt: { gte: since } }, _count: true }),
-        tx.membership.count({ where: { status: 'ACTIVE' } }),
+        showMembers ? tx.member.count({ where: { status: 'ACTIVE' } }) : 0,
+        showMembers ? tx.member.count() : 0,
+        can('events:read') ? tx.event.findMany({ where: { startsAt: { gte: new Date() }, status: 'SCHEDULED' }, orderBy: { startsAt: 'asc' }, take: 5 }) : [],
+        showFinance ? tx.feeCharge.aggregate({ where: { status: { in: ['PENDING', 'OVERDUE'] } }, _count: true, _sum: { amountCents: true } }) : null,
+        showAttendance ? tx.attendance.groupBy({ by: ['status'], where: { recordedAt: { gte: since } }, _count: true }) : [],
+        showAccount ? tx.membership.count({ where: { status: 'ACTIVE' } }) : 0,
       ]);
       const totalAtt = att.reduce((s, a) => s + a._count, 0);
       const present = att.filter((a) => a.status === 'PRESENT' || a.status === 'LATE').reduce((s, a) => s + a._count, 0);
       return {
-        members: { active, total },
+        members: showMembers ? { active, total } : null,
         nextEvents,
-        pendingCharges: { count: pending._count, amountCents: pending._sum.amountCents ?? 0 },
+        pendingCharges: pending ? { count: pending._count, amountCents: pending._sum.amountCents ?? 0 } : null,
         // Tasa como fracción 0–1 (la web la formatea como porcentaje).
         attendanceRate30d: totalAtt ? Math.round((present / totalAtt) * 1000) / 1000 : null,
-        storage: { usedBytes: Number(tenant.storageUsedBytes), limitBytes: tenant.plan.storageMb * 1024 * 1024 },
-        users: { used: users, limit: tenant.plan.maxUsers },
+        storage: showAccount ? { usedBytes: Number(tenant.storageUsedBytes), limitBytes: tenant.plan.storageMb * 1024 * 1024 } : null,
+        users: showAccount ? { used: users, limit: tenant.plan.maxUsers } : null,
       };
     });
   }

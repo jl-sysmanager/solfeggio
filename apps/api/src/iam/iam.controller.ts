@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, ForbiddenException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
@@ -42,6 +42,33 @@ export class IamController {
     return PERMISSIONS;
   }
 
+  /**
+   * Un editor sólo puede conceder permisos que él mismo tiene (el propietario los tiene todos), de modo
+   * que ni roles ni invitaciones permiten escalar privilegios, p. ej. darse `billing:manage`.
+   */
+  private assertCeiling(ctx: RequestContext, permissions: readonly string[]) {
+    const over = permissions.filter((p) => !ctx.permissions.has(p));
+    if (over.length) {
+      throw new ForbiddenException({ message: 'No puedes conceder permisos que no tienes', code: 'PERMISSION_CEILING', details: { permissions: over } });
+    }
+  }
+
+  private ownerOnly() {
+    return new ForbiddenException({ message: 'Sólo un propietario puede gestionar a los propietarios', code: 'OWNER_ONLY' });
+  }
+
+  /** Roles que quien gestiona usuarios puede asignar o invitar: dentro de su techo de permisos. */
+  @Perm('users:manage')
+  @Get('roles/assignable')
+  assignableRoles(@Ctx() ctx: RequestContext) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const roles = await tx.role.findMany({ orderBy: [{ isSystem: 'desc' }, { name: 'asc' }] });
+      return roles
+        .filter((r) => (r.key !== 'owner' || ctx.roleKey === 'owner') && r.permissions.every((p) => ctx.permissions.has(p)))
+        .map((r) => ({ id: r.id, key: r.key, name: r.name, isSystem: r.isSystem }));
+    });
+  }
+
   @Perm('roles:manage')
   @Get('roles')
   roles(@Ctx() ctx: RequestContext) {
@@ -53,6 +80,7 @@ export class IamController {
   @Perm('roles:manage')
   @Post('roles')
   createRole(@Ctx() ctx: RequestContext, @Body(zod(roleCreate)) body: z.infer<typeof roleCreate>) {
+    this.assertCeiling(ctx, body.permissions);
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const role = await tx.role.create({ data: { ...body, tenantId: ctx.tenantId } });
       await this.audit.log(tx, ctx, 'role.created', 'role', role.id, body);
@@ -68,6 +96,7 @@ export class IamController {
       if (role.key === 'owner' && body.permissions) {
         throw new BadRequestException({ message: 'Los permisos del propietario no se pueden modificar', code: 'OWNER_IMMUTABLE' });
       }
+      if (body.permissions) this.assertCeiling(ctx, body.permissions.filter((p) => !role.permissions.includes(p)));
       const updated = await tx.role.update({ where: { id }, data: body });
       await this.audit.log(tx, ctx, 'role.updated', 'role', id, body);
       return updated;
@@ -107,8 +136,16 @@ export class IamController {
   updateUser(@Ctx() ctx: RequestContext, @Param('membershipId', zod(idParam)) id: string, @Body(zod(userPatch)) body: z.infer<typeof userPatch>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const m = found(await tx.membership.findUnique({ where: { id }, include: { role: true } }), 'Usuario');
+      if (m.id === ctx.membershipId) {
+        throw new BadRequestException({ message: 'No puedes cambiar tu propio rol ni suspender tu acceso', code: 'SELF_CHANGE' });
+      }
+      if (m.role.key === 'owner' && ctx.roleKey !== 'owner') throw this.ownerOnly();
       await this.assertNotLastOwner(tx, m, body);
-      if (body.roleId) found(await tx.role.findUnique({ where: { id: body.roleId } }), 'Rol');
+      if (body.roleId) {
+        const role = found(await tx.role.findUnique({ where: { id: body.roleId } }), 'Rol');
+        if (role.key === 'owner' && ctx.roleKey !== 'owner') throw this.ownerOnly();
+        this.assertCeiling(ctx, role.permissions);
+      }
       const updated = await tx.membership.update({ where: { id }, data: body });
       await this.audit.log(tx, ctx, 'membership.updated', 'membership', id, body);
       return updated;
@@ -121,6 +158,7 @@ export class IamController {
   async removeUser(@Ctx() ctx: RequestContext, @Param('membershipId', zod(idParam)) id: string) {
     await this.db.tenant(ctx.tenantId, async (tx) => {
       const m = found(await tx.membership.findUnique({ where: { id }, include: { role: true } }), 'Usuario');
+      if (m.role.key === 'owner' && ctx.roleKey !== 'owner') throw this.ownerOnly();
       await this.assertNotLastOwner(tx, m, { remove: true });
       await tx.membership.delete({ where: { id } });
       await this.audit.log(tx, ctx, 'membership.removed', 'membership', id, { userId: m.userId });
@@ -159,6 +197,7 @@ export class IamController {
       if (role.key === 'owner' && ctx.roleKey !== 'owner') {
         throw new BadRequestException({ message: 'Sólo un propietario puede invitar propietarios', code: 'FORBIDDEN' });
       }
+      this.assertCeiling(ctx, role.permissions);
       if (body.memberId) found(await tx.member.findUnique({ where: { id: body.memberId } }), 'Socio');
       const inv = await tx.invitation.create({
         data: {

@@ -55,7 +55,7 @@ export const NAV: NavGroup[] = [
     label: 'Comunidad',
     items: [
       { to: '/market', icon: 'store', label: 'BandMarket', perm: ['market:read'], feature: 'market' },
-      { to: '/reinforcements', icon: 'handshake', label: 'Bolsa de refuerzos', feature: 'reinforcements' },
+      { to: '/reinforcements', icon: 'handshake', label: 'Bolsa de refuerzos', perm: ['events:read', 'reinforcements:manage'], feature: 'reinforcements' },
     ],
   },
   {

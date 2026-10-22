@@ -92,3 +92,13 @@ Los logs se envían en JSON por la salida estándar al agregador (Loki, CloudWat
 - **Mínima exposición:** las tablas del panel global (fotos, notas, avisos, registros de correo, latidos, denuncias) no son accesibles para el rol de la aplicación. Las notas internas de soporte no llegan nunca a la banda, ni siquiera con una consulta directa (RLS).
 - **Bloqueo de cuentas:** un usuario bloqueado por moderación pierde el acceso y sus tokens de refresco se revocan. Las acciones de bloqueo quedan en el registro de plataforma.
 - **Webhooks y latidos:** los endpoints públicos `/webhooks/email/:provider` y `/ops/heartbeat/:name` exigen un token propio (`EMAIL_WEBHOOK_TOKEN` y `OPS_HEARTBEAT_TOKEN`, de al menos 16 caracteres) y responden 401 si no está configurado.
+
+## 9. Control de accesos dentro de la banda
+
+- **Techo de permisos:** nadie puede conceder permisos que no tiene. Al crear o editar un rol, al asignar un rol a un usuario y al invitar, el API comprueba que los permisos del rol no superan los de quien actúa (403 `PERMISSION_CEILING`). Así un administrador no puede darse `billing:manage` editando su rol, ni invitar a un rol con más poder que el suyo.
+- **Propietarios:** sólo un propietario asigna el rol de propietario o cambia, suspende o retira a otro propietario (403 `OWNER_ONLY`). Siempre debe quedar al menos uno (`LAST_OWNER`).
+- **Sin cambios sobre uno mismo:** nadie cambia su propio rol ni suspende su acceso (400 `SELF_CHANGE`); lo hace otra persona con permiso.
+- **Mínimo necesario:** el panel de inicio devuelve cada indicador sólo si el rol tiene acceso al módulo que lo origina, y el profesorado no accede a los datos de contacto de las familias.
+- **Rol Archivero:** cuida el archivo musical (`archive:read` y `archive:write`) sin acceso a socios, tesorería ni escuela.
+- Todos los cambios de roles, usuarios e invitaciones quedan en la auditoría de la banda.
+

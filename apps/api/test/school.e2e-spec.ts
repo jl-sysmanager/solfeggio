@@ -91,10 +91,10 @@ describe('Escuela de música', () => {
       member = (await post('/members', { firstName: 'Marta', lastName: 'Pérez' }).expect(201)).body;
       guardian = (await post(`/school/families/${family.id}/guardians`, { firstName: 'Marta', lastName: 'Pérez', relationship: 'Madre', email: 'marta@familia.local', nationalId: '12345678Z', memberId: member.id }).expect(201)).body;
 
-      const asTeacher = await get('/school/families', teacherToken).expect(200);
-      expect(asTeacher.body[0].iban).toBeUndefined();
-      expect(asTeacher.body[0].ibanMasked).toMatch(/1332$/);
-      expect(asTeacher.body[0].guardians[0].nationalId).toBeUndefined();
+      // El profesorado no consulta el listado de familias ni las solicitudes de matrícula (datos de contacto).
+      await get('/school/families', teacherToken).expect(403);
+      await get(`/school/families/${family.id}`, teacherToken).expect(403);
+      await get('/school/applications', teacherToken).expect(403);
       await post('/school/families', { name: 'X' }, teacherToken).expect(403);
     });
 

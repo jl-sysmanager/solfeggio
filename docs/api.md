@@ -273,7 +273,40 @@ finance:write wardrobe:read wardrobe:write instruments:read instruments:write ma
 school:read school:write school:teach school:family performances:read performances:write
 reinforcements:manage governance:read governance:write governance:vote incidents:write`
 
-Roles de sistema: owner, admin, director, secretary, treasurer, material_manager, musician, collaborator, teacher (Profesor) y family (Familia).
+Roles de sistema: owner (Propietario), admin (Administrador), director, secretary (Secretario), treasurer (Tesorero), material_manager (Responsable de material), musician (Músico), collaborator (Colaborador), archivist (Archivero), teacher (Profesor) y family (Familia).
+
+### Menú visible por rol
+
+Cada entrada del menú aparece sólo si el rol tiene el permiso del módulo y el plan incluye la funcionalidad. Un rol personalizado se comporta igual según los permisos que se le marquen en Ajustes.
+
+| Entrada del menú | Propietario | Administrador | Director | Secretario | Tesorero | Responsable de material | Músico | Colaborador | Archivero | Profesor | Familia |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Inicio | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Agenda | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| Notificaciones | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Archivo musical | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| Ensayos y actuaciones | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| Asistencia | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · | · | · |
+| Contrataciones | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · | · |
+| Escuela de música | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | ✓ | · |
+| Portal de familias | ✓ | ✓ | · | · | · | · | · | · | · | · | ✓ |
+| Socios | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · |
+| Comunicaciones | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · | · | · |
+| Documentos | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | · | · | · | · |
+| Tesorería | ✓ | ✓ | · | · | ✓ | · | · | · | · | · | · |
+| Mayordomía | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · |
+| Instrumentación | ✓ | ✓ | ✓ | · | · | ✓ | · | · | · | · | · |
+| Gobierno | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | ✓ | · | · |
+| BandMarket | ✓ | ✓ | ✓ | · | · | ✓ | ✓ | · | ✓ | · | · |
+| Bolsa de refuerzos | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · |
+| Ajustes | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · |
+| Plan y facturación | ✓ | · | · | · | · | · | · | · | · | · | · |
+| Soporte | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | · | · |
+| Seguridad de la cuenta | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+- **Inicio** muestra únicamente los indicadores de los módulos a los que el rol tiene acceso: socios (`members:read`), asistencia (`attendance:read`), cuotas pendientes (`finance:read` con tesorería en el plan) y almacenamiento y usuarios (`tenant:manage`, `billing:manage` o `users:manage`). Las familias de la escuela entran directamente en su portal.
+- **Escuela:** el profesorado (`school:teach`) ve alumnos, grupos y clases, pero no el listado de familias, las solicitudes de matrícula ni el email de los tutores; eso queda para quien tiene `school:write`.
+- `GET /roles/assignable` [users:manage] → roles que quien lo pide puede asignar o invitar (dentro de sus propios permisos, y el de propietario sólo si lo es).
 
 ## Funcionalidades por plan
 

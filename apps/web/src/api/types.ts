@@ -42,13 +42,14 @@ export interface Plan {
   trialDays: number;
 }
 
+/** Cada indicador llega sólo si el rol tiene el permiso del módulo que lo origina; si no, `null`. */
 export interface Dashboard {
-  members: { active: number; total: number };
+  members: { active: number; total: number } | null;
   nextEvents: EventItem[];
-  pendingCharges: { count: number; amountCents: number };
+  pendingCharges: { count: number; amountCents: number } | null;
   attendanceRate30d: number | null;
-  storage: { usedBytes: number; limitBytes: number };
-  users: { used: number; limit: number };
+  storage: { usedBytes: number; limitBytes: number } | null;
+  users: { used: number; limit: number } | null;
 }
 
 export interface Section {

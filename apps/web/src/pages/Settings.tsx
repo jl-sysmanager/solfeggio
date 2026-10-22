@@ -61,6 +61,7 @@ function TenantTab() {
 }
 
 function RolesTab() {
+  const { can } = useAuth();
   const perms = useApi<PermissionDef[]>('/permissions');
   const roles = useApi<Role[]>('/roles');
   const [draft, setDraft] = useState<Record<string, string[]>>({});
@@ -131,7 +132,8 @@ function RolesTab() {
                             type="checkbox"
                             aria-label={`${p.label} para ${r.name}`}
                             checked={r.key === 'owner' || (draft[r.id] ?? []).includes(p.key)}
-                            disabled={r.key === 'owner'}
+                            disabled={r.key === 'owner' || (!(draft[r.id] ?? []).includes(p.key) && !can(p.key))}
+                            title={!can(p.key) ? 'No puedes conceder un permiso que no tienes' : undefined}
                             onChange={() => toggle(r.id, p.key)}
                             style={{ width: 18, height: 18, accentColor: 'var(--blue-600)' }}
                           />
@@ -206,7 +208,8 @@ function RolesTab() {
 function UsersTab() {
   const { session } = useAuth();
   const users = useApi<TenantUser[] | Paginated<TenantUser>>('/users');
-  const roles = useApi<Role[]>('/roles');
+  // Sólo los roles que quien gestiona usuarios puede asignar (dentro de sus propios permisos).
+  const roles = useApi<Pick<Role, 'id' | 'key' | 'name'>[]>('/roles/assignable');
   const invites = useApi<Invitation[]>('/invitations');
   const [inviting, setInviting] = useState(false);
   const [removing, setRemoving] = useState<TenantUser | null>(null);
@@ -247,6 +250,7 @@ function UsersTab() {
                       onChange={(e) => update.mutate({ id: u.id, body: { roleId: e.target.value } })}
                       style={{ minHeight: 36, padding: '4px 10px' }}
                     >
+                      {!roleOptions.some((o) => o.value === u.role.id) && <option value={u.role.id}>{u.role.name}</option>}
                       {roleOptions.map((o) => (
                         <option key={o.value} value={o.value}>
                           {o.label}

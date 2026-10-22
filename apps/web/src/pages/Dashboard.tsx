@@ -1,3 +1,4 @@
+import { Navigate } from 'react-router-dom';
 import { useApi } from '../api/hooks';
 import type { Dashboard } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
@@ -13,10 +14,13 @@ const PAID_FEATURES = ['treasury', 'wardrobe', 'instruments', 'communications', 
 
 export function DashboardPage() {
   const { session, can, hasFeature } = useAuth();
-  const q = useApi<Dashboard>('/dashboard');
+  // Las familias de la escuela sólo tienen su portal: es su página de inicio.
+  const familyOnly = can('school:family') && !can('events:read');
+  const q = useApi<Dashboard>(familyOnly ? null : '/dashboard');
   const d = q.data;
   const locked = PAID_FEATURES.filter((f) => !hasFeature(f));
   const firstName = session?.user.name.split(' ')[0];
+  if (familyOnly) return <Navigate to="/family" replace />;
 
   return (
     <Page
@@ -35,32 +39,38 @@ export function DashboardPage() {
       {d && (
         <>
           <section aria-label="Indicadores" className="grid grid--stats">
-            <StatCard label="Socios activos" value={d.members.active} hint={`${d.members.total} en total`} icon="users" iconColor="blue" />
-            <StatCard
-              label="Asistencia últimos 30 días"
-              value={percent(d.attendanceRate30d)}
-              meter={d.attendanceRate30d ?? undefined}
-              icon="check"
-              iconColor="green"
-            />
-            {can('finance:read') && hasFeature('treasury') && (
+            {d.members && <StatCard label="Socios activos" value={d.members.active} hint={`${d.members.total} en total`} icon="users" iconColor="blue" />}
+            {can('attendance:read') && (
+              <StatCard
+                label="Asistencia últimos 30 días"
+                value={percent(d.attendanceRate30d)}
+                meter={d.attendanceRate30d ?? undefined}
+                icon="check"
+                iconColor="green"
+              />
+            )}
+            {d.pendingCharges && (
               <StatCard label="Cuotas pendientes" value={money(d.pendingCharges.amountCents)} hint={`${d.pendingCharges.count} recibos`} icon="euro" iconColor="amber" />
             )}
-            <StatCard
-              label="Almacenamiento"
-              value={bytes(d.storage.usedBytes)}
-              hint={`de ${bytes(d.storage.limitBytes)}`}
-              icon="storage"
-              iconColor="slate"
-              meter={d.storage.limitBytes ? d.storage.usedBytes / d.storage.limitBytes : 0}
-            />
-            <StatCard
-              label="Usuarios"
-              value={`${d.users.used} / ${d.users.limit < 0 ? '∞' : d.users.limit}`}
-              meter={d.users.limit > 0 ? d.users.used / d.users.limit : undefined}
-              icon="user"
-              iconColor="blue"
-            />
+            {d.storage && (
+              <StatCard
+                label="Almacenamiento"
+                value={bytes(d.storage.usedBytes)}
+                hint={`de ${bytes(d.storage.limitBytes)}`}
+                icon="storage"
+                iconColor="slate"
+                meter={d.storage.limitBytes ? d.storage.usedBytes / d.storage.limitBytes : 0}
+              />
+            )}
+            {d.users && (
+              <StatCard
+                label="Usuarios"
+                value={`${d.users.used} / ${d.users.limit < 0 ? '∞' : d.users.limit}`}
+                meter={d.users.limit > 0 ? d.users.used / d.users.limit : undefined}
+                icon="user"
+                iconColor="blue"
+              />
+            )}
           </section>
 
           <div className="grid grid--2">

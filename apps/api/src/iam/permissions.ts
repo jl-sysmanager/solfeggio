@@ -87,6 +87,14 @@ export const SYSTEM_ROLES: { key: string; name: string; permissions: Permission[
   },
   { key: 'musician', name: 'Músico', permissions: ['archive:read', 'events:read', 'attendance:self', 'market:read', 'governance:read', 'governance:vote'] },
   { key: 'collaborator', name: 'Colaborador', permissions: ['events:read', 'archive:read'] },
+  {
+    key: 'archivist',
+    name: 'Archivero',
+    permissions: [
+      'archive:read', 'archive:write', 'events:read', 'attendance:self', 'market:read', 'governance:read', 'governance:vote',
+      'incidents:write',
+    ],
+  },
   { key: 'teacher', name: 'Profesor', permissions: ['archive:read', 'events:read', 'school:read', 'school:teach'] },
   { key: 'family', name: 'Familia', permissions: ['school:family'] },
 ];
