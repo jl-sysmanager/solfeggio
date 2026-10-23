@@ -4,6 +4,7 @@ import { Worker } from 'bullmq';
 import { AuditModule } from './audit/audit.service';
 import { BillingOpsService } from './billing/billing-ops.service';
 import { BillingService } from './billing/billing.service';
+import { PlanSync } from './billing/plan-sync';
 import { StripeClient } from './billing/stripe.provider';
 import { DbModule } from './db/db.service';
 import { IntegrationsModule } from './integrations/integrations.module';
@@ -16,7 +17,7 @@ import { StorageModule } from './storage/storage.service';
 
 @Module({
   imports: [DbModule, JobsModule, IntegrationsModule, StorageModule, AuditModule],
-  providers: [Processors, BillingService, StripeClient, BillingOpsService, InsightsService, SupportService, OpsService],
+  providers: [Processors, BillingService, PlanSync, StripeClient, BillingOpsService, InsightsService, SupportService, OpsService],
 })
 class WorkerModule {}
 
