@@ -19,6 +19,7 @@ import { IncidentsTab } from '../components/admin/IncidentsTab';
 import { MetricsTab } from '../components/admin/MetricsTab';
 import { ModerationTab } from '../components/admin/ModerationTab';
 import { OpsTab } from '../components/admin/OpsTab';
+import { BrandTab } from '../components/admin/BrandTab';
 import { TenantsTab } from '../components/admin/TenantsTab';
 
 /** Cierra dependencias al marcar una funcionalidad (misma regla que el API). */
@@ -175,6 +176,7 @@ const SECTIONS: Record<string, Section> = {
   ops: { eyebrow: 'Plataforma', title: 'Sistema', description: 'Colas de trabajos, correo, almacenamiento, tareas programadas y copias de seguridad.', content: () => <OpsTab /> },
   plans: { eyebrow: 'Plataforma', title: 'Planes', description: 'Precios, límites y funcionalidades de cada plan.', content: () => <PlansTab /> },
   integrations: { eyebrow: 'Plataforma', title: 'Integraciones', description: 'Pagos (Stripe) y correo: credenciales, estado y prueba de conexión.', content: () => <IntegrationsTab /> },
+  brand: { eyebrow: 'Plataforma', title: 'Marca', description: 'Logotipo que ven las bandas al entrar y en la cabecera de la aplicación.', content: () => <BrandTab /> },
 };
 
 /** Panel global: una pantalla por sección, elegida con la ruta `/admin/:section`. */

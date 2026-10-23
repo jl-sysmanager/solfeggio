@@ -213,10 +213,10 @@ export interface BookletEntry {
 }
 
 const PAGE: [number, number] = [595.28, 841.89];
-const LINES_PER_PAGE = 34;
+const LINES_PER_PAGE = 28;
 
 /** Índice (etiqueta, título, página o «falta») seguido de las particellas en el orden del libreto. */
-export async function mergeBooklet(title: string, instrument: string, entries: BookletEntry[]) {
+export async function mergeBooklet(title: string, instrument: string, entries: BookletEntry[], org?: string | null) {
   const out = await PDFDocument.create();
   out.setTitle(winAnsi(`${title} - ${instrument}`));
   const font = await out.embedFont(StandardFonts.Helvetica);
@@ -237,15 +237,27 @@ export async function mergeBooklet(title: string, instrument: string, entries: B
     while (cut.length > 1 && f.widthOfTextAtSize(cut + '...', size) > max) cut = cut.slice(0, -1);
     return cut + '...';
   };
+  const ink = rgb(0.12, 0.23, 0.37);
+  const mute = rgb(0.36, 0.42, 0.48);
   for (let p = 0; p < indexPages; p++) {
     const page = out.addPage(PAGE);
-    let y = PAGE[1] - 60;
+    page.drawRectangle({ x: 0, y: PAGE[1] - 10, width: PAGE[0], height: 10, color: ink });
+    let y = PAGE[1] - 48;
     if (p === 0) {
+      if (org) {
+        page.drawText(fit(org, bold, 11, 480), { x: 50, y, size: 11, font: bold, color: ink });
+        y -= 18;
+      }
       page.drawText(fit(title, bold, 18, 480), { x: 50, y, size: 18, font: bold });
-      y -= 24;
-      page.drawText(fit(instrument, font, 13, 480), { x: 50, y, size: 13, font, color: rgb(0.3, 0.3, 0.3) });
-      y -= 34;
+      y -= 22;
+      page.drawText(fit(instrument, font, 12, 480), { x: 50, y, size: 12, font, color: mute });
+      y -= 16;
+      page.drawLine({ start: { x: 50, y }, end: { x: 545, y }, thickness: 0.6, color: ink });
+      y -= 26;
     }
+    page.drawText('Solfeamos', { x: 50, y: 28, size: 8, font, color: mute });
+    const pageNo = `${p + 1} / ${indexPages}`;
+    page.drawText(pageNo, { x: 545 - font.widthOfTextAtSize(pageNo, 8), y: 28, size: 8, font, color: mute });
     entries.slice(p * LINES_PER_PAGE, (p + 1) * LINES_PER_PAGE).forEach((e, i) => {
       const idx = p * LINES_PER_PAGE + i;
       const color = e.pdf ? rgb(0, 0, 0) : rgb(0.55, 0.1, 0.1);

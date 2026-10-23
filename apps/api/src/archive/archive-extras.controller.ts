@@ -313,7 +313,8 @@ export class ArchiveExtrasController {
       if (part) pdf = await loadPdf(await this.storage.getObject(part.fileKey)).catch(() => null);
       entries.push({ label: item.label, title: item.work.title, composer: item.work.composer?.name ?? null, pdf });
     }
-    const bytes = await mergeBooklet(booklet.name, parts[0].instrument!, entries);
+    const tenant = await this.db.system.tenant.findUnique({ where: { id: ctx.tenantId }, select: { name: true } });
+    const bytes = await mergeBooklet(booklet.name, parts[0].instrument!, entries, tenant?.name);
     attachment(res, `${booklet.name} - ${parts[0].instrument}.pdf`, PDF);
     return new StreamableFile(Buffer.from(bytes));
   }

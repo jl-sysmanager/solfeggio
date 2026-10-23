@@ -18,15 +18,32 @@ import { date, dateTime } from '../lib/format';
 import { tenantStatus } from '../lib/labels';
 import { StatusChip } from '../components/Chip';
 import { REGIONS } from '../components/admin/support/shared';
+import { LogoEditor } from '../components/LogoEditor';
 
 function TenantTab() {
-  const { reload } = useAuth();
+  const { reload, can } = useAuth();
   const q = useApi<Tenant & { region?: string | null }>('/tenant');
   const save = useApiMutation((body: unknown) => patch('/tenant', body), { success: 'Datos de la banda guardados', invalidate: ['/tenant'], onSuccess: () => reload() });
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
   const t = q.data;
+  const preview = t.hasLogo ? `/api/v1/bands/${encodeURIComponent(t.slug)}/logo?v=${encodeURIComponent(t.logoVersion ?? '')}` : null;
   return (
+    <div className="stack" style={{ gap: 24 }}>
+    {can('tenant:manage') && (
+    <Card title="Logotipo de la banda">
+      <LogoEditor
+        previewUrl={preview}
+        uploadUrlPath="/tenant/logo/upload-url"
+        confirmPath="/tenant/logo"
+        deletePath="/tenant/logo"
+        onChanged={() => {
+          q.refetch();
+          reload();
+        }}
+      />
+    </Card>
+    )}
     <Card title="Datos de la banda">
       <form
         className="form"
@@ -57,6 +74,7 @@ function TenantTab() {
         </div>
       </form>
     </Card>
+    </div>
   );
 }
 
@@ -248,7 +266,6 @@ function UsersTab() {
                       aria-label={`Rol de ${u.user.name}`}
                       value={u.role.id}
                       onChange={(e) => update.mutate({ id: u.id, body: { roleId: e.target.value } })}
-                      style={{ minHeight: 36, padding: '4px 10px' }}
                     >
                       {!roleOptions.some((o) => o.value === u.role.id) && <option value={u.role.id}>{u.role.name}</option>}
                       {roleOptions.map((o) => (

@@ -92,6 +92,9 @@ model Tenant {
   tags                String[]     @default([])
   accountManagerId    String?      @db.Uuid
   region              String?
+  /// Logotipo de la banda (clave S3). Lo sube la propia banda y se muestra en la interfaz y en los documentos.
+  logoKey             String?
+  logoMime            String?
   /// Cuenta bonificada: sin cobro en Stripe hasta esa fecha (pilotos, bandas benéficas).
   complimentaryUntil  DateTime?
   complimentaryReason String?
@@ -104,6 +107,16 @@ model Tenant {
   memberships  Membership[]
 
   @@map("tenants")
+}
+
+/// Logotipo de la plataforma. Una sola fila (`id = platform`), editable desde el panel global.
+model PlatformBrand {
+  id       String   @id
+  logoKey  String?
+  logoMime String?
+  updatedAt DateTime @updatedAt
+
+  @@map("platform_brand")
 }
 
 model Subscription {

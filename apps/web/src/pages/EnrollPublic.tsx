@@ -7,7 +7,7 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState, ErrorNote, Loading } from '../components/EmptyState';
 import { Checkbox, FormError, TextAreaField, TextField, formValues } from '../components/Field';
-import { Wordmark } from '../components/Logo';
+import { BrandMark } from '../components/Logo';
 import { PageHeader } from '../components/PageHeader';
 import { money } from '../lib/format';
 import { subjectKind } from '../lib/labels-school';
@@ -55,7 +55,7 @@ export default function EnrollPublicPage() {
         Saltar al contenido
       </a>
       <div className="container" style={{ paddingTop: 16 }}>
-        <Wordmark />
+        <BrandMark />
       </div>
       <PageHeader title={o ? `Matrícula · ${o.band.name}` : 'Matrícula en la escuela de música'} description={o ? `Escuela de música · Curso ${o.year.name}` : undefined} />
       <main id="main" className="container page__body" style={{ maxWidth: 760 }}>

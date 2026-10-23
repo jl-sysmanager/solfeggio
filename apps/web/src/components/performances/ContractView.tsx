@@ -6,18 +6,9 @@ import { date, dateTime, money } from '../../lib/format';
 import { clientKind } from '../../lib/labels-performances';
 import { Button } from '../Button';
 import { ErrorNote, Loading } from '../EmptyState';
+import { brandOf, printDocument } from '../governance/print';
 import { Modal } from '../Modal';
 import { lineCents } from './totals';
-
-const PRINT_CSS = `
-  body { font: 12pt/1.5 Georgia, 'Times New Roman', serif; color: #111; margin: 2cm; }
-  h1 { font-size: 18pt; margin: 0 0 4pt; } h2 { font-size: 13pt; margin: 18pt 0 6pt; }
-  table { width: 100%; border-collapse: collapse; margin-top: 8pt; }
-  th, td { border-bottom: 1px solid #999; padding: 4pt 6pt; text-align: left; vertical-align: top; }
-  .num { text-align: right; white-space: nowrap; } .muted { color: #555; } .terms { white-space: pre-wrap; }
-  .parties { display: flex; gap: 24pt; } .parties > div { flex: 1; }
-  .sign { display: flex; gap: 24pt; margin-top: 48pt; } .sign > div { flex: 1; border-top: 1px solid #111; padding-top: 4pt; }
-`;
 
 /** Documento de contrato (presupuesto aceptado) apto para imprimir o guardar como PDF. */
 export function ContractDocument({ quote, bandName }: { quote: Quote; bandName: string }) {
@@ -128,13 +119,9 @@ export function ContractModal({ quoteId, onClose }: { quoteId: string | null; on
   const bandName = session?.tenant?.name ?? 'La banda';
 
   function print() {
-    // Ventana aparte con estilos de impresión propios: la interfaz de la aplicación no se imprime.
-    const w = window.open('', '_blank', 'noopener=no,width=900,height=1000');
-    if (!w || !ref.current) return;
-    w.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Contrato ${quote?.number ?? ''}</title><style>${PRINT_CSS}</style></head><body>${ref.current.innerHTML}</body></html>`);
-    w.document.close();
-    w.focus();
-    w.print();
+    if (!ref.current || !quote) return;
+    const brand = brandOf(session);
+    printDocument(quote.status === 'ACCEPTED' ? `Contrato ${quote.number}` : `Presupuesto ${quote.number}`, ref.current.innerHTML, { ...brand, org: bandName });
   }
 
   return (

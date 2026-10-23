@@ -6,7 +6,7 @@ import { effectiveLimits } from '../tenancy/effective-limits';
 
 export interface Session {
   user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean };
-  tenant: { id: string; name: string; slug: string; status: string; timezone: string } | null;
+  tenant: { id: string; name: string; slug: string; status: string; timezone: string; hasLogo: boolean; logoVersion: string | null } | null;
   role: { id: string; key: string; name: string } | null;
   permissions: string[];
   plan: { code: string; name: string; features: string[]; maxUsers: number; maxMembers: number; storageMb: number } | null;
@@ -53,6 +53,8 @@ export class SessionService {
             slug: active.tenant.slug,
             status: active.tenant.status,
             timezone: active.tenant.timezone,
+            hasLogo: !!active.tenant.logoKey,
+            logoVersion: active.tenant.logoKey ? active.tenant.updatedAt.toISOString() : null,
           }
         : null,
       role: active ? { id: active.role.id, key: active.role.key, name: active.role.name } : null,
@@ -85,7 +87,10 @@ export class SessionService {
     ]);
     return {
       user: { id: user.id, email: user.email, name: user.name, mfaEnabled: user.mfaEnabled, isPlatformAdmin: user.isPlatformAdmin },
-      tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status, timezone: tenant.timezone },
+      tenant: {
+        id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status, timezone: tenant.timezone,
+        hasLogo: !!tenant.logoKey, logoVersion: tenant.logoKey ? tenant.updatedAt.toISOString() : null,
+      },
       role: IMPERSONATION_ROLE,
       permissions: IMPERSONATION_PERMISSIONS,
       plan: {

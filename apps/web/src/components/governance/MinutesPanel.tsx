@@ -9,10 +9,10 @@ import { FormError, TextAreaField } from '../Field';
 import { ConfirmModal } from '../Modal';
 import { date } from '../../lib/format';
 import { minutesHtml } from './MinutesBookTab';
-import { printDocument } from './print';
+import { brandOf, printDocument } from './print';
 
 export function MinutesPanel({ assembly }: { assembly: AssemblyDetail }) {
-  const { can } = useAuth();
+  const { can, session } = useAuth();
   const approved = !!assembly.minutesApprovedAt;
   const editable = can('governance:write') && !approved;
   const [text, setText] = useState(assembly.minutes ?? '');
@@ -41,7 +41,7 @@ export function MinutesPanel({ assembly }: { assembly: AssemblyDetail }) {
           size="sm"
           variant="ghost"
           disabled={!text}
-          onClick={() => printDocument(assembly.title, minutesHtml({ ...assembly, minutes: text, minutesApprovedAt: assembly.minutesApprovedAt ?? '' }))}
+          onClick={() => printDocument(assembly.title, minutesHtml({ ...assembly, minutes: text, minutesApprovedAt: assembly.minutesApprovedAt ?? '' }), brandOf(session))}
         >
           Imprimir
         </Button>

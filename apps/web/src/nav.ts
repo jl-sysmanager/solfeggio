@@ -125,6 +125,7 @@ export const ADMIN_NAV: NavGroup[] = [
       { to: '/admin/ops', icon: 'storage', label: 'Sistema' },
       { to: '/admin/plans', icon: 'euro', label: 'Planes' },
       { to: '/admin/integrations', icon: 'settings', label: 'Integraciones' },
+      { to: '/admin/brand', icon: 'landmark', label: 'Marca' },
     ],
   },
 ];

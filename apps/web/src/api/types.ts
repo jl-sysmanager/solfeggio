@@ -20,7 +20,7 @@ export interface Membership {
 
 export interface Session {
   user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean };
-  tenant: { id: string; name: string; slug: string; status: TenantStatus; timezone: string } | null;
+  tenant: { id: string; name: string; slug: string; status: TenantStatus; timezone: string; hasLogo?: boolean; logoVersion?: string | null } | null;
   role: { id: string; key: string; name: string } | null;
   permissions: string[];
   plan: { code: PlanCode; name: string; features: string[]; maxUsers: number; maxMembers: number; storageMb: number } | null;
@@ -399,6 +399,8 @@ export interface Tenant {
   timezone: string;
   locale: string;
   status: TenantStatus;
+  hasLogo?: boolean;
+  logoVersion?: string | null;
 }
 
 export interface NotificationItem {

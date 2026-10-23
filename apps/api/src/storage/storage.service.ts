@@ -59,6 +59,18 @@ export class Storage implements OnApplicationBootstrap {
     return `tenants/${tenantId}/${area}/${randomUUID()}.${ext}`;
   }
 
+  /** Clave del logotipo de plataforma. No pertenece a ningún tenant. */
+  platformLogoKey(fileName: string) {
+    const ext = fileName.includes('.') ? fileName.split('.').pop()!.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 8) : 'bin';
+    return `platform/brand/${randomUUID()}.${ext}`;
+  }
+
+  assertPlatformLogo(key: string) {
+    if (!/^platform\/brand\/[0-9a-f-]{36}\.[a-z0-9]{1,8}$/.test(key)) {
+      throw new BadRequestException({ message: 'Clave de archivo no válida', code: 'INVALID_FILE_KEY' });
+    }
+  }
+
   assertOwned(tenantId: string, key: string, area: string) {
     if (!key.startsWith(`tenants/${tenantId}/${area}/`) || key.includes('..')) {
       throw new BadRequestException({ message: 'Clave de archivo no válida', code: 'INVALID_FILE_KEY' });

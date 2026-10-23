@@ -15,6 +15,7 @@ import { Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
 import { groupLabel, slotText } from '../components/school/common';
 import { StudentFormModal } from '../components/school/StudentsTab';
+import { brandOf, escapeHtml, printDocument } from '../components/governance/print';
 import { date, fullName, money } from '../lib/format';
 import { attendanceStatus } from '../lib/labels';
 import { bandStage, enrollmentStatus, score, studentStatus, termName, tuitionStatus } from '../lib/labels-school';
@@ -89,8 +90,30 @@ function PromoteModal({ student, open, onClose }: { student: StudentDetail; open
   );
 }
 
+function reportCardHtml(r: ReportCard) {
+  const rows = r.subjects
+    .map((s) => {
+      const cells = [1, 2, 3, 4]
+        .map((t) => {
+          const g = s.grades.find((x) => x.term === t);
+          const text = g ? [g.scoreTenths != null ? score(g.scoreTenths) : null, g.qualitative].filter(Boolean).join(' · ') || '—' : '—';
+          return `<td class="num">${escapeHtml(text)}</td>`;
+        })
+        .join('');
+      const abs = (s.attendance.ABSENT ?? 0) + (s.attendance.EXCUSED ?? 0);
+      return `<tr><th>${escapeHtml(s.subject)}<div class="muted">${escapeHtml([s.groupName, s.teacher].filter(Boolean).join(' · '))}</div></th>${cells}<td class="num">${abs}</td></tr>`;
+    })
+    .join('');
+  const notes = r.subjects.flatMap((s) => s.grades.filter((g) => g.comment).map((g) => `<li><strong>${escapeHtml(s.subject)} (${escapeHtml(termName(g.term))}):</strong> ${escapeHtml(g.comment ?? '')}</li>`)).join('');
+  return `<h1>Boletín de notas</h1>
+<p><strong>${escapeHtml(fullName(r.student))}</strong>${r.year ? ` · Curso ${escapeHtml(r.year.name)}` : ''}${r.student.instrument ? ` · ${escapeHtml(r.student.instrument)}` : ''}</p>
+<table><thead><tr><th>Asignatura</th>${[1, 2, 3, 4].map((t) => `<th class="num">${escapeHtml(termName(t))}</th>`).join('')}<th class="num">Faltas</th></tr></thead><tbody>${rows || '<tr><td colspan="6">Sin asignaturas en este curso.</td></tr>'}</tbody></table>
+${notes ? `<h2>Observaciones</h2><ul>${notes}</ul>` : ''}`;
+}
+
 /** Boletín imprimible: al imprimir sólo se muestra esta sección. */
 function ReportCardSection({ studentId }: { studentId: string }) {
+  const { session } = useAuth();
   const years = useApi<SchoolYear[]>('/school/years');
   const [yearId, setYearId] = useState('');
   const q = useApi<ReportCard>(`/school/students/${studentId}/report-card`, { yearId: yearId || undefined });
@@ -101,17 +124,12 @@ function ReportCardSection({ studentId }: { studentId: string }) {
       actions={
         <>
           <SelectField label="Curso" value={yearId || r?.year?.id || ''} onChange={(e) => setYearId(e.target.value)} options={(years.data ?? []).map((y) => ({ value: y.id, label: y.name }))} />
-          <Button variant="ghost" size="sm" onClick={() => window.print()}>
+          <Button variant="ghost" size="sm" disabled={!r} onClick={() => r && printDocument(`Boletín · ${fullName(r.student)}`, reportCardHtml(r), brandOf(session))}>
             Imprimir boletín
           </Button>
         </>
       }
     >
-      <style>{`@media print {
-        body * { visibility: hidden; }
-        .report-card, .report-card * { visibility: visible; }
-        .report-card { position: absolute; inset: 0 auto auto 0; width: 100%; padding: 24px; }
-      }`}</style>
       {q.isLoading && <Loading rows={3} />}
       {r && (
         <div className="report-card">

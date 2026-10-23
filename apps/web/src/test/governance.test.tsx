@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeQuorum } from '../components/governance/AttendancePanel';
+import { documentHtml } from '../components/governance/print';
 import { minutesHtml } from '../components/governance/MinutesBookTab';
 import { certificateHtml } from '../components/treasury/DonorsTab';
 
@@ -31,5 +32,14 @@ describe('vistas imprimibles', () => {
     expect(html).toContain('Ley 49/2002');
     expect(html).toContain('12345678Z');
     expect(html).toMatch(/100,00/);
+  });
+
+  it('la cabecera del documento lleva la banda y escapa el nombre', () => {
+    const html = documentHtml('Acta', '<p>Cuerpo</p>', { org: 'Banda <script>', logoUrl: 'https://ejemplo.test/logo.png' });
+    expect(html).toContain('Banda &lt;script&gt;');
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('https://ejemplo.test/logo.png');
+    expect(html).toContain('Solfeamos');
+    expect(html).toContain('<p>Cuerpo</p>');
   });
 });

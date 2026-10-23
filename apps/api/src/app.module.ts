@@ -38,6 +38,7 @@ import { WardrobeController } from './wardrobe/wardrobe.controller';
 import { AdminInsightsController } from './platform/admin-insights.controller';
 import { AdminOpsController } from './platform/admin-ops.controller';
 import { AdminSupportController } from './platform/admin-support.controller';
+import { BrandController } from './platform/brand.controller';
 import { AnnouncementsController } from './platform/announcements.controller';
 import { ImpersonationController } from './platform/impersonation.controller';
 import { InsightsService } from './platform/insights.service';
@@ -103,6 +104,7 @@ import { TreasuryExtrasController } from './treasury/treasury-extras.controller'
     AdminSupportController,
     AnnouncementsController,
     AdminOpsController,
+    BrandController,
   ],
   providers: [
     LimitsService,

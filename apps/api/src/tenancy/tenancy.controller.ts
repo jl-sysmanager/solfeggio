@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Patch, Post, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { z } from 'zod';
@@ -9,6 +9,9 @@ import { env } from '../config/env';
 import { FEATURE_MODULES } from '../billing/feature-catalog';
 import { Db } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
+import { acceptLogo, assertLogoRequest } from '../platform/logo';
+import { uploadRequest } from '../storage/upload';
+import { Storage } from '../storage/storage.service';
 import { effectiveLimits } from './effective-limits';
 import { OnboardingService } from './onboarding.service';
 
@@ -27,6 +30,12 @@ export const REGIONS = [
 
 /** Campos de la banda visibles para sus usuarios (sin contadores internos como el almacenamiento). */
 const TENANT_FIELDS = { id: true, name: true, slug: true, legalName: true, taxId: true, country: true, timezone: true, locale: true, region: true, status: true, createdAt: true } as const;
+const TENANT_SELECT = { ...TENANT_FIELDS, logoKey: true, updatedAt: true } as const;
+
+function presentTenant<T extends { logoKey: string | null; updatedAt: Date }>(t: T) {
+  const { logoKey, updatedAt, ...rest } = t;
+  return { ...rest, updatedAt, hasLogo: !!logoKey, logoVersion: logoKey ? updatedAt.toISOString() : null };
+}
 
 const tenantPatch = z.object({
   name: z.string().trim().min(2).max(120).optional(),
@@ -46,6 +55,7 @@ export class TenancyController {
     private readonly db: Db,
     private readonly onboarding: OnboardingService,
     private readonly audit: Audit,
+    private readonly storage: Storage,
   ) {}
 
   @Public()
@@ -80,21 +90,58 @@ export class TenancyController {
   }
 
   @Get('tenant')
-  tenant(@Ctx() ctx: RequestContext) {
-    return this.db.tenant(ctx.tenantId, (tx) =>
-      tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: TENANT_FIELDS }),
-    );
+  async tenant(@Ctx() ctx: RequestContext) {
+    const t = await this.db.tenant(ctx.tenantId, (tx) => tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: TENANT_SELECT }));
+    return presentTenant(t);
   }
 
   @Perm('tenant:manage')
   @Patch('tenant')
-  updateTenant(@Ctx() ctx: RequestContext, @Body(zod(tenantPatch)) body: z.infer<typeof tenantPatch>) {
+  async updateTenant(@Ctx() ctx: RequestContext, @Body(zod(tenantPatch)) body: z.infer<typeof tenantPatch>) {
     // Sólo campos de la lista blanca: estado, plan y uso de almacenamiento los gestiona el sistema.
-    return this.db.tenant(ctx.tenantId, async (tx) => {
-      const t = await tx.tenant.update({ where: { id: ctx.tenantId }, data: body, select: TENANT_FIELDS });
-      await this.audit.log(tx, ctx, 'tenant.updated', 'tenant', t.id, body);
-      return t;
+    const t = await this.db.tenant(ctx.tenantId, async (tx) => {
+      const row = await tx.tenant.update({ where: { id: ctx.tenantId }, data: body, select: TENANT_SELECT });
+      await this.audit.log(tx, ctx, 'tenant.updated', 'tenant', row.id, body);
+      return row;
     });
+    return presentTenant(t);
+  }
+
+  @Perm('tenant:manage')
+  @Post('tenant/logo/upload-url')
+  async logoUploadUrl(@Ctx() ctx: RequestContext, @Body(zod(uploadRequest)) body: z.infer<typeof uploadRequest>) {
+    assertLogoRequest(body.mimeType, body.sizeBytes);
+    const fileKey = this.storage.newKey(ctx.tenantId, 'brand', body.fileName);
+    return { fileKey, uploadUrl: await this.storage.uploadUrl(fileKey, body.mimeType, body.sizeBytes) };
+  }
+
+  @Perm('tenant:manage')
+  @Post('tenant/logo')
+  async logoSave(@Ctx() ctx: RequestContext, @Body(zod(z.object({ fileKey: z.string().max(300) }))) body: { fileKey: string }) {
+    this.storage.assertOwned(ctx.tenantId, body.fileKey, 'brand');
+    const { mime } = await acceptLogo(this.storage, body.fileKey);
+    const t = await this.db.tenant(ctx.tenantId, async (tx) => {
+      const prev = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { logoKey: true } });
+      const row = await tx.tenant.update({ where: { id: ctx.tenantId }, data: { logoKey: body.fileKey, logoMime: mime }, select: TENANT_SELECT });
+      await this.audit.log(tx, ctx, 'tenant.logo', 'tenant', row.id);
+      if (prev.logoKey && prev.logoKey !== body.fileKey) await this.storage.remove(prev.logoKey);
+      return row;
+    });
+    return presentTenant(t);
+  }
+
+  @Perm('tenant:manage')
+  @Delete('tenant/logo')
+  @HttpCode(200)
+  async logoRemove(@Ctx() ctx: RequestContext) {
+    const t = await this.db.tenant(ctx.tenantId, async (tx) => {
+      const prev = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { logoKey: true } });
+      const row = await tx.tenant.update({ where: { id: ctx.tenantId }, data: { logoKey: null, logoMime: null }, select: TENANT_SELECT });
+      await this.audit.log(tx, ctx, 'tenant.logo_removed', 'tenant', row.id);
+      if (prev.logoKey) await this.storage.remove(prev.logoKey);
+      return row;
+    });
+    return presentTenant(t);
   }
 
   @Get('dashboard')

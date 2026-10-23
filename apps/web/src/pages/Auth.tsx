@@ -5,19 +5,24 @@ import type { Session } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { FormError, TextField, formValues } from '../components/Field';
-import { Wordmark } from '../components/Logo';
+import { BrandMark } from '../components/Logo';
 
-export function AuthLayout({ title, children }: { title: string; children: ReactNode }) {
+export function AuthLayout({ title, lead, children }: { title: string; lead?: string; children: ReactNode }) {
   return (
     <div className="auth">
-      {/* Panel oscuro con el mismo fondo que la barra lateral (DESIGN.md: Dashboard Style). */}
       <aside className="auth__aside" aria-label="Solfeamos">
         <Link to="/login" className="brand brand--on-dark" aria-label="Solfeamos, entrar">
-          <Wordmark />
+          <BrandMark />
         </Link>
-        <div>
+        <div className="auth__copy">
+          <p className="auth__kicker">Para bandas de música</p>
           <p className="auth__headline">Toda tu banda, en un solo panel.</p>
-          <p className="auth__lead">Archivo musical, ensayos, asistencia, tesorería y material, con los datos de cada banda siempre separados.</p>
+          <p className="auth__lead">Archivo, ensayos, socios, tesorería y escuela. Cada banda trabaja con sus datos, separados del resto.</p>
+          <ul className="auth__points">
+            <li>Convocatorias y asistencia en el mismo sitio</li>
+            <li>Partituras, cuotas y actas listas para imprimir</li>
+            <li>La marca de tu banda en la aplicación y en los documentos</li>
+          </ul>
         </div>
         <div className="auth__preview" aria-hidden="true">
           <div>
@@ -37,6 +42,7 @@ export function AuthLayout({ title, children }: { title: string; children: React
       <main id="main" className="auth__panel">
         <div className="auth__card card">
           <h1>{title}</h1>
+          {lead && <p className="auth__card-lead">{lead}</p>}
           {children}
         </div>
       </main>
@@ -97,7 +103,7 @@ export function LoginPage() {
   }
 
   return (
-    <AuthLayout title={step === 'mfa' ? 'Verificación en dos pasos' : 'Entrar'}>
+    <AuthLayout title={step === 'mfa' ? 'Verificación en dos pasos' : 'Entrar'} lead={step === 'mfa' ? 'Introduce el código de tu aplicación de autenticación.' : 'Accede con el email de tu cuenta.'}>
       <form className="form" onSubmit={submit} noValidate={false}>
         {step === 'credentials' ? (
           <>
@@ -106,7 +112,6 @@ export function LoginPage() {
           </>
         ) : (
           <>
-            <p className="small">Introduce el código de 6 dígitos de tu aplicación de autenticación.</p>
             <TextField
               label="Código"
               name="mfaCode"
@@ -168,7 +173,7 @@ export function RegisterPage() {
   }
 
   return (
-    <AuthLayout title="Crear cuenta">
+    <AuthLayout title="Crear cuenta" lead="En unos minutos tendrás el panel de tu banda.">
       <form className="form" onSubmit={submit}>
         <TextField label="Nombre y apellidos" name="name" autoComplete="name" required autoFocus />
         <TextField label="Email" name="email" type="email" autoComplete="email" required />
@@ -217,9 +222,8 @@ export function AcceptInvitePage() {
   }
 
   return (
-    <AuthLayout title="Únete a tu banda">
+    <AuthLayout title="Únete a tu banda" lead="Te han invitado a Solfeamos. Si es tu primera vez, indica tu nombre y una contraseña. Si ya tienes cuenta, introduce tu contraseña actual.">
       <form className="form" onSubmit={submit}>
-        <p className="small">Te han invitado a Solfeamos. Si es tu primera vez, indica tu nombre y una contraseña. Si ya tienes cuenta, introduce tu contraseña actual.</p>
         <TextField label="Nombre y apellidos" name="name" autoComplete="name" />
         <TextField label="Contraseña" name="password" type="password" autoComplete="new-password" required minLength={12} />
         <FormError error={error} />

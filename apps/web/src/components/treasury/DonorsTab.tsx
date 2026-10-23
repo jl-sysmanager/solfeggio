@@ -9,7 +9,7 @@ import { Chip } from '../Chip';
 import { DataTable } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { Checkbox, FormError, SelectField, TextField, formValues } from '../Field';
-import { escapeHtml, printDocument } from '../governance/print';
+import { brandOf, escapeHtml, printDocument } from '../governance/print';
 import { Menu } from '../Menu';
 import { ConfirmModal, Modal } from '../Modal';
 import { useToast } from '../Toasts';
@@ -149,7 +149,7 @@ function DonationsModal({ donorId, onClose }: { donorId: string; onClose: () => 
 }
 
 export function DonorsTab() {
-  const { can } = useAuth();
+  const { can, session } = useAuth();
   const toast = useToast();
   const write = can('finance:write');
   const [year, setYear] = useState(new Date().getFullYear() - (new Date().getMonth() < 3 ? 1 : 0));
@@ -163,7 +163,7 @@ export function DonorsTab() {
     try {
       const c = await get<DonationCertificate>(`/finance/donors/${d.id}/certificate`, { year });
       if (c.donations.length === 0) return toast.notify(`${d.name} no tiene donativos en ${year}`);
-      if (!printDocument(`Certificado ${year} · ${d.name}`, certificateHtml(c))) toast.notify('Permite las ventanas emergentes para imprimir');
+      if (!printDocument(`Certificado ${year} · ${d.name}`, certificateHtml(c), brandOf(session))) toast.notify('Permite las ventanas emergentes para imprimir');
     } catch (e) {
       toast.error(e);
     }

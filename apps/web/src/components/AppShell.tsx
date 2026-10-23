@@ -9,7 +9,7 @@ import { ImpersonationBanner } from './admin/ImpersonationBanner';
 import { Avatar } from './Avatar';
 import { CommandPalette, useCommandPaletteShortcut } from './CommandPalette';
 import { Icon } from './Icon';
-import { Wordmark } from './Logo';
+import { BrandMark } from './Logo';
 import { Menu, type MenuItem } from './Menu';
 import { useNavSections } from './useNavSections';
 import { tenantStatus } from '../lib/labels';
@@ -122,7 +122,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <nav id="sidenav" className={`sidenav${open ? ' is-open' : ''}`} aria-label="Navegación principal">
           <div className="sidenav__brand">
             <Link to={homeTo} className="brand brand--on-dark" aria-label="Solfeamos, inicio">
-              <Wordmark />
+              <BrandMark />
             </Link>
             <button
               type="button"
@@ -142,6 +142,13 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
           {!adminMode && session?.tenant && (
             <div className="sidenav__tenant">
+              {session.tenant.hasLogo && (
+                <img
+                  className="sidenav__logo"
+                  src={`/api/v1/bands/${encodeURIComponent(session.tenant.slug)}/logo${session.tenant.logoVersion ? `?v=${encodeURIComponent(session.tenant.logoVersion)}` : ''}`}
+                  alt=""
+                />
+              )}
               <p className="sidenav__tenant-name">{session.tenant.name}</p>
               {status && <span className={`chip chip--${tenantStatus[status]?.tone ?? 'neutral'}`}>{tenantStatus[status]?.label ?? status}</span>}
             </div>
@@ -203,7 +210,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Icon name={open ? 'close' : 'menu'} size={20} />
               </button>
               <Link to={homeTo} className="brand topbar__brand" aria-label="Solfeamos, inicio">
-                <Wordmark />
+                <BrandMark />
               </Link>
               <button type="button" className="search-trigger" onClick={openPalette} aria-label="Buscar y navegar (Ctrl+K)" aria-keyshortcuts="Control+K Meta+K">
                 <Icon name="search" size={16} />
