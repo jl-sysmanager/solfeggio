@@ -108,6 +108,17 @@ describe('Facturación con Stripe', () => {
     expect(members.body.total).toBe(1);
   });
 
+  it('checkout publica el precio en Stripe si el plan todavía no lo tiene', async () => {
+    await ctx.db.system.plan.update({ where: { code: 'ENTERPRISE' }, data: { stripePriceMonthly: null, stripePriceYearly: null } });
+    const res = await ctx.http().post('/api/v1/billing/checkout').set(auth(band.token)).send({ planCode: 'ENTERPRISE', interval: 'MONTH' }).expect(200);
+    const plan = await ctx.db.system.plan.findUniqueOrThrow({ where: { code: 'ENTERPRISE' } });
+    expect(plan.stripePriceMonthly).toBe('price_ENTERPRISE_month');
+    expect(plan.stripePriceYearly).toBe('price_ENTERPRISE_year');
+    expect(res.body.url).toContain('checkout.stripe.test');
+    const call = ctx.stripe.calls.find((c) => c.method === 'checkout.create' && c.args.metadata?.planCode === 'ENTERPRISE')!.args;
+    expect(call.line_items).toEqual([{ price: 'price_ENTERPRISE_month', quantity: 1 }]);
+  });
+
   it('una nueva suscripción tras cancelar no repite la prueba gratuita', async () => {
     ctx.stripe.calls.length = 0;
     await ctx.http().post('/api/v1/billing/checkout').set(auth(band.token)).send({ planCode: 'PRO', interval: 'MONTH' }).expect(200);

@@ -79,7 +79,21 @@ export class FakeStripe {
   }
   client = {
     checkout: { sessions: { create: async (args: any) => (this.calls.push({ method: 'checkout.create', args }), { url: 'https://checkout.stripe.test/s' }) } },
-    billingPortal: { sessions: { create: async (args: any) => (this.calls.push({ method: 'portal.create', args }), { url: 'https://billing.stripe.test/p' }) } },
+    billingPortal: {
+      sessions: { create: async (args: any) => (this.calls.push({ method: 'portal.create', args }), { url: 'https://billing.stripe.test/p' }) },
+      configurations: { list: async () => ({ data: [] }) },
+    },
+    products: {
+      search: async () => ({ data: [] }),
+      create: async (args: any) => (this.calls.push({ method: 'products.create', args }), { id: `prod_${args.metadata.planCode}` }),
+      update: async (id: string, args: any) => (this.calls.push({ method: 'products.update', args: { id, ...args } }), { id }),
+    },
+    prices: {
+      create: async (args: any) => {
+        this.calls.push({ method: 'prices.create', args });
+        return { id: `price_${args.metadata.planCode}_${args.recurring.interval}`, active: true, unit_amount: args.unit_amount, currency: args.currency, recurring: args.recurring, product: args.product };
+      },
+    },
     subscriptions: {
       retrieve: async (id: string) => this.subscriptions.get(id),
       update: async (id: string, args: any) => {

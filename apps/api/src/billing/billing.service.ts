@@ -7,6 +7,7 @@ import { IntegrationsService } from '../integrations/integrations.service';
 import { Jobs } from '../jobs/jobs.service';
 import { effectiveLimits } from '../tenancy/effective-limits';
 import { addonLines, addonPrices, isComplimentary } from './addons';
+import { PlanSync } from './plan-sync';
 import { StripeClient } from './stripe.provider';
 
 const DAY = 86_400_000;
@@ -20,6 +21,7 @@ export class BillingService {
     private readonly stripe: StripeClient,
     private readonly jobs: Jobs,
     private readonly integrations: IntegrationsService,
+    private readonly planSync: PlanSync,
   ) {}
 
   async overview(tenantId: string) {
@@ -74,7 +76,7 @@ export class BillingService {
     // Comprueba primero que los pagos estén habilitados (503) antes de validar precios o crear clientes.
     const { taxEnabled } = await this.stripe.settings();
     const plan = await this.db.system.plan.findUniqueOrThrow({ where: { code: planCode } });
-    const price = interval === 'YEAR' ? plan.stripePriceYearly : plan.stripePriceMonthly;
+    const price = await this.priceForCheckout(plan, interval);
     if (!price) throw new BadRequestException({ message: 'Precio no configurado para este plan', code: 'PRICE_NOT_CONFIGURED' });
 
     const { tenant, customerId } = await this.ensureCustomer(tenantId, email);
@@ -105,6 +107,24 @@ export class BillingService {
       { idempotencyKey: `checkout:${tenantId}:${planCode}:${interval}:${Math.floor(Date.now() / 60_000)}` },
     );
     return { url: session.url };
+  }
+
+  /** Usa el precio de Stripe del plan. Si el panel tiene importe pero aún no hay precio, lo publica. */
+  private async priceForCheckout(plan: { id: string; code: PlanCode; name: string; priceMonthlyCents: number; priceYearlyCents: number; stripePriceMonthly: string | null; stripePriceYearly: string | null }, interval: BillingInterval) {
+    const cents = interval === 'YEAR' ? plan.priceYearlyCents : plan.priceMonthlyCents;
+    const price = interval === 'YEAR' ? plan.stripePriceYearly : plan.stripePriceMonthly;
+    if (price || cents <= 0) return price;
+    const catalog = {
+      code: plan.code,
+      name: plan.name,
+      priceMonthlyCents: plan.priceMonthlyCents,
+      priceYearlyCents: plan.priceYearlyCents,
+      stripePriceMonthly: plan.stripePriceMonthly,
+      stripePriceYearly: plan.stripePriceYearly,
+    };
+    const synced = await this.planSync.publish(catalog, catalog);
+    await this.db.system.plan.update({ where: { id: plan.id }, data: synced });
+    return interval === 'YEAR' ? synced.stripePriceYearly : synced.stripePriceMonthly;
   }
 
   async portal(tenantId: string, email: string) {
