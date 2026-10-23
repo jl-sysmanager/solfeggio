@@ -40,7 +40,7 @@ const schema = z.object({
   MAX_UPLOAD_MB: z.coerce.number().default(100),
 
   SMTP_URL: z.string().default('smtp://localhost:1025'),
-  MAIL_FROM: z.string().default('Solfeggio <no-reply@solfeggio.local>'),
+  MAIL_FROM: z.string().default('Solfeamos <no-reply@solfeggio.local>'),
 
   STRIPE_SECRET_KEY: z.string().optional().default(''),
   STRIPE_WEBHOOK_SECRET: z.string().optional().default(''),

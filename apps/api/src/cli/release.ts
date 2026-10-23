@@ -67,7 +67,7 @@ async function platformAdmin(owner: PrismaClient) {
     return;
   }
   await owner.user.create({
-    data: { email, name: 'Administración Solfeggio', isPlatformAdmin: true, passwordHash: await argon2.hash(password, { type: argon2.argon2id }), emailVerifiedAt: new Date() },
+    data: { email, name: 'Administración Solfeamos', isPlatformAdmin: true, passwordHash: await argon2.hash(password, { type: argon2.argon2id }), emailVerifiedAt: new Date() },
   });
   log(`administrador de plataforma ${email} creado; cambia la contraseña tras el primer acceso`);
 }

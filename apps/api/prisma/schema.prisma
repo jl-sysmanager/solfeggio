@@ -1,4 +1,4 @@
-// Solfeggio — modelo de datos.
+// Solfeamos — modelo de datos.
 //
 // Convenciones:
 // - Toda tabla de negocio lleva `tenant_id` (columna física) y está protegida por

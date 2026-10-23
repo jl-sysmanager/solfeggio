@@ -135,7 +135,7 @@ async function seedDemo() {
 
 async function main() {
   await seedPlans(db);
-  if (process.env.PLATFORM_ADMIN_EMAIL) await user(process.env.PLATFORM_ADMIN_EMAIL.toLowerCase(), 'Administración Solfeggio', true);
+  if (process.env.PLATFORM_ADMIN_EMAIL) await user(process.env.PLATFORM_ADMIN_EMAIL.toLowerCase(), 'Administración Solfeamos', true);
   if (process.env.SEED_DEMO === 'true') await seedDemo();
   console.log('Seed completado');
 }

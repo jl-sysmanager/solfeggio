@@ -66,7 +66,7 @@ export class IntegrationsController {
       if (id === 'email') {
         const to = body.to ?? ctx.email;
         await this.mailer.send(
-          { to, subject: 'Prueba de correo de Solfeggio', text: `Si recibes este mensaje, el envío con ${cfg.provider} funciona correctamente.` },
+          { to, subject: 'Prueba de correo de Solfeamos', text: `Si recibes este mensaje, el envío con ${cfg.provider} funciona correctamente.` },
           { ...cfg, enabled: true },
         );
         result = { ok: true, message: `Correo de prueba enviado a ${to} con ${cfg.provider}` };

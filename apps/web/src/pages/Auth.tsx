@@ -11,8 +11,8 @@ export function AuthLayout({ title, children }: { title: string; children: React
   return (
     <div className="auth">
       {/* Panel oscuro con el mismo fondo que la barra lateral (DESIGN.md: Dashboard Style). */}
-      <aside className="auth__aside" aria-label="Solfeggio">
-        <Link to="/login" className="brand brand--on-dark" aria-label="Solfeggio, entrar">
+      <aside className="auth__aside" aria-label="Solfeamos">
+        <Link to="/login" className="brand brand--on-dark" aria-label="Solfeamos, entrar">
           <Wordmark />
         </Link>
         <div>
@@ -129,7 +129,7 @@ export function LoginPage() {
           </button>
         ) : (
           <p className="small">
-            ¿Tu banda aún no usa Solfeggio? <Link to="/register">Crea una cuenta</Link>
+            ¿Tu banda aún no usa Solfeamos? <Link to="/register">Crea una cuenta</Link>
           </p>
         )}
       </form>
@@ -219,7 +219,7 @@ export function AcceptInvitePage() {
   return (
     <AuthLayout title="Únete a tu banda">
       <form className="form" onSubmit={submit}>
-        <p className="small">Te han invitado a Solfeggio. Si es tu primera vez, indica tu nombre y una contraseña. Si ya tienes cuenta, introduce tu contraseña actual.</p>
+        <p className="small">Te han invitado a Solfeamos. Si es tu primera vez, indica tu nombre y una contraseña. Si ya tienes cuenta, introduce tu contraseña actual.</p>
         <TextField label="Nombre y apellidos" name="name" autoComplete="name" />
         <TextField label="Contraseña" name="password" type="password" autoComplete="new-password" required minLength={12} />
         <FormError error={error} />

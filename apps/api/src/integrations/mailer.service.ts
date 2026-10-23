@@ -43,7 +43,7 @@ export class Mailer {
     }
     const c = cfg.config as Record<string, string | number | undefined>;
     const s = cfg.secrets;
-    const from = { email: clean(c.fromAddress), name: clean(c.fromName || 'Solfeggio') };
+    const from = { email: clean(c.fromAddress), name: clean(c.fromName || 'Solfeamos') };
     const fromHeader = `"${from.name.replace(/"/g, "'")}" <${from.email}>`;
     const message = { to: clean(msg.to), subject: clean(msg.subject), text: msg.text, html: msg.html, replyTo: c.replyTo ? clean(c.replyTo) : undefined };
 

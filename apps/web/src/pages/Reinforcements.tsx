@@ -189,7 +189,7 @@ function ProfileTab() {
   return (
     <Card title="Mi perfil de músico" tone="cream">
       <p className="small">
-        Tu perfil es personal y sirve para todas las bandas de Solfeggio. Las bandas que buscan refuerzos ven tu nombre, instrumentos, provincia, localidad y
+        Tu perfil es personal y sirve para todas las bandas de Solfeamos. Las bandas que buscan refuerzos ven tu nombre, instrumentos, provincia, localidad y
         presentación; nunca tu email ni tu teléfono. Si te contactan, recibirás el mensaje por email.
       </p>
       <form className="form" key={p?.id ?? 'new'} onSubmit={submit}>
@@ -443,7 +443,7 @@ function MusiciansTab() {
           <SelectField label="Provincia" value={filters.province} onChange={(e) => setFilters((f) => ({ ...f, province: e.target.value }))} placeholder="Todas" options={provinceOptions} />
         </div>
         <p className="small muted" style={{ marginBottom: 0 }}>
-          Sólo aparecen músicos disponibles. Su email no se muestra: la propuesta se le envía desde Solfeggio y responde presentándose a vuestra necesidad.
+          Sólo aparecen músicos disponibles. Su email no se muestra: la propuesta se le envía desde Solfeamos y responde presentándose a vuestra necesidad.
         </p>
       </Card>
       {q.isLoading && <Loading />}

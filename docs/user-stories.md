@@ -9,7 +9,7 @@ Roles: propietario, administrador, director, secretario, tesorero, responsable d
 ## SaaS: registro, onboarding y facturación (SAAS)
 
 **SAAS-01 · Registro de banda** (Fase 1)
-Como responsable de una banda quiero registrarme y crear mi banda para empezar a usar Solfeggio.
+Como responsable de una banda quiero registrarme y crear mi banda para empezar a usar Solfeamos.
 - Dado un email no registrado, cuando envío nombre, email y una contraseña de al menos 10 caracteres con letras y números, entonces se crea el usuario (el email de verificación está pendiente, ver roadmap).
 - Dado un usuario autenticado sin banda, cuando completo `bandName` y un `slug` libre, entonces se crea el tenant en estado `TRIALING` con el plan Free y los 8 roles de sistema, y yo quedo como propietario.
 - Dado un `slug` ya usado, cuando lo envío, entonces recibo `409` y el tenant no se crea.

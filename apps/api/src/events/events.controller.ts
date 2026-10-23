@@ -170,7 +170,7 @@ export class EventsController {
       await this.jobs.add('notify.fanout', {
         tenantId: ctx.tenantId, memberIds: created, type: 'event.call', email: true,
         title: `Convocatoria: ${ev.title}`,
-        body: `Has sido convocado a «${ev.title}» (${TYPE_LABEL[ev.type].toLowerCase()}) el ${ev.startsAt.toISOString().slice(0, 16).replace('T', ' ')} UTC${ev.location ? ` en ${ev.location}` : ''}. Confirma tu asistencia en Solfeggio.`,
+        body: `Has sido convocado a «${ev.title}» (${TYPE_LABEL[ev.type].toLowerCase()}) el ${ev.startsAt.toISOString().slice(0, 16).replace('T', ' ')} UTC${ev.location ? ` en ${ev.location}` : ''}. Confirma tu asistencia en Solfeamos.`,
         link: `/events/${ev.id}`,
       });
     }

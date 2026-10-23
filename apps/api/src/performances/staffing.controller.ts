@@ -102,7 +102,7 @@ export class StaffingController {
         tenantId: ctx.tenantId, memberIds, type: body.call ? 'event.call' : 'event.vacancy', email: true,
         title: body.call ? `Convocatoria: ${ev.title}` : `Faltan músicos: ${ev.title}`,
         body: body.call
-          ? `Has sido convocado a «${ev.title}» el ${when(ev.startsAt)} UTC${ev.location ? ` en ${ev.location}` : ''}. Faltan músicos de tu instrumento: confirma tu asistencia en Solfeggio.`
+          ? `Has sido convocado a «${ev.title}» el ${when(ev.startsAt)} UTC${ev.location ? ` en ${ev.location}` : ''}. Faltan músicos de tu instrumento: confirma tu asistencia en Solfeamos.`
           : `Faltan músicos de tu instrumento para «${ev.title}» el ${when(ev.startsAt)} UTC. Si puedes participar, avisa a la dirección.`,
         link: `/events/${ev.id}`,
       });

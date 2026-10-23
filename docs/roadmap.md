@@ -71,7 +71,7 @@ Objetivo: que entre 5 y 10 bandas piloto trabajen con su día a día de ensayos 
 | Sincronización ICS | Feed personal por membership (suscripción de sólo lectura, plan Pro) | ✅ |
 | Métricas del panel global (MRR, estados) | | ✅ |
 
-**Criterio de salida:** al menos 3 bandas cierran un trimestre contable completo con Solfeggio y obtienen su informe para la asamblea.
+**Criterio de salida:** al menos 3 bandas cierran un trimestre contable completo con Solfeamos y obtienen su informe para la asamblea.
 
 ## Fase 3 · BandMarket e informes (6 semanas)
 
@@ -100,7 +100,7 @@ Objetivo: que entre 5 y 10 bandas piloto trabajen con su día a día de ensayos 
 
 ## Fase 5 · Escuela de música, cobros y app del músico (10–12 semanas)
 
-Objetivo: aumentar el ingreso por banda con la escuela y los cobros, y que el músico use Solfeggio cada semana. Esta fase incluye el pago de cuotas por los socios y la PWA, que antes estaban en la Fase 4.
+Objetivo: aumentar el ingreso por banda con la escuela y los cobros, y que el músico use Solfeamos cada semana. Esta fase incluye el pago de cuotas por los socios y la PWA, que antes estaban en la Fase 4.
 
 | Área | Alcance | Estado |
 |---|---|---|
@@ -120,7 +120,7 @@ Objetivo: aumentar el ingreso por banda con la escuela y los cobros, y que el m�
 | App del músico (PWA) · Avisos y cuotas | Notificaciones push y consulta y pago de cuotas propias | ⬜ |
 
 **Criterios de salida:**
-- Al menos 3 bandas gestionan un curso escolar completo de su escuela con Solfeggio (matrícula, horarios, cobros y boletines).
+- Al menos 3 bandas gestionan un curso escolar completo de su escuela con Solfeamos (matrícula, horarios, cobros y boletines).
 - Más del 50 % de las cuotas de las bandas piloto se cobran por la plataforma.
 - Más del 60 % de los músicos activos confirman su asistencia desde la PWA.
 
@@ -144,7 +144,7 @@ Objetivo: cubrir las tareas específicas de las bandas que un software genérico
 | Tesorería · Socios protectores y patrocinadores | Certificados de donación y modelo 182 para entidades acogidas a la Ley 49/2002 | ✅ |
 
 **Criterios de salida:**
-- Al menos 5 bandas generan su informe SGAE y la justificación de una subvención desde Solfeggio.
+- Al menos 5 bandas generan su informe SGAE y la justificación de una subvención desde Solfeamos.
 - La bolsa de refuerzos cubre al menos 50 vacantes con músicos de otras bandas.
 
 ## Fase 7 · Panel global de plataforma

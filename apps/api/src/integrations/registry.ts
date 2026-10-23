@@ -54,14 +54,14 @@ export type CategoryId = 'payments' | 'email';
 
 const senderFields: FieldDef[] = [
   { key: 'fromAddress', label: 'Remitente (email)', type: 'email', required: true, placeholder: 'no-reply@tudominio.es' },
-  { key: 'fromName', label: 'Nombre del remitente', type: 'text', placeholder: 'Solfeggio', default: 'Solfeggio' },
+  { key: 'fromName', label: 'Nombre del remitente', type: 'text', placeholder: 'Solfeamos', default: 'Solfeamos' },
   { key: 'replyTo', label: 'Responder a', type: 'email', placeholder: 'soporte@tudominio.es' },
 ];
 
 /** «Nombre <correo>» → partes. */
 function parseFrom(value: string) {
   const m = /^\s*(.*?)\s*<([^>]+)>\s*$/.exec(value);
-  return m ? { fromName: m[1].replace(/^"|"$/g, ''), fromAddress: m[2] } : { fromName: 'Solfeggio', fromAddress: value.trim() };
+  return m ? { fromName: m[1].replace(/^"|"$/g, ''), fromAddress: m[2] } : { fromName: 'Solfeamos', fromAddress: value.trim() };
 }
 
 export const CATEGORIES: CategoryDef[] = [

@@ -108,7 +108,7 @@ export class AuthService {
     if (user.mfaEnabled) throw new BadRequestException({ message: 'MFA ya está activado', code: 'MFA_ALREADY_ENABLED' });
     const secret = authenticator.generateSecret();
     await this.db.system.user.update({ where: { id: userId }, data: { mfaSecretEnc: encrypt(secret) } });
-    const otpauthUrl = authenticator.keyuri(user.email, 'Solfeggio', secret);
+    const otpauthUrl = authenticator.keyuri(user.email, 'Solfeamos', secret);
     return { otpauthUrl, qrDataUrl: await QRCode.toDataURL(otpauthUrl) };
   }
 

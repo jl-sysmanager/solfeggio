@@ -377,7 +377,7 @@ export class AdminSupportController {
         if (user) {
           await this.jobs.add('email.send', {
             to: user.email, subject: 'Tu perfil de músico se ha ocultado',
-            text: `El equipo de Solfeggio ha ocultado tu perfil de la bolsa de refuerzos.${body.note ? `\n\nMotivo: ${body.note}` : ''}`,
+            text: `El equipo de Solfeamos ha ocultado tu perfil de la bolsa de refuerzos.${body.note ? `\n\nMotivo: ${body.note}` : ''}`,
           });
         }
       }

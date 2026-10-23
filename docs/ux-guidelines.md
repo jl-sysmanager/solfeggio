@@ -12,7 +12,7 @@ Estas pautas complementan el sistema visual, que replica el de [Breeze](https://
 | Pestañas con URL | `UrlTabs` | Las pestañas internas de una sección se guardan en `?tab=` (p. ej. `/admin/billing?tab=webhooks`); la primera pestaña no añade parámetro. |
 | Paleta de comandos | `CommandPalette` | **⌘K / Ctrl+K**, o el campo «Buscar…» de la barra superior. Sirve para ir a cualquier módulo visible, lanzar acciones frecuentes («Dar de alta a un socio», «Planificar ensayo») y buscar el texto escrito en socios o en el archivo. Los resultados se filtran sin distinguir tildes. |
 | Migas de pan | `PageHeader` | `Inicio / Sección / Página`. «Inicio» es un enlace y la página actual lleva `aria-current="page"`. |
-| Título de la pestaña | `PageHeader` | Cada pantalla fija `document.title = "<Título> · Solfeggio"` (WCAG 2.4.2). |
+| Título de la pestaña | `PageHeader` | Cada pantalla fija `document.title = "<Título> · Solfeamos"` (WCAG 2.4.2). |
 | Foco tras navegar | `AppShell` | El foco pasa al `h1` de la nueva página, así que los lectores de pantalla anuncian el cambio. |
 | Menú de usuario | `Menu` + `Avatar` | Agrupa seguridad, cambio de banda, tema y cierre de sesión. No se ponen botones de cuenta sueltos en la barra. |
 | Avisos de estado | `AppShell` | La franja de estado sólo aparece si hay algo que hacer (pago pendiente, sólo lectura, prueba) y enlaza a facturación. |

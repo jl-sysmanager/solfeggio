@@ -4,7 +4,7 @@ import { Audit } from '../audit/audit.service';
 import { SYSTEM_ROLES } from '../iam/permissions';
 import { AuthService } from '../auth/auth.service';
 
-const RESERVED_SLUGS = new Set(['admin', 'api', 'app', 'www', 'solfeggio', 'market', 'billing', 'help', 'status']);
+const RESERVED_SLUGS = new Set(['admin', 'api', 'app', 'www', 'solfeggio', 'solfeamos', 'market', 'billing', 'help', 'status']);
 
 export const DEFAULT_SECTIONS = ['Flautas', 'Oboes', 'Clarinetes', 'Saxofones', 'Fagotes', 'Trompas', 'Trompetas', 'Trombones', 'Bombardinos', 'Tubas', 'Percusión'];
 const DEFAULT_CATEGORIES: { name: string; kind: 'INCOME' | 'EXPENSE' }[] = [

@@ -1,6 +1,6 @@
 # Despliegue en Railway
 
-Guía para publicar Solfeggio en [Railway](https://railway.com) con el código del repositorio, sin tocar nada más que variables de entorno.
+Guía para publicar Solfeamos en [Railway](https://railway.com) con el código del repositorio, sin tocar nada más que variables de entorno.
 
 ## 1. Arquitectura
 

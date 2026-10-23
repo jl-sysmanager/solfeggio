@@ -123,7 +123,7 @@ describe('Integraciones de terceros (panel global)', () => {
 
   describe('correo', () => {
     it('envía con SendGrid usando la configuración de la BD', async () => {
-      await put('email', { provider: 'sendgrid', enabled: true, config: { fromAddress: 'avisos@solfeggio.es', fromName: 'Solfeggio', replyTo: 'soporte@solfeggio.es' }, secrets: { apiKey: SENDGRID } }).expect(200);
+      await put('email', { provider: 'sendgrid', enabled: true, config: { fromAddress: 'avisos@solfeggio.es', fromName: 'Solfeamos', replyTo: 'soporte@solfeggio.es' }, secrets: { apiKey: SENDGRID } }).expect(200);
       const result = await ctx.app.get(Mailer).send({ to: 'socio@banda.es', subject: 'Convocatoria', text: 'Hola' });
       expect(result).toEqual({ sent: true, provider: 'sendgrid' });
       const [url, init] = fetchSpy.mock.calls[0];
@@ -131,7 +131,7 @@ describe('Integraciones de terceros (panel global)', () => {
       expect(init.headers.Authorization).toBe(`Bearer ${SENDGRID}`);
       expect(JSON.parse(init.body)).toMatchObject({
         personalizations: [{ to: [{ email: 'socio@banda.es' }] }],
-        from: { email: 'avisos@solfeggio.es', name: 'Solfeggio' },
+        from: { email: 'avisos@solfeggio.es', name: 'Solfeamos' },
         reply_to: { email: 'soporte@solfeggio.es' },
         subject: 'Convocatoria',
       });

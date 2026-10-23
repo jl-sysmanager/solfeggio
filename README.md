@@ -1,6 +1,6 @@
-# Solfeggio
+# Solfeamos
 
-Solfeggio es una plataforma SaaS **multi-tenant** para la gestión integral de bandas de música. Cada banda es un tenant aislado, con sus propios socios, archivo, ensayos, tesorería y material, y las bandas pueden comprar y vender instrumentos entre sí en **BandMarket**.
+Solfeamos es una plataforma SaaS **multi-tenant** para la gestión integral de bandas de música. Cada banda es un tenant aislado, con sus propios socios, archivo, ensayos, tesorería y material, y las bandas pueden comprar y vender instrumentos entre sí en **BandMarket**.
 
 ## Funcionalidades
 

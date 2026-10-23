@@ -31,7 +31,7 @@ export function PageHeader({
   const root = pathname.startsWith('/admin') ? { to: '/admin/metrics', label: 'Panel global' } : { to: '/', label: 'Inicio' };
   // Título de la pestaña por pantalla (WCAG 2.4.2).
   useEffect(() => {
-    document.title = `${title} · Solfeggio`;
+    document.title = `${title} · Solfeamos`;
   }, [title]);
   return (
     <header className={`band band--${tone}`}>

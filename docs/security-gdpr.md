@@ -48,7 +48,7 @@
 
 | Aspecto | Cómo se aborda |
 |---|---|
-| Roles | Cada banda es **responsable del tratamiento** de los datos de sus socios. Solfeggio actúa como **encargado** (art. 28) y firma una DPA con cada banda (la aceptación explícita en el flujo de onboarding está pendiente). Para los datos de las cuentas de usuario y de facturación, Solfeggio es responsable. |
+| Roles | Cada banda es **responsable del tratamiento** de los datos de sus socios. Solfeamos actúa como **encargado** (art. 28) y firma una DPA con cada banda (la aceptación explícita en el flujo de onboarding está pendiente). Para los datos de las cuentas de usuario y de facturación, Solfeamos es responsable. |
 | Base legal | Gestión de la relación asociativa (art. 6.1.b) para los datos de socio; obligación legal (6.1.c) para la contabilidad; consentimiento (6.1.a) para la imagen y las comunicaciones no esenciales. |
 | Consentimientos | `members.consentDataAt` y `members.consentImages` registran fecha y alcance. La retirada del consentimiento se registra en la auditoría. |
 | Minimización | Sólo son obligatorios el nombre y los apellidos. El DNI y el IBAN son opcionales y están cifrados. Quien no tiene `members:sensitive` no ve los campos sensibles. |

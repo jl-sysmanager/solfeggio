@@ -219,7 +219,7 @@ function ListingModal({ open, onClose, listing }: { open: boolean; onClose: () =
           <TextField label="Localidad" name="location" defaultValue={listing?.location ?? ''} />
         </div>
         <TextAreaField label="Descripción" name="description" required rows={6} defaultValue={listing?.description} hint="Indica marca, modelo, año, estado y accesorios incluidos." />
-        <p className="small muted">Los anuncios los revisa el equipo de Solfeggio antes de publicarse. No incluyas datos personales de contacto: usa la mensajería.</p>
+        <p className="small muted">Los anuncios los revisa el equipo de Solfeamos antes de publicarse. No incluyas datos personales de contacto: usa la mensajería.</p>
         <FormError error={save.error} />
         <div className="modal__footer">
           <Button variant="ghost" onClick={onClose}>
@@ -358,7 +358,7 @@ export default function MarketPage() {
           tone="warm"
           eyebrow="BandMarket"
           title="Compraventa entre bandas"
-          description="Instrumentos y material de segunda mano entre bandas de la comunidad Solfeggio. Anuncios moderados."
+          description="Instrumentos y material de segunda mano entre bandas de la comunidad Solfeamos. Anuncios moderados."
         />
       }
     >

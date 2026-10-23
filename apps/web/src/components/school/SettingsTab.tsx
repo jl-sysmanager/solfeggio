@@ -215,7 +215,7 @@ function TeachersCard({ write }: { write: boolean }) {
           </div>
           <SelectField
             key={users.data ? 'ready' : 'loading'}
-            label="Usuario de Solfeggio"
+            label="Usuario de Solfeamos"
             name="userId"
             defaultValue={editing?.userId ?? ''}
             placeholder="Sin vincular"

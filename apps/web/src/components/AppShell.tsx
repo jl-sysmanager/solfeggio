@@ -121,7 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Barra lateral (estilo Breeze) con secciones plegables. */}
         <nav id="sidenav" className={`sidenav${open ? ' is-open' : ''}`} aria-label="Navegación principal">
           <div className="sidenav__brand">
-            <Link to={homeTo} className="brand brand--on-dark" aria-label="Solfeggio, inicio">
+            <Link to={homeTo} className="brand brand--on-dark" aria-label="Solfeamos, inicio">
               <Wordmark />
             </Link>
             <button
@@ -202,7 +202,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 <Icon name={open ? 'close' : 'menu'} size={20} />
               </button>
-              <Link to={homeTo} className="brand topbar__brand" aria-label="Solfeggio, inicio">
+              <Link to={homeTo} className="brand topbar__brand" aria-label="Solfeamos, inicio">
                 <Wordmark />
               </Link>
               <button type="button" className="search-trigger" onClick={openPalette} aria-label="Buscar y navegar (Ctrl+K)" aria-keyshortcuts="Control+K Meta+K">

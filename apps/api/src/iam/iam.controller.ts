@@ -211,7 +211,7 @@ export class IamController {
     const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
     await this.jobs.add('email.send', {
       to: email,
-      subject: `Invitación a ${tenant.name} en Solfeggio`,
+      subject: `Invitación a ${tenant.name} en Solfeamos`,
       text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${env().APP_URL}/invite/${token}`,
     });
     return result;

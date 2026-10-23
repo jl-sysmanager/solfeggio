@@ -36,7 +36,7 @@ export class StripeClient {
     const cfg = await this.config();
     const key = cfg.secrets.secretKey;
     if (this.instance?.key !== key) {
-      this.instance = { key, stripe: new Stripe(key, { apiVersion: '2025-02-24.acacia', maxNetworkRetries: 2, appInfo: { name: 'Solfeggio' } }) };
+      this.instance = { key, stripe: new Stripe(key, { apiVersion: '2025-02-24.acacia', maxNetworkRetries: 2, appInfo: { name: 'Solfeamos' } }) };
     }
     return this.instance.stripe;
   }

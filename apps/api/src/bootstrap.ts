@@ -24,7 +24,7 @@ export function configureApp(app: INestApplication) {
   if (e.NODE_ENV !== 'production') {
     const doc = SwaggerModule.createDocument(
       app,
-      new DocumentBuilder().setTitle('Solfeggio API').setVersion('1.0').addBearerAuth().build(),
+      new DocumentBuilder().setTitle('Solfeamos API').setVersion('1.0').addBearerAuth().build(),
     );
     // La UI de Swagger necesita scripts inline: CSP relajada sólo en esa ruta y fuera de producción.
     app.use('/api/docs', helmet({ contentSecurityPolicy: false }));

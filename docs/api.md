@@ -1,4 +1,4 @@
-# API Solfeggio v1
+# API Solfeamos v1
 
 Base: `/api/v1` · JSON · OpenAPI generado en `/api/docs` (Swagger UI) y `/api/docs-json`.
 

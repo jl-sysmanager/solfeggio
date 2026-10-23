@@ -1,6 +1,6 @@
-# Arquitectura de Solfeggio
+# Arquitectura de Solfeamos
 
-Solfeggio es una plataforma SaaS multi-tenant para gestionar bandas de música. Cada banda registrada es un **tenant** independiente. Todas las bandas comparten base de datos y esquema, y el aislamiento entre ellas se garantiza con la columna `tenant_id` y con Row Level Security (RLS) de PostgreSQL.
+Solfeamos es una plataforma SaaS multi-tenant para gestionar bandas de música. Cada banda registrada es un **tenant** independiente. Todas las bandas comparten base de datos y esquema, y el aislamiento entre ellas se garantiza con la columna `tenant_id` y con Row Level Security (RLS) de PostgreSQL.
 
 ## 1. Contexto (C4 nivel 1)
 
@@ -12,7 +12,7 @@ flowchart LR
     O[Propietario / Administrador]
     P[Equipo de plataforma]
   end
-  S((Solfeggio))
+  S((Solfeamos))
   ST[Stripe<br/>Checkout · Portal · Tax · Webhooks]
   MAIL[Servidor SMTP<br/>emails transaccionales]
   CAL[Calendarios externos<br/>Google · Outlook · Apple vía ICS]
@@ -230,7 +230,7 @@ El equipo de plataforma configura Stripe y el envío de correo desde **Panel glo
 
 ## 9. Interfaz
 
-La SPA (`apps/web`) replica el lenguaje visual de [Breeze](https://github.com/lanternops/breeze) (`apps/web`, estilo shadcn sobre Tailwind 4). Sus tokens están copiados de `apps/web/src/styles/globals.css` de ese proyecto, en `:root` y `.dark`, y en Solfeggio viven en `apps/web/src/styles/tokens.css`.
+La SPA (`apps/web`) replica el lenguaje visual de [Breeze](https://github.com/lanternops/breeze) (`apps/web`, estilo shadcn sobre Tailwind 4). Sus tokens están copiados de `apps/web/src/styles/globals.css` de ese proyecto, en `:root` y `.dark`, y en Solfeamos viven en `apps/web/src/styles/tokens.css`.
 
 **Tokens**
 - **Superficies:** cálidas, nunca blanco ni negro puros (`hsl(220 20% 98%)` de fondo y `hsl(220 20% 99%)` en tarjetas).
