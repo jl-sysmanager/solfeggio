@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, NoTenant, Perm, Public } from '../auth/decorators';
@@ -9,8 +9,7 @@ import { env } from '../config/env';
 import { FEATURE_MODULES } from '../billing/feature-catalog';
 import { Db } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
-import { acceptLogo, assertLogoRequest } from '../platform/logo';
-import { uploadRequest } from '../storage/upload';
+import { logoFileName, readLogo } from '../platform/logo';
 import { Storage } from '../storage/storage.service';
 import { effectiveLimits } from './effective-limits';
 import { OnboardingService } from './onboarding.service';
@@ -108,23 +107,16 @@ export class TenancyController {
   }
 
   @Perm('tenant:manage')
-  @Post('tenant/logo/upload-url')
-  async logoUploadUrl(@Ctx() ctx: RequestContext, @Body(zod(uploadRequest)) body: z.infer<typeof uploadRequest>) {
-    assertLogoRequest(body.mimeType, body.sizeBytes);
-    const fileKey = this.storage.newKey(ctx.tenantId, 'brand', body.fileName);
-    return { fileKey, uploadUrl: await this.storage.uploadUrl(fileKey, body.mimeType, body.sizeBytes) };
-  }
-
-  @Perm('tenant:manage')
   @Post('tenant/logo')
-  async logoSave(@Ctx() ctx: RequestContext, @Body(zod(z.object({ fileKey: z.string().max(300) }))) body: { fileKey: string }) {
-    this.storage.assertOwned(ctx.tenantId, body.fileKey, 'brand');
-    const { mime } = await acceptLogo(this.storage, body.fileKey);
+  async logoSave(@Ctx() ctx: RequestContext, @Req() req: Request) {
+    const { buf, mime } = await readLogo(req);
+    const fileKey = this.storage.newKey(ctx.tenantId, 'brand', logoFileName(mime));
+    await this.storage.putObject(fileKey, buf, mime);
     const t = await this.db.tenant(ctx.tenantId, async (tx) => {
       const prev = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { logoKey: true } });
-      const row = await tx.tenant.update({ where: { id: ctx.tenantId }, data: { logoKey: body.fileKey, logoMime: mime }, select: TENANT_SELECT });
+      const row = await tx.tenant.update({ where: { id: ctx.tenantId }, data: { logoKey: fileKey, logoMime: mime }, select: TENANT_SELECT });
       await this.audit.log(tx, ctx, 'tenant.logo', 'tenant', row.id);
-      if (prev.logoKey && prev.logoKey !== body.fileKey) await this.storage.remove(prev.logoKey);
+      if (prev.logoKey && prev.logoKey !== fileKey) await this.storage.remove(prev.logoKey);
       return row;
     });
     return presentTenant(t);

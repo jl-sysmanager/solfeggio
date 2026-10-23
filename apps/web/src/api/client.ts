@@ -75,6 +75,9 @@ interface RequestOptions {
   /** No intentar refresh en 401 (p. ej. login). */
   noRefresh?: boolean;
   raw?: boolean;
+  /** Cuerpo binario. No se serializa como JSON. */
+  rawBody?: BodyInit;
+  contentType?: string;
 }
 
 async function parseError(res: Response): Promise<ApiError> {
@@ -91,12 +94,19 @@ async function parseError(res: Response): Promise<ApiError> {
 export async function api<T = unknown>(path: string, opts: RequestOptions = {}): Promise<T> {
   const doFetch = () => {
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
+    let body: BodyInit | undefined;
+    if (opts.rawBody !== undefined) {
+      headers['Content-Type'] = opts.contentType || 'application/octet-stream';
+      body = opts.rawBody;
+    } else if (opts.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(opts.body);
+    }
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
     return fetch(`${API_BASE}${withQuery(path, opts.query)}`, {
-      method: opts.method ?? (opts.body !== undefined ? 'POST' : 'GET'),
+      method: opts.method ?? (body !== undefined ? 'POST' : 'GET'),
       headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+      body,
       credentials: 'include',
     });
   };

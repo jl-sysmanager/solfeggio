@@ -34,7 +34,6 @@ function TenantTab() {
     <Card title="Logotipo de la banda">
       <LogoEditor
         previewUrl={preview}
-        uploadUrlPath="/tenant/logo/upload-url"
         confirmPath="/tenant/logo"
         deletePath="/tenant/logo"
         onChanged={() => {

@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { Storage } from '../storage/storage.service';
+import type { Request } from 'express';
 
 export const LOGO_MIMES = ['image/png', 'image/jpeg', 'image/webp'] as const;
 export const LOGO_MAX_BYTES = 1_048_576;
@@ -12,23 +12,40 @@ export function sniffImage(buf: Buffer): (typeof LOGO_MIMES)[number] | null {
   return null;
 }
 
-export function assertLogoRequest(mimeType: string, sizeBytes: number) {
-  if (!(LOGO_MIMES as readonly string[]).includes(mimeType)) {
-    throw new BadRequestException({ message: 'El logotipo debe ser PNG, JPEG o WebP', code: 'MIME_NOT_ALLOWED' });
-  }
-  if (!Number.isInteger(sizeBytes) || sizeBytes <= 0 || sizeBytes > LOGO_MAX_BYTES) {
-    throw new BadRequestException({ message: 'El logotipo no puede superar 1 MB', code: 'FILE_TOO_LARGE' });
-  }
+export function logoFileName(mime: (typeof LOGO_MIMES)[number]) {
+  if (mime === 'image/png') return 'logo.png';
+  if (mime === 'image/webp') return 'logo.webp';
+  return 'logo.jpg';
 }
 
-/** Descarga el objeto subido y acepta sólo una imagen reconocida dentro del límite. */
-export async function acceptLogo(storage: Storage, key: string) {
-  const buf = await storage.getObject(key).catch(() => null);
-  if (!buf) throw new BadRequestException({ message: 'El archivo no se ha subido', code: 'UPLOAD_MISSING' });
-  const mime = sniffImage(buf);
-  if (!mime || buf.byteLength > LOGO_MAX_BYTES) {
-    await storage.remove(key);
-    throw new BadRequestException({ message: 'El archivo no es una imagen PNG, JPEG o WebP de hasta 1 MB', code: 'MIME_NOT_ALLOWED' });
+/** Lee el cuerpo de la petición (ya bufferizado o en crudo) y acepta sólo PNG, JPEG o WebP. */
+export async function readLogo(req: Request): Promise<{ buf: Buffer; mime: (typeof LOGO_MIMES)[number] }> {
+  const buf = Buffer.isBuffer(req.body) ? req.body : await readStream(req);
+  if (!buf.length) throw new BadRequestException({ message: 'Falta la imagen del logotipo', code: 'UPLOAD_MISSING' });
+  if (buf.byteLength > LOGO_MAX_BYTES) {
+    throw new BadRequestException({ message: 'El logotipo no puede superar 1 MB', code: 'FILE_TOO_LARGE' });
   }
-  return { mime, size: buf.byteLength };
+  const mime = sniffImage(buf);
+  if (!mime) throw new BadRequestException({ message: 'El logotipo debe ser PNG, JPEG o WebP', code: 'MIME_NOT_ALLOWED' });
+  return { buf, mime };
+}
+
+function readStream(req: Request): Promise<Buffer> {
+  if (req.readableEnded) return Promise.resolve(Buffer.alloc(0));
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    req.on('data', (chunk: Buffer | string) => {
+      const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      size += part.length;
+      if (size > LOGO_MAX_BYTES) {
+        req.destroy();
+        reject(new BadRequestException({ message: 'El logotipo no puede superar 1 MB', code: 'FILE_TOO_LARGE' }));
+        return;
+      }
+      chunks.push(part);
+    });
+    req.on('end', () => resolve(Buffer.concat(chunks)));
+    req.on('error', () => reject(new BadRequestException({ message: 'No se pudo leer la imagen', code: 'UPLOAD_MISSING' })));
+  });
 }

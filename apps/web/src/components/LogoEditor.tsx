@@ -1,20 +1,18 @@
 import { useState, type FormEvent } from 'react';
-import { del, post } from '../api/client';
-import { uploadFile } from '../lib/upload';
+import { ApiError, api, del } from '../api/client';
 import { Button } from './Button';
 import { FormError } from './Field';
 
 const ACCEPT = 'image/png,image/jpeg,image/webp';
+const MAX_BYTES = 1_048_576;
 
 export function LogoEditor({
   previewUrl,
-  uploadUrlPath,
   confirmPath,
   deletePath,
   onChanged,
 }: {
   previewUrl: string | null;
-  uploadUrlPath: string;
   confirmPath: string;
   deletePath: string;
   onChanged: () => void;
@@ -26,11 +24,14 @@ export function LogoEditor({
     e.preventDefault();
     const file = (e.currentTarget.elements.namedItem('logo') as HTMLInputElement).files?.[0];
     if (!file) return;
+    if (file.size > MAX_BYTES) {
+      setError(new ApiError(400, 'El logotipo no puede superar 1 MB'));
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
-      const up = await uploadFile(uploadUrlPath, file);
-      await post(confirmPath, { fileKey: up.fileKey });
+      await api(confirmPath, { method: 'POST', rawBody: file, contentType: file.type || 'application/octet-stream' });
       e.currentTarget.reset();
       onChanged();
     } catch (err) {

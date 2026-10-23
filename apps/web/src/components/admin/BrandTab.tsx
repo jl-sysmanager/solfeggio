@@ -16,7 +16,6 @@ export function BrandTab() {
       <p className="small muted">Aparece en el acceso y en la cabecera de la aplicación. Cada banda configura el suyo en Ajustes.</p>
       <LogoEditor
         previewUrl={preview}
-        uploadUrlPath="/admin/brand/logo/upload-url"
         confirmPath="/admin/brand/logo"
         deletePath="/admin/brand/logo"
         onChanged={() => {

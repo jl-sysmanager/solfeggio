@@ -1,18 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Res, StreamableFile } from '@nestjs/common';
+import { Controller, Delete, Get, HttpCode, Param, Post, Req, Res, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import type { RequestContext } from '../auth/context';
 import { Ctx, PlatformAdmin, Public } from '../auth/decorators';
 import { notFound } from '../common/errors';
-import { zod } from '../common/zod.pipe';
 import { Db } from '../db/db.service';
-import { uploadRequest } from '../storage/upload';
 import { Storage } from '../storage/storage.service';
-import { acceptLogo, assertLogoRequest } from './logo';
-import { z } from 'zod';
+import { logoFileName, readLogo } from './logo';
 
 const BRAND_ID = 'platform';
-const confirmSchema = z.object({ fileKey: z.string().max(300) });
 
 @ApiTags('brand')
 @Controller()
@@ -46,27 +42,18 @@ export class BrandController {
 
   @ApiBearerAuth()
   @PlatformAdmin()
-  @Post('admin/brand/logo/upload-url')
-  async uploadUrl(@Body(zod(uploadRequest)) body: z.infer<typeof uploadRequest>) {
-    assertLogoRequest(body.mimeType, body.sizeBytes);
-    const fileKey = this.storage.platformLogoKey(body.fileName);
-    this.storage.assertPlatformLogo(fileKey);
-    return { fileKey, uploadUrl: await this.storage.uploadUrl(fileKey, body.mimeType, body.sizeBytes) };
-  }
-
-  @ApiBearerAuth()
-  @PlatformAdmin()
   @Post('admin/brand/logo')
-  async save(@Ctx() ctx: RequestContext, @Body(zod(confirmSchema)) body: z.infer<typeof confirmSchema>) {
-    this.storage.assertPlatformLogo(body.fileKey);
-    const { mime } = await acceptLogo(this.storage, body.fileKey);
+  async save(@Ctx() ctx: RequestContext, @Req() req: Request) {
+    const { buf, mime } = await readLogo(req);
+    const fileKey = this.storage.platformLogoKey(logoFileName(mime));
+    await this.storage.putObject(fileKey, buf, mime);
     const prev = await this.db.system.platformBrand.findUnique({ where: { id: BRAND_ID } });
     const row = await this.db.system.platformBrand.upsert({
       where: { id: BRAND_ID },
-      create: { id: BRAND_ID, logoKey: body.fileKey, logoMime: mime },
-      update: { logoKey: body.fileKey, logoMime: mime },
+      create: { id: BRAND_ID, logoKey: fileKey, logoMime: mime },
+      update: { logoKey: fileKey, logoMime: mime },
     });
-    if (prev?.logoKey && prev.logoKey !== body.fileKey) await this.storage.remove(prev.logoKey);
+    if (prev?.logoKey && prev.logoKey !== fileKey) await this.storage.remove(prev.logoKey);
     await this.db.system.platformAuditLog.create({
       data: { actorId: ctx.userId, action: 'brand.logo', entity: 'platform_brand', entityId: BRAND_ID },
     });
