@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -10,6 +10,7 @@ import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
 import { BillingOpsService } from '../billing/billing-ops.service';
+import { PlanSync } from '../billing/plan-sync';
 import { resetEntitlementsCache } from '../billing/entitlements';
 import { FEATURE_MODULES, withDependencies } from '../billing/feature-catalog';
 import { Db } from '../db/db.service';
@@ -56,6 +57,7 @@ export class AdminController {
   constructor(
     private readonly db: Db,
     private readonly billingOps: BillingOpsService,
+    private readonly planSync: PlanSync,
   ) {}
 
   private auditFor(tenantId: string, ctx: RequestContext, action: string, entity: string, entityId: string, metadata?: object) {
@@ -192,9 +194,35 @@ export class AdminController {
 
   @Patch('plans/:id')
   async updatePlan(@Param('id', zod(idParam)) id: string, @Body(zod(planPatch)) body: z.infer<typeof planPatch>) {
-    const data = body.features ? { ...body, features: withDependencies(body.features) } : body;
-    const plan = await this.db.system.plan.update({ where: { id }, data });
+    const current = found(await this.db.system.plan.findUnique({ where: { id } }), 'Plan');
+    this.assertPrices(current.code, body);
+    const { stripePriceMonthly, stripePriceYearly, features, ...rest } = body;
+    void stripePriceMonthly;
+    void stripePriceYearly;
+    const data = features ? { ...rest, features: withDependencies(features) } : rest;
+    const synced = await this.planSync.publish(current, {
+      code: current.code,
+      name: data.name ?? current.name,
+      priceMonthlyCents: data.priceMonthlyCents ?? current.priceMonthlyCents,
+      priceYearlyCents: data.priceYearlyCents ?? current.priceYearlyCents,
+      stripePriceMonthly: current.stripePriceMonthly,
+      stripePriceYearly: current.stripePriceYearly,
+    });
+    const plan = await this.db.system.plan.update({ where: { id }, data: { ...data, ...synced } });
     if (plan.code === 'FREE' && body.features) resetEntitlementsCache();
     return plan;
+  }
+
+  /** Free no se cobra. Un plan de pago necesita los dos importes: Stripe no admite un precio a cero. */
+  private assertPrices(code: string, body: z.infer<typeof planPatch>) {
+    if (code === 'FREE') {
+      if ((body.priceMonthlyCents ?? 0) > 0 || (body.priceYearlyCents ?? 0) > 0) {
+        throw new BadRequestException({ message: 'El plan Free no se cobra', code: 'INVALID_PRICE' });
+      }
+      return;
+    }
+    if ((body.priceMonthlyCents !== undefined && body.priceMonthlyCents <= 0) || (body.priceYearlyCents !== undefined && body.priceYearlyCents <= 0)) {
+      throw new BadRequestException({ message: 'Un plan de pago necesita precio mensual y anual', code: 'INVALID_PRICE' });
+    }
   }
 }

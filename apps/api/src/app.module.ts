@@ -12,6 +12,7 @@ import { AdminBillingController } from './billing/admin-billing.controller';
 import { BillingController } from './billing/billing.controller';
 import { BillingOpsService } from './billing/billing-ops.service';
 import { BillingService } from './billing/billing.service';
+import { PlanSync } from './billing/plan-sync';
 import { StripeClient } from './billing/stripe.provider';
 import { AllExceptionsFilter } from './common/http-exception.filter';
 import { loggerModule } from './common/logger';
@@ -112,6 +113,7 @@ import { TreasuryExtrasController } from './treasury/treasury-extras.controller'
     Uploads,
     StripeClient,
     BillingService,
+    PlanSync,
     BillingOpsService,
     InsightsService,
     SupportService,

@@ -132,7 +132,7 @@ Los cambios se aplican en menos de 30 segundos en la API y el worker, sin reinic
 
 ### Configuración de Stripe
 
-1. **Productos y precios:** crea tres productos (Basic, Pro y Enterprise), cada uno con un precio mensual y otro anual en EUR, recurrentes y con `tax_behavior` exclusivo o inclusivo según la política comercial. Copia los `price_…` en `STRIPE_PRICE_BASIC_MONTHLY`, `STRIPE_PRICE_BASIC_YEARLY` y equivalentes. El seed los vuelca en `plans.stripePriceMonthly` y `plans.stripePriceYearly`, o puedes editarlos en el panel global.
+1. **Productos y precios:** no hace falta crearlos a mano. En **Panel global → Planes** el nombre y los importes (mensual y anual, EUR, sin impuestos) se publican en Stripe al guardar. Si el importe cambia, se crea un precio nuevo, las suscripciones vivas pasan a él en el siguiente cobro (sin prorrateo) y el precio anterior se archiva. Los límites y los módulos no viajan a Stripe: se aplican desde el panel. `STRIPE_PRICE_*` sólo rellena los identificadores la primera vez que se crea el plan; un despliegue posterior no pisa lo editado en el panel.
 2. **Stripe Tax:** activa Tax, registra la empresa en España y en la UE (OSS) y marca «Calcular impuestos con Stripe Tax» en el panel de integraciones.
 3. **Cupones:** crea cupones y códigos promocionales en Stripe. Checkout los acepta gracias a `allow_promotion_codes`.
 4. **Customer Portal:** activa la actualización del método de pago, la cancelación al final del periodo, el cambio de plan entre los precios anteriores y el historial de facturas. La URL de vuelta es `${APP_URL}/billing`; Checkout vuelve a `/billing?checkout=success` o `/billing?checkout=cancel`.

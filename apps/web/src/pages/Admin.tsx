@@ -108,7 +108,7 @@ function PlansTab() {
               });
           }}
         >
-          <p className="small muted">Los precios cobrados los define Stripe (Price IDs). Cambiar aquí el importe sólo actualiza el catálogo mostrado; crea un nuevo Price en Stripe y enlázalo.</p>
+          <p className="small muted">Al guardar, el nombre y los precios se publican en Stripe (importe sin impuestos). Las bandas con suscripción pasan al nuevo importe en el siguiente cobro, sin un cargo prorrateado. Límites y módulos se aplican al momento.</p>
           <div className="form-row">
             <TextField label="Precio mensual (€)" name="monthly" defaultValue={editing ? String(editing.priceMonthlyCents / 100).replace('.', ',') : ''} />
             <TextField label="Precio anual (€)" name="yearly" defaultValue={editing ? String(editing.priceYearlyCents / 100).replace('.', ',') : ''} />

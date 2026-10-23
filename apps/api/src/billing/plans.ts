@@ -37,8 +37,8 @@ export async function seedPlans(db: PrismaClient) {
     await db.plan.upsert({
       where: { code: p.code },
       create: { code: p.code, features: p.features, ...catalog, ...prices },
-      // * No pisa `features`: el panel global las configura por módulos.
-      update: { ...catalog, ...Object.fromEntries(Object.entries(prices).filter(([, v]) => v)) },
+      // * El panel global es la fuente de verdad (precios, límites, módulos). Un release no los pisa.
+      update: {},
     });
   }
   // * Quita claves que ya no están en el catálogo (p. ej. SSO anunciado y no construido).
