@@ -175,7 +175,7 @@ const SECTIONS: Record<string, Section> = {
   announcements: { eyebrow: 'Atención', title: 'Avisos', description: 'Avisos dentro de la aplicación para todas las bandas o para un segmento.', content: () => <AnnouncementsTab /> },
   ops: { eyebrow: 'Plataforma', title: 'Sistema', description: 'Colas de trabajos, correo, almacenamiento, tareas programadas y copias de seguridad.', content: () => <OpsTab /> },
   plans: { eyebrow: 'Plataforma', title: 'Planes', description: 'Precios, límites y funcionalidades de cada plan.', content: () => <PlansTab /> },
-  integrations: { eyebrow: 'Plataforma', title: 'Integraciones', description: 'Pagos (Stripe) y correo: credenciales, estado y prueba de conexión.', content: () => <IntegrationsTab /> },
+  integrations: { eyebrow: 'Plataforma', title: 'Integraciones', description: 'Pagos, correo y destino de copias: credenciales, estado y prueba de conexión.', content: () => <IntegrationsTab /> },
   brand: { eyebrow: 'Plataforma', title: 'Marca', description: 'Logotipo que ven las bandas al entrar y en la cabecera de la aplicación.', content: () => <BrandTab /> },
 };
 

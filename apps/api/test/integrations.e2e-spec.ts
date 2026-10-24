@@ -40,6 +40,7 @@ describe('Integraciones de terceros (panel global)', () => {
   it('lista categorías y proveedores; sin fila en BD hereda de variables de entorno', async () => {
     const cats = await list();
     expect(cats.map((c) => c.id)).toEqual(['payments', 'email', 'backups']);
+    expect(cats.map((c) => c.group)).toEqual(['income', 'communication', 'storage']);
     expect(cats[1].providers.map((p: { id: string }) => p.id)).toEqual(['smtp', 'sendgrid', 'mailgun', 'resend', 'postmark']);
     expect(cats[0].current).toMatchObject({ source: 'none', enabled: false });
     expect(cats[1].current).toMatchObject({ source: 'env', provider: 'smtp', enabled: true });

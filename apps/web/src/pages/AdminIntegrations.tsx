@@ -299,6 +299,9 @@ export function IntegrationsTab() {
           </section>
         );
       })}
+      {(q.data ?? [])
+        .filter((category) => category.group !== 'income' && category.group !== 'communication' && category.group !== 'storage')
+        .map((category) => <IntegrationCard key={category.id} cat={category} />)}
       <History />
     </div>
   );

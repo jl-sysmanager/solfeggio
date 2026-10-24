@@ -115,6 +115,7 @@ export class IntegrationsService {
         const secretFields = (provider?.fields ?? []).filter((f) => f.type === 'secret');
         return {
           id: def.id,
+          group: def.group,
           label: def.label,
           description: def.description,
           disabledBehavior: def.disabledBehavior,
