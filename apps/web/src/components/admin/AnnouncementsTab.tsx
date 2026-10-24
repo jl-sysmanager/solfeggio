@@ -5,13 +5,13 @@ import type { AdminTenant, Paginated } from '../../api/types';
 import type { AnnouncementRow, Segment } from '../../api/types-admin-support';
 import { date, dateTime, toLocalInput } from '../../lib/format';
 import { featureLabels } from '../../lib/labels';
-import { Button } from '../Button';
+import { Button, IconButton } from '../Button';
 import { Card } from '../Card';
 import { Chip, type ChipTone } from '../Chip';
 import { DataTable } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { Checkbox, FormError, SelectField, TextAreaField, TextField, formValues } from '../Field';
-import { ConfirmModal, Modal } from '../Modal';
+import { ConfirmModal, Drawer } from '../Modal';
 import { REGIONS } from './support/shared';
 
 const LEVELS = { INFO: 'Novedad', WARNING: 'Aviso', MAINTENANCE: 'Mantenimiento' } as const;
@@ -66,12 +66,12 @@ function AnnouncementForm({ editing, onClose }: { editing: AnnouncementRow | nul
       <TextField label="Título" name="title" required defaultValue={editing?.title} maxLength={140} />
       <TextAreaField label="Mensaje" name="body" required defaultValue={editing?.body} maxLength={1000} />
       <div className="form-row">
-        <SelectField label="Tipo" name="level" defaultValue={editing?.level ?? 'INFO'} options={Object.entries(LEVELS).map(([value, label]) => ({ value, label }))} hint="El mantenimiento se muestra a todo el mundo, sin segmentar." />
-        <TextField label="Enlace (opcional)" name="link" defaultValue={editing?.link ?? ''} placeholder="/billing o https://…" />
+        <SelectField className="field--medium" label="Tipo" name="level" defaultValue={editing?.level ?? 'INFO'} options={Object.entries(LEVELS).map(([value, label]) => ({ value, label }))} hint="El mantenimiento se muestra a todo el mundo, sin segmentar." />
+        <TextField className="field--medium" label="Enlace (opcional)" name="link" defaultValue={editing?.link ?? ''} placeholder="/billing o https://…" />
       </div>
       <div className="form-row">
-        <TextField label="Empieza" name="startsAt" type="datetime-local" defaultValue={toLocalInput(editing?.startsAt)} hint="Vacío = ahora." />
-        <TextField label="Termina" name="endsAt" type="datetime-local" defaultValue={toLocalInput(editing?.endsAt)} hint="Vacío = hasta que lo finalices." />
+        <TextField className="field--medium" label="Empieza" name="startsAt" type="datetime-local" defaultValue={toLocalInput(editing?.startsAt)} hint="Vacío = ahora." />
+        <TextField className="field--medium" label="Termina" name="endsAt" type="datetime-local" defaultValue={toLocalInput(editing?.endsAt)} hint="Vacío = hasta que lo finalices." />
       </div>
       <Checkbox label="Los usuarios pueden descartarlo" name="dismissible" defaultChecked={editing?.dismissible ?? true} />
       <fieldset className="stack">
@@ -129,6 +129,7 @@ export function AnnouncementsTab() {
         caption="Avisos a las bandas"
         rows={q.data ?? []}
         rowKey={(a) => a.id}
+        onRowClick={setEditing}
         empty="No hay avisos. Crea uno para informar de un mantenimiento o una novedad."
         columns={[
           { key: 't', header: 'Aviso', render: (a) => (<><strong>{a.title}</strong><br /><span className="small muted">{LEVELS[a.level]}</span></>) },
@@ -140,17 +141,17 @@ export function AnnouncementsTab() {
             header: 'Acciones',
             render: (a) => (
               <span className="row">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(a)} aria-label={`Editar aviso ${a.title}`}>Editar</Button>
-                {a.state !== 'ended' && <Button size="sm" variant="ghost" onClick={() => setEnding(a)} aria-label={`Finalizar aviso ${a.title}`}>Finalizar</Button>}
-                <Button size="sm" variant="ghost" onClick={() => remove.mutate(a.id)} aria-label={`Eliminar aviso ${a.title}`}>Eliminar</Button>
+                <IconButton icon="edit" label={`Editar aviso ${a.title}`} onClick={() => setEditing(a)} />
+                {a.state !== 'ended' && <IconButton icon="check" label={`Finalizar aviso ${a.title}`} onClick={() => setEnding(a)} />}
+                <IconButton icon="trash" variant="danger" label={`Eliminar aviso ${a.title}`} onClick={() => remove.mutate(a.id)} />
               </span>
             ),
           },
         ]}
       />
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing && editing !== 'new' ? 'Editar aviso' : 'Nuevo aviso'}>
+      <Drawer open={!!editing} onClose={() => setEditing(null)} title={editing && editing !== 'new' ? 'Editar aviso' : 'Nuevo aviso'}>
         {editing && <AnnouncementForm key={editing === 'new' ? 'new' : editing.id} editing={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
-      </Modal>
+      </Drawer>
       <ConfirmModal open={!!ending} title="Finalizar aviso" message={`«${ending?.title ?? ''}» dejará de mostrarse ahora mismo.`} confirmLabel="Finalizar" loading={end.isPending} onConfirm={() => ending && end.mutate(ending.id)} onClose={() => setEnding(null)} />
     </Card>
   );

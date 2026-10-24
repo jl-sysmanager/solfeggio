@@ -58,11 +58,12 @@ export function SelectField({
   id,
   options,
   placeholder,
+  className,
   ...rest
 }: Base & SelectHTMLAttributes<HTMLSelectElement> & { options: Option[]; placeholder?: string }) {
   const { fieldId, hintId, errorId } = useFieldIds(id);
   return (
-    <div className="field">
+    <div className={['field', className].filter(Boolean).join(' ')}>
       <label htmlFor={fieldId}>
         {label}
         {rest.required && <span aria-hidden="true"> *</span>}

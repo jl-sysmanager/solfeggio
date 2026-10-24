@@ -43,6 +43,10 @@ const PATHS = {
   chevronsDownUp: 'M7 20l5-5 5 5M7 4l5 5 5-5',
   chevronsUpDown: 'M7 15l5 5 5-5M7 9l5-5 5 5',
   inbox: 'M22 12h-6l-2 3h-4l-2-3H2M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z',
+  edit: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+  trash: 'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6',
+  eye: 'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+  play: 'M6 4l14 8-14 8z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

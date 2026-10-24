@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { post } from '../../../api/client';
 import { useApi, useApiMutation } from '../../../api/hooks';
 import type { DunningRow } from '../../../api/types-admin-billing';
-import { Button } from '../../Button';
+import { Button, IconButton } from '../../Button';
 import { Card } from '../../Card';
 import { StatusChip } from '../../Chip';
 import { DataTable } from '../../DataTable';
 import { ErrorNote, Loading } from '../../EmptyState';
 import { FormError, TextField, formValues } from '../../Field';
-import { ConfirmModal, Modal } from '../../Modal';
+import { ConfirmModal, Drawer } from '../../Modal';
 import { useToast } from '../../Toasts';
 import { date, money } from '../../../lib/format';
 import { tenantStatus } from '../../../lib/labels';
@@ -44,6 +44,7 @@ export function DunningSection() {
         caption="Bandas con pagos pendientes"
         rows={rows}
         rowKey={(r) => r.tenant.id}
+        onRowClick={(r) => setAction({ kind: 'grace', row: r })}
         empty="Ninguna banda tiene pagos pendientes."
         columns={[
           { key: 'b', header: 'Banda', render: (r) => <><strong>{r.tenant.name}</strong><br /><span className="small muted">{r.owners[0]?.email ?? 'Sin propietario'}</span></> },
@@ -58,10 +59,12 @@ export function DunningSection() {
             header: 'Acciones',
             render: (r) => (
               <div className="row" style={{ flexWrap: 'wrap', gap: 4 }}>
-                <Button size="sm" variant="ghost" onClick={() => setAction({ kind: 'retry', row: r })} aria-label={`Reintentar cobro de ${r.tenant.name}`}>Reintentar</Button>
-                <Button size="sm" variant="ghost" onClick={() => setAction({ kind: 'remind', row: r })} aria-label={`Enviar recordatorio a ${r.tenant.name}`}>Avisar</Button>
-                <Button size="sm" variant="ghost" onClick={() => setAction({ kind: 'grace', row: r })} aria-label={`Ampliar la gracia de ${r.tenant.name}`}>Gracia</Button>
-                <Button size="sm" variant="danger" disabled={r.tenant.status === 'READ_ONLY' || !!r.complimentaryUntil} onClick={() => setAction({ kind: 'read-only', row: r })} aria-label={`Pasar ${r.tenant.name} a sólo lectura`}>Sólo lectura</Button>
+                <span className="row">
+                  <IconButton icon="swap" label={`Reintentar cobro de ${r.tenant.name}`} onClick={() => setAction({ kind: 'retry', row: r })} />
+                  <IconButton icon="bell" label={`Enviar recordatorio a ${r.tenant.name}`} onClick={() => setAction({ kind: 'remind', row: r })} />
+                  <IconButton icon="calendar" label={`Ampliar la gracia de ${r.tenant.name}`} onClick={() => setAction({ kind: 'grace', row: r })} />
+                  <IconButton icon="shield" variant="danger" label={`Pasar ${r.tenant.name} a sólo lectura`} disabled={r.tenant.status === 'READ_ONLY' || !!r.complimentaryUntil} onClick={() => setAction({ kind: 'read-only', row: r })} />
+                </span>
               </div>
             ),
           },
@@ -78,7 +81,7 @@ export function DunningSection() {
           onConfirm={() => run.mutate({ id: action.row.tenant.id, path: action.kind })}
         />
       )}
-      <Modal open={action?.kind === 'grace'} onClose={() => setAction(null)} title={`Ampliar la gracia de ${action?.row.tenant.name ?? ''}`}>
+      <Drawer open={action?.kind === 'grace'} onClose={() => setAction(null)} title={`Ampliar la gracia de ${action?.row.tenant.name ?? ''}`}>
         <form
           className="form"
           onSubmit={(e) => {
@@ -86,14 +89,14 @@ export function DunningSection() {
             if (action) run.mutate({ id: action.row.tenant.id, path: 'grace', body: { days: Number(formValues(e.currentTarget).days) } });
           }}
         >
-          <TextField label="Días adicionales" name="days" type="number" min={1} max={90} defaultValue={7} required hint="Se suman a la fecha actual de gracia y reabren la edición si estaba en sólo lectura." />
+          <TextField className="field--short" label="Días adicionales" name="days" type="number" min={1} max={90} defaultValue={7} required hint="Se suman a la fecha actual de gracia y reabren la edición si estaba en sólo lectura." />
           <FormError error={run.error} />
           <div className="modal__footer">
             <Button variant="ghost" onClick={() => setAction(null)}>Cancelar</Button>
             <Button type="submit" loading={run.isPending}>Ampliar</Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </Card>
   );
 }

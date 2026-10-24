@@ -22,12 +22,15 @@ export function DataTable<T>({
   rowKey,
   caption,
   empty = 'No hay registros todavía.',
+  onRowClick,
 }: {
   columns: Column<T>[];
   rows: T[];
   rowKey: (row: T) => string;
   caption: string;
   empty?: ReactNode;
+  /** Abre la ficha del registro. Los clics en enlaces y botones de la fila no lo disparan. */
+  onRowClick?: (row: T) => void;
 }) {
   if (rows.length === 0) return <EmptyState title="Sin resultados" icon="search">{empty}</EmptyState>;
   return (
@@ -45,7 +48,30 @@ export function DataTable<T>({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)}>
+            <tr
+              key={rowKey(row)}
+              className={onRowClick ? 'row-link' : undefined}
+              tabIndex={onRowClick ? 0 : undefined}
+              onClick={
+                onRowClick
+                  ? (e) => {
+                      const target = e.target as HTMLElement;
+                      if (target.closest('a, button, input, select, textarea, label')) return;
+                      onRowClick(row);
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                onRowClick
+                  ? (e) => {
+                      if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                        e.preventDefault();
+                        onRowClick(row);
+                      }
+                    }
+                  : undefined
+              }
+            >
               {columns.map((c) => (
                 <td key={c.key} data-label={c.header} className={cellClass(c)}>
                   {c.render(row)}

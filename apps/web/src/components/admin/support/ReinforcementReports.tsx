@@ -3,11 +3,11 @@ import { post } from '../../../api/client';
 import { useApi, useApiMutation } from '../../../api/hooks';
 import type { ReinforcementGroup } from '../../../api/types-admin-support';
 import { date } from '../../../lib/format';
-import { Button } from '../../Button';
+import { Button, IconButton } from '../../Button';
 import { Chip } from '../../Chip';
 import { EmptyState, ErrorNote, Loading } from '../../EmptyState';
 import { FormError, TextAreaField, formValues } from '../../Field';
-import { Modal } from '../../Modal';
+import { Drawer } from '../../Modal';
 
 type Action = 'dismiss' | 'hide_request' | 'hide_profile' | 'block_user';
 const TITLES: Record<Action, string> = {
@@ -54,17 +54,15 @@ export function ReinforcementReports() {
                 ))}
               </ul>
               <div className="row" style={{ flexWrap: 'wrap' }}>
-                <Button size="sm" variant="ghost" onClick={() => setPending({ group: g, action: 'dismiss' })}>Descartar</Button>
-                <Button size="sm" onClick={() => setPending({ group: g, action: g.kind === 'request' ? 'hide_request' : 'hide_profile' })}>
-                  {g.kind === 'request' ? 'Ocultar necesidad' : 'Ocultar perfil'}
-                </Button>
-                <Button size="sm" variant="danger" onClick={() => setPending({ group: g, action: 'block_user' })}>Bloquear usuario</Button>
+                <IconButton icon="close" label="Descartar denuncia" onClick={() => setPending({ group: g, action: 'dismiss' })} />
+                <IconButton icon="eye" label={g.kind === 'request' ? 'Ocultar necesidad' : 'Ocultar perfil'} onClick={() => setPending({ group: g, action: g.kind === 'request' ? 'hide_request' : 'hide_profile' })} />
+                <IconButton icon="shield" variant="danger" label="Bloquear usuario" onClick={() => setPending({ group: g, action: 'block_user' })} />
               </div>
             </li>
           );
         })}
       </ul>
-      <Modal open={!!pending} onClose={() => setPending(null)} title={pending ? TITLES[pending.action] : ''}>
+      <Drawer open={!!pending} onClose={() => setPending(null)} title={pending ? TITLES[pending.action] : ''}>
         <form
           className="form"
           key={pending?.group.key}
@@ -86,7 +84,7 @@ export function ReinforcementReports() {
             <Button type="submit" variant={pending?.action === 'block_user' ? 'danger' : 'primary'} loading={resolve.isPending}>Confirmar</Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </>
   );
 }

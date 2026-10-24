@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { del, patch, post } from '../../../api/client';
 import { useApi, useApiMutation } from '../../../api/hooks';
 import type { CannedReply } from '../../../api/types-admin-support';
-import { Button } from '../../Button';
+import { Button, IconButton } from '../../Button';
 import { Card } from '../../Card';
 import { ErrorNote, Loading } from '../../EmptyState';
 import { FormError, TextAreaField, TextField, formValues } from '../../Field';
-import { Modal } from '../../Modal';
+import { Drawer } from '../../Modal';
 
 /** Gestión de respuestas predefinidas del equipo de soporte. */
 export function CannedReplies() {
@@ -27,19 +27,19 @@ export function CannedReplies() {
       {q.data?.length === 0 && <p className="small muted">Aún no hay respuestas. Crea las más habituales para contestar más rápido.</p>}
       <ul className="stack list-plain">
         {q.data?.map((c) => (
-          <li key={c.id} className="row between">
+          <li key={c.id} className="row between row-link" tabIndex={0} onClick={() => setEditing(c)} onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) setEditing(c); }}>
             <span>
               <strong>{c.title}</strong>
               <span className="small muted"> · {c.body.slice(0, 80)}{c.body.length > 80 ? '…' : ''}</span>
             </span>
             <span className="row">
-              <Button size="sm" variant="ghost" onClick={() => setEditing(c)} aria-label={`Editar respuesta ${c.title}`}>Editar</Button>
-              <Button size="sm" variant="ghost" onClick={() => remove.mutate(c.id)} aria-label={`Eliminar respuesta ${c.title}`}>Eliminar</Button>
+              <IconButton icon="edit" label={`Editar respuesta ${c.title}`} onClick={() => setEditing(c)} />
+              <IconButton icon="trash" variant="danger" label={`Eliminar respuesta ${c.title}`} onClick={() => remove.mutate(c.id)} />
             </span>
           </li>
         ))}
       </ul>
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={cur ? 'Editar respuesta' : 'Nueva respuesta'}>
+      <Drawer open={!!editing} onClose={() => setEditing(null)} title={cur ? 'Editar respuesta' : 'Nueva respuesta'}>
         <form
           className="form"
           key={cur?.id ?? 'new'}
@@ -49,7 +49,7 @@ export function CannedReplies() {
             save.mutate({ id: cur?.id, body: { title: v.title, body: v.body } });
           }}
         >
-          <TextField label="Título" name="title" required defaultValue={cur?.title} />
+          <TextField className="field--medium" label="Título" name="title" required defaultValue={cur?.title} />
           <TextAreaField label="Texto" name="body" required defaultValue={cur?.body} rows={6} />
           <FormError error={save.error} />
           <div className="modal__footer">
@@ -57,7 +57,7 @@ export function CannedReplies() {
             <Button type="submit" loading={save.isPending}>Guardar</Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </Card>
   );
 }

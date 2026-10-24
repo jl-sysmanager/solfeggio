@@ -3,13 +3,14 @@ import { del, post } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
 import type { OpsEmail, OpsHeartbeats, OpsQueues, OpsSchedule, OpsStorage } from '../../api/types-admin-support';
 import { bytes, dateTime } from '../../lib/format';
-import { Button } from '../Button';
+import { Button, IconButton } from '../Button';
 import { Card, StatCard } from '../Card';
 import { Chip } from '../Chip';
 import { DataTable } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { FormError, SelectField, TextField } from '../Field';
-import { ConfirmModal } from '../Modal';
+import { ConfirmModal, Drawer } from '../Modal';
+import { UrlTabs } from '../Tabs';
 import { KpiRow } from './support/shared';
 
 const QUEUE_LABEL: Record<string, string> = { waiting: 'En espera', active: 'En curso', delayed: 'Diferidos', completed: 'Completados', failed: 'Fallidos', paused: 'En pausa' };
@@ -46,8 +47,10 @@ function Queues() {
             header: 'Acciones',
             render: (j) => (
               <span className="row">
-                <Button size="sm" variant="ghost" onClick={() => retry.mutate(j.id)} aria-label={`Reintentar trabajo ${j.name} ${j.id}`}>Reintentar</Button>
-                <Button size="sm" variant="ghost" onClick={() => remove.mutate(j.id)} aria-label={`Eliminar trabajo ${j.name} ${j.id}`}>Eliminar</Button>
+                <span className="row">
+                  <IconButton icon="swap" label={`Reintentar trabajo ${j.name} ${j.id}`} onClick={() => retry.mutate(j.id)} />
+                  <IconButton icon="trash" variant="danger" label={`Eliminar trabajo ${j.name} ${j.id}`} onClick={() => remove.mutate(j.id)} />
+                </span>
               </span>
             ),
           },
@@ -159,7 +162,7 @@ const SCHEDULE_PRESETS = [
   { value: '0 4 1 * *', label: 'El día 1 de cada mes, 04:00' },
 ];
 
-function ScheduleEditor({ schedule }: { schedule: OpsSchedule }) {
+function ScheduleEditor({ schedule, embedded = false }: { schedule: OpsSchedule; embedded?: boolean }) {
   const [pattern, setPattern] = useState(schedule.pattern);
   const [enabled, setEnabled] = useState(schedule.enabled);
   const save = useApiMutation(
@@ -167,8 +170,7 @@ function ScheduleEditor({ schedule }: { schedule: OpsSchedule }) {
     { success: 'Programación guardada', invalidate: ['/admin/ops/schedules', '/admin/ops/queues'] },
   );
   const run = useApiMutation(() => post(`/admin/ops/schedules/${schedule.name}/run`), { success: 'Tarea encolada', invalidate: ['/admin/ops/queues'] });
-  return (
-    <Card title={schedule.label} actions={<Chip tone={enabled ? 'success' : 'neutral'}>{enabled ? 'Activa' : 'Pausada'}</Chip>}>
+  const form = (
       <form
         className="form"
         onSubmit={(event) => {
@@ -177,15 +179,15 @@ function ScheduleEditor({ schedule }: { schedule: OpsSchedule }) {
         }}
       >
         <p className="small muted">{schedule.description}</p>
-        <div className="form-row">
-          <SelectField
+        <div className="fields-fit">
+          <SelectField className="field--medium"
             label="Frecuencia"
             name={`preset-${schedule.name}`}
             value={SCHEDULE_PRESETS.some((preset) => preset.value === pattern) ? pattern : 'custom'}
             onChange={(event) => setPattern(event.target.value === 'custom' ? pattern : event.target.value)}
             options={[...SCHEDULE_PRESETS, { value: 'custom', label: 'Cron personalizado' }]}
           />
-          <TextField label="Programación cron" value={pattern} onChange={(event) => setPattern(event.target.value)} hint="Cinco campos: minuto, hora, día, mes y semana." required />
+          <TextField className="field--medium" label="Programación cron" value={pattern} onChange={(event) => setPattern(event.target.value)} hint="Cinco campos: minuto, hora, día, mes y semana." required />
           <label className="field"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /> Activar esta tarea</label>
         </div>
         <FormError error={save.error} />
@@ -194,12 +196,18 @@ function ScheduleEditor({ schedule }: { schedule: OpsSchedule }) {
           <Button variant="ghost" type="button" onClick={() => run.mutate()} loading={run.isPending}>Ejecutar ahora</Button>
         </div>
       </form>
+  );
+  if (embedded) return form;
+  return (
+    <Card title={schedule.label} actions={<Chip tone={enabled ? 'success' : 'neutral'}>{enabled ? 'Activa' : 'Pausada'}</Chip>}>
+      {form}
     </Card>
   );
 }
 
 function Schedules() {
   const q = useApi<OpsSchedule[]>('/admin/ops/schedules');
+  const [open, setOpen] = useState<OpsSchedule | null>(null);
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
   return (
@@ -208,6 +216,7 @@ function Schedules() {
         caption="Tareas programadas"
         rows={q.data}
         rowKey={(s) => s.name}
+        onRowClick={setOpen}
         columns={[
           { key: 'n', header: 'Tarea', render: (s) => s.label },
           { key: 'p', header: 'Programación', render: (s) => s.pattern },
@@ -215,9 +224,12 @@ function Schedules() {
           { key: 'l', header: 'Última ejecución', render: (s) => (s.lastRunAt ? dateTime(s.lastRunAt) : '—'), nowrap: true },
           { key: 'x', header: 'Próxima', render: (s) => (s.next ? dateTime(s.next) : '—'), nowrap: true },
           { key: 'e', header: 'Detalle', render: (s) => s.detail?.error ?? '' },
+          { key: 'a', header: 'Acciones', render: (s) => <IconButton icon="edit" label={`Editar ${s.label}`} onClick={() => setOpen(s)} /> },
         ]}
       />
-      {q.data.map((schedule) => <ScheduleEditor key={schedule.name} schedule={schedule} />)}
+      <Drawer open={!!open} onClose={() => setOpen(null)} title={open?.label ?? 'Tarea'}>
+        {open && <ScheduleEditor key={`${open.name}-${open.pattern}`} schedule={open} embedded />}
+      </Drawer>
     </section>
   );
 }
@@ -257,12 +269,15 @@ function Backups() {
 /** Salud técnica: colas, correo, almacenamiento, tareas programadas y copias de seguridad. */
 export function OpsTab() {
   return (
-    <div className="stack" style={{ gap: 24 }}>
-      <Backups />
-      <Queues />
-      <EmailPanel />
-      <StoragePanel />
-      <Schedules />
-    </div>
+    <UrlTabs
+      label="Sistema"
+      tabs={[
+        { id: 'backups', label: 'Copias', content: <Backups /> },
+        { id: 'queues', label: 'Colas', content: <Queues /> },
+        { id: 'email', label: 'Correo', content: <EmailPanel /> },
+        { id: 'storage', label: 'Almacenamiento', content: <StoragePanel /> },
+        { id: 'schedules', label: 'Programación', content: <Schedules /> },
+      ]}
+    />
   );
 }

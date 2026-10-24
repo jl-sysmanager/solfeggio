@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { post } from '../../../api/client';
 import { useApi, useApiMutation } from '../../../api/hooks';
 import type { StripeEventRow, WebhookDetail, WebhooksPage } from '../../../api/types-admin-billing';
-import { Button } from '../../Button';
+import { Button, IconButton } from '../../Button';
 import { Card } from '../../Card';
 import { StatusChip } from '../../Chip';
 import { DataTable, Pagination } from '../../DataTable';
 import { ErrorNote, Loading } from '../../EmptyState';
 import { SelectField } from '../../Field';
-import { Modal } from '../../Modal';
+import { Drawer } from '../../Modal';
 import { useToast } from '../../Toasts';
 import { dateTime } from '../../../lib/format';
 import { EVENT_STATUS } from './helpers';
@@ -22,7 +22,7 @@ function EventDetail({ id, onClose }: { id: string | null; onClose: () => void }
   });
   const e = q.data;
   return (
-    <Modal open={!!id} onClose={onClose} title="Evento de Stripe">
+    <Drawer open={!!id} onClose={onClose} title="Evento de Stripe">
       {q.isLoading && <Loading rows={3} />}
       {q.error && <ErrorNote error={q.error} />}
       {e && (
@@ -42,7 +42,7 @@ function EventDetail({ id, onClose }: { id: string | null; onClose: () => void }
           </div>
         </div>
       )}
-    </Modal>
+    </Drawer>
   );
 }
 
@@ -69,13 +69,14 @@ export function WebhooksSection() {
             caption="Eventos recibidos de Stripe"
             rows={q.data.data}
             rowKey={(e) => e.id}
+            onRowClick={(e) => setSelected(e.id)}
             empty="No hay eventos con esos filtros."
             columns={[
               { key: 't', header: 'Evento', render: (e: StripeEventRow) => <><strong>{e.type}</strong><br /><span className="small mono muted">{e.id}</span></> },
               { key: 'r', header: 'Recibido', render: (e) => dateTime(e.receivedAt), nowrap: true },
               { key: 's', header: 'Estado', render: (e) => <StatusChip value={e.status} map={EVENT_STATUS} /> },
               { key: 'e', header: 'Error', render: (e) => (e.error ? <span className="small">{e.error.slice(0, 80)}</span> : '—') },
-              { key: 'a', header: 'Acciones', render: (e) => <Button size="sm" variant="ghost" onClick={() => setSelected(e.id)} aria-label={`Ver evento ${e.id}`}>Detalle</Button> },
+              { key: 'a', header: 'Acciones', render: (e) => <IconButton icon="eye" label={`Ver evento ${e.id}`} onClick={() => setSelected(e.id)} /> },
             ]}
           />
           <Pagination page={q.data.page} pageSize={q.data.pageSize} total={q.data.total} onPage={setPage} />

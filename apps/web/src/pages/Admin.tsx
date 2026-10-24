@@ -2,12 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { patch } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
 import type { FeatureModule, Plan } from '../api/types';
-import { Button } from '../components/Button';
+import { Button, IconButton } from '../components/Button';
 import { Card } from '../components/Card';
 import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { Checkbox, FormError, TextField, formValues } from '../components/Field';
-import { Modal } from '../components/Modal';
+import { Drawer } from '../components/Modal';
 import { Navigate, useParams } from 'react-router-dom';
 import { Page, PageHeader } from '../components/PageHeader';
 import { money, parseMoney } from '../lib/format';
@@ -65,6 +65,7 @@ function PlansTab() {
           caption="Planes"
           rows={q.data ?? []}
           rowKey={(p) => p.id}
+          onRowClick={setEditing}
           columns={[
             { key: 'n', header: 'Plan', render: (p) => p.name },
             { key: 'm', header: 'Mensual', render: (p) => money(p.priceMonthlyCents), numeric: true, nowrap: true },
@@ -78,15 +79,13 @@ function PlansTab() {
               key: 'a',
               header: 'Acciones',
               render: (p) => (
-                <Button size="sm" variant="ghost" onClick={() => setEditing(p)} aria-label={`Editar plan ${p.name}`}>
-                  Editar
-                </Button>
+                <IconButton icon="edit" label={`Editar plan ${p.name}`} onClick={() => setEditing(p)} />
               ),
             },
           ]}
         />
       </Card>
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={`Editar plan ${editing?.name ?? ''}`}>
+      <Drawer open={!!editing} onClose={() => setEditing(null)} title={`Editar plan ${editing?.name ?? ''}`}>
         <form
           className="form"
           key={editing?.id}
@@ -110,16 +109,16 @@ function PlansTab() {
         >
           <p className="small muted">Al guardar, el nombre y los precios se publican en Stripe (importe sin impuestos). Las bandas con suscripción pasan al nuevo importe en el siguiente cobro, sin un cargo prorrateado. Límites y módulos se aplican al momento.</p>
           <div className="form-row">
-            <TextField label="Precio mensual (€)" name="monthly" defaultValue={editing ? String(editing.priceMonthlyCents / 100).replace('.', ',') : ''} />
-            <TextField label="Precio anual (€)" name="yearly" defaultValue={editing ? String(editing.priceYearlyCents / 100).replace('.', ',') : ''} />
+            <TextField className="field--medium" label="Precio mensual (€)" name="monthly" defaultValue={editing ? String(editing.priceMonthlyCents / 100).replace('.', ',') : ''} />
+            <TextField className="field--medium" label="Precio anual (€)" name="yearly" defaultValue={editing ? String(editing.priceYearlyCents / 100).replace('.', ',') : ''} />
           </div>
           <div className="form-row">
-            <TextField label="Máx. usuarios (−1 = ∞)" name="maxUsers" type="number" defaultValue={editing?.maxUsers} />
-            <TextField label="Máx. socios (−1 = ∞)" name="maxMembers" type="number" defaultValue={editing?.maxMembers} />
+            <TextField className="field--short" label="Máx. usuarios (−1 = ∞)" name="maxUsers" type="number" defaultValue={editing?.maxUsers} />
+            <TextField className="field--short" label="Máx. socios (−1 = ∞)" name="maxMembers" type="number" defaultValue={editing?.maxMembers} />
           </div>
           <div className="form-row">
-            <TextField label="Almacenamiento (MB)" name="storageMb" type="number" defaultValue={editing?.storageMb} />
-            <TextField label="Días de prueba" name="trialDays" type="number" min={0} defaultValue={editing?.trialDays} />
+            <TextField className="field--short" label="Almacenamiento (MB)" name="storageMb" type="number" defaultValue={editing?.storageMb} />
+            <TextField className="field--short" label="Días de prueba" name="trialDays" type="number" min={0} defaultValue={editing?.trialDays} />
           </div>
           <fieldset className="stack" style={{ gap: 12, border: 0, padding: 0 }}>
             <legend className="label-caps">Funcionalidades por módulo</legend>
@@ -152,7 +151,7 @@ function PlansTab() {
             </Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </>
   );
 }

@@ -5,12 +5,13 @@ import type { SupportIncident, SupportKpis } from '../../api/types-admin-support
 import { dateTime } from '../../lib/format';
 import { incidentStatus } from '../../lib/labels';
 import { Person } from '../Avatar';
-import { Button } from '../Button';
+import { IconButton } from '../Button';
 import { Card, StatCard } from '../Card';
 import { Chip, StatusChip } from '../Chip';
 import { DataTable } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { SelectField, TextField } from '../Field';
+import { UrlTabs } from '../Tabs';
 import { CannedReplies } from './support/CannedReplies';
 import { IncidentDetail } from './support/IncidentDetail';
 import { KpiRow, PRIORITY_LABEL, SlaChip, minutesLabel } from './support/shared';
@@ -36,8 +37,12 @@ export function IncidentsTab() {
           <StatCard label="Dentro de SLA (30 d)" value={k.last30d.withinSlaPct === null ? '—' : `${k.last30d.withinSlaPct} %`} />
         </KpiRow>
       )}
+      <UrlTabs
+        label="Soporte"
+        tabs={[
+          { id: 'queue', label: 'Cola', content: (
       <Card title="Incidencias de todas las bandas">
-        <div className="form-row" role="search">
+        <div className="toolbar" role="search">
           <SelectField label="Estado" value={f.status} onChange={set('status')} options={[{ value: 'ACTIVE', label: 'Abiertas y en curso' }, ...Object.entries(incidentStatus).map(([value, { label }]) => ({ value, label }))]} placeholder="Todos" />
           <SelectField label="Prioridad" value={f.priority} onChange={set('priority')} placeholder="Todas" options={[1, 2, 3, 4, 5].map((p) => ({ value: String(p), label: PRIORITY_LABEL[p] }))} />
           <SelectField label="Responsable" value={f.assignee} onChange={set('assignee')} placeholder="Todos" options={[{ value: 'none', label: 'Sin asignar' }, { value: 'me', label: 'Asignadas a mí' }, ...(agents.data ?? []).map((a) => ({ value: a.id, label: a.name }))]} />
@@ -51,6 +56,7 @@ export function IncidentsTab() {
             caption="Incidencias de todas las bandas"
             rows={q.data.data}
             rowKey={(i) => i.id}
+            onRowClick={(i) => setOpen(i.id)}
             empty="Sin incidencias con estos filtros."
             columns={[
               { key: 't', header: 'Banda', render: (i) => (i.tenant ? <Person name={i.tenant.name} detail={i.tenant.slug} /> : '—') },
@@ -64,16 +70,17 @@ export function IncidentsTab() {
                 key: 'x',
                 header: 'Acciones',
                 render: (i) => (
-                  <Button size="sm" variant="ghost" onClick={() => setOpen(i.id)} aria-label={`Atender incidencia: ${i.subject}`}>
-                    Atender
-                  </Button>
+                  <IconButton icon="eye" label={`Atender incidencia: ${i.subject}`} onClick={() => setOpen(i.id)} />
                 ),
               },
             ]}
           />
         )}
       </Card>
-      <CannedReplies />
+          ) },
+          { id: 'replies', label: 'Respuestas', content: <CannedReplies /> },
+        ]}
+      />
       <IncidentDetail id={open} onClose={() => setOpen(null)} />
     </div>
   );

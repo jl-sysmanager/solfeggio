@@ -9,7 +9,7 @@ import { Card } from '../../Card';
 import { Chip, StatusChip } from '../../Chip';
 import { ErrorNote, Loading } from '../../EmptyState';
 import { Checkbox, FormError, SelectField, TextAreaField } from '../../Field';
-import { Modal } from '../../Modal';
+import { Drawer } from '../../Modal';
 import { PRIORITY_LABEL, SLA_HOURS, SlaChip } from './shared';
 
 /** Conversación y gestión de una incidencia (plataforma): asignar, prioridad, estado y responder. */
@@ -28,7 +28,7 @@ export function IncidentDetail({ id, onClose }: { id: string | null; onClose: ()
   });
   const inc = q.data;
   return (
-    <Modal open={!!id} onClose={onClose} title={inc?.subject ?? 'Incidencia'}>
+    <Drawer open={!!id} onClose={onClose} title={inc?.subject ?? 'Incidencia'}>
       {q.isLoading && <Loading />}
       {q.error && <ErrorNote error={q.error} />}
       {inc && (
@@ -111,6 +111,6 @@ export function IncidentDetail({ id, onClose }: { id: string | null; onClose: ()
           )}
         </div>
       )}
-    </Modal>
+    </Drawer>
   );
 }

@@ -3,13 +3,13 @@ import { post } from '../../../api/client';
 import { useApi, useApiMutation } from '../../../api/hooks';
 import type { ModUser } from '../../../api/types-admin-support';
 import { date } from '../../../lib/format';
-import { Button } from '../../Button';
+import { Button, IconButton } from '../../Button';
 import { Card } from '../../Card';
 import { Chip } from '../../Chip';
 import { DataTable } from '../../DataTable';
 import { ErrorNote } from '../../EmptyState';
 import { FormError, TextAreaField, TextField, formValues } from '../../Field';
-import { Modal } from '../../Modal';
+import { Drawer } from '../../Modal';
 
 /** Búsqueda de usuarios para bloquearlos o desbloquearlos (nunca administradores de plataforma). */
 export function UserBlocking() {
@@ -31,6 +31,7 @@ export function UserBlocking() {
         caption="Usuarios"
         rows={q.data ?? []}
         rowKey={(u) => u.id}
+        onRowClick={(u) => { if (!u.isPlatformAdmin && !u.blockedAt) setBlocking(u); }}
         empty="Ningún usuario coincide."
         columns={[
           { key: 'n', header: 'Usuario', render: (u) => `${u.name} · ${u.email}` },
@@ -41,14 +42,14 @@ export function UserBlocking() {
             header: 'Acciones',
             render: (u) =>
               u.isPlatformAdmin ? null : u.blockedAt ? (
-                <Button size="sm" variant="ghost" onClick={() => unblock.mutate(u.id)} aria-label={`Desbloquear a ${u.name}`}>Desbloquear</Button>
+                <IconButton icon="check" label={`Desbloquear a ${u.name}`} onClick={() => unblock.mutate(u.id)} />
               ) : (
-                <Button size="sm" variant="danger" onClick={() => setBlocking(u)} aria-label={`Bloquear a ${u.name}`}>Bloquear</Button>
+                <IconButton icon="shield" variant="danger" label={`Bloquear a ${u.name}`} onClick={() => setBlocking(u)} />
               ),
           },
         ]}
       />
-      <Modal open={!!blocking} onClose={() => setBlocking(null)} title={`Bloquear a ${blocking?.name ?? ''}`}>
+      <Drawer open={!!blocking} onClose={() => setBlocking(null)} title={`Bloquear a ${blocking?.name ?? ''}`}>
         <form
           className="form"
           onSubmit={(e) => {
@@ -64,7 +65,7 @@ export function UserBlocking() {
             <Button type="submit" variant="danger" loading={block.isPending}>Bloquear</Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </Card>
   );
 }

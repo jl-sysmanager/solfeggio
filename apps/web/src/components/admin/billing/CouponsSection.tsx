@@ -3,13 +3,13 @@ import { del, post } from '../../../api/client';
 import { useApi, useApiMutation } from '../../../api/hooks';
 import type { AdminCoupon, BillingTenantSummary } from '../../../api/types-admin-billing';
 import type { Paginated } from '../../../api/types';
-import { Button } from '../../Button';
+import { Button, IconButton } from '../../Button';
 import { Card } from '../../Card';
 import { Chip } from '../../Chip';
 import { DataTable } from '../../DataTable';
 import { ErrorNote, Loading } from '../../EmptyState';
 import { FormError, SelectField, TextAreaField, TextField, formValues } from '../../Field';
-import { ConfirmModal, Modal } from '../../Modal';
+import { ConfirmModal, Drawer } from '../../Modal';
 import { date } from '../../../lib/format';
 import { parseMoney } from '../../../lib/format';
 import { couponLabel } from './helpers';
@@ -106,7 +106,7 @@ function TenantActions({ coupons }: { coupons: AdminCoupon[] }) {
           </div>
         </div>
       )}
-      <Modal open={!!action} onClose={() => setAction(null)} title={`${ACTIONS.find((a) => a.id === action)?.label ?? ''} · ${s?.tenant.name ?? ''}`}>
+      <Drawer open={!!action} onClose={() => setAction(null)} title={`${ACTIONS.find((a) => a.id === action)?.label ?? ''} · ${s?.tenant.name ?? ''}`}>
         <form
           className="form"
           key={action}
@@ -123,15 +123,15 @@ function TenantActions({ coupons }: { coupons: AdminCoupon[] }) {
           {action === 'coupon' && <SelectField label="Cupón" name="couponId" required placeholder="Elige un cupón" options={coupons.filter((c) => c.valid).map((c) => ({ value: c.id, label: `${c.name ?? c.id} · ${couponLabel(c)}` }))} />}
           {action === 'credit' && (
             <>
-              <TextField label="Importe (€)" name="amount" required inputMode="decimal" hint="Se descontará de las próximas facturas." />
+              <TextField className="field--short" label="Importe (€)" name="amount" required inputMode="decimal" hint="Se descontará de las próximas facturas." />
               <TextField label="Motivo" name="description" required maxLength={200} />
             </>
           )}
-          {action === 'free-months' && <TextField label="Meses gratis" name="months" type="number" min={1} max={24} defaultValue={1} required hint="Crea un cupón del 100 % de un solo uso y lo aplica a la suscripción." />}
-          {action === 'extend-trial' && <TextField label="Días adicionales" name="days" type="number" min={1} max={90} defaultValue={7} required hint="Sólo si la banda está en periodo de prueba." />}
+          {action === 'free-months' && <TextField className="field--short" label="Meses gratis" name="months" type="number" min={1} max={24} defaultValue={1} required hint="Crea un cupón del 100 % de un solo uso y lo aplica a la suscripción." />}
+          {action === 'extend-trial' && <TextField className="field--short" label="Días adicionales" name="days" type="number" min={1} max={90} defaultValue={7} required hint="Sólo si la banda está en periodo de prueba." />}
           {action === 'complimentary' && (
             <>
-              <SelectField label="Plan" name="planCode" defaultValue="PRO" options={['BASIC', 'PRO', 'ENTERPRISE'].map((c) => ({ value: c, label: c }))} />
+              <SelectField className="field--medium" label="Plan" name="planCode" defaultValue="PRO" options={['BASIC', 'PRO', 'ENTERPRISE'].map((c) => ({ value: c, label: c }))} />
               <TextField label="Hasta" name="until" type="date" required hint="Sin cobro en Stripe hasta esa fecha; después pasa a Free. Se avisa a los propietarios 7 días antes." />
               <TextAreaField label="Motivo" name="reason" required maxLength={300} rows={2} />
             </>
@@ -142,7 +142,7 @@ function TenantActions({ coupons }: { coupons: AdminCoupon[] }) {
             <Button type="submit" loading={run.isPending}>Aplicar</Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </Card>
   );
 }
@@ -170,15 +170,15 @@ export function CouponsSection() {
               { key: 'c', header: 'Códigos', render: (c) => (c.promotionCodes.length ? c.promotionCodes.map((p) => p.code).join(', ') : '—') },
               { key: 'u', header: 'Usos', render: (c) => `${c.timesRedeemed}${c.maxRedemptions ? ` / ${c.maxRedemptions}` : ''}`, numeric: true },
               { key: 's', header: 'Estado', render: (c) => <Chip tone={c.valid ? 'success' : 'neutral'}>{c.valid ? 'Vigente' : 'Agotado'}</Chip> },
-              { key: 'a', header: 'Acciones', render: (c) => <Button size="sm" variant="danger" onClick={() => setDeleting(c)} aria-label={`Eliminar cupón ${c.name ?? c.id}`}>Eliminar</Button> },
+              { key: 'a', header: 'Acciones', render: (c) => <IconButton icon="trash" variant="danger" label={`Eliminar cupón ${c.name ?? c.id}`} onClick={() => setDeleting(c)} /> },
             ]}
           />
         )}
       </Card>
       <TenantActions coupons={q.data ?? []} />
-      <Modal open={creating} onClose={() => setCreating(false)} title="Nuevo cupón">
+      <Drawer open={creating} onClose={() => setCreating(false)} title="Nuevo cupón">
         <CouponForm onDone={() => setCreating(false)} />
-      </Modal>
+      </Drawer>
       <ConfirmModal
         open={!!deleting}
         title="Eliminar cupón"

@@ -4,13 +4,13 @@ import { patch } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
 import type { AdminTenant, Paginated, PlanCode } from '../../api/types';
 import { Person } from '../Avatar';
-import { Button } from '../Button';
+import { Button, IconButton } from '../Button';
 import { Card } from '../Card';
 import { StatusChip } from '../Chip';
 import { DataTable, Pagination } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { Checkbox, FormError, SelectField, TextField, formValues } from '../Field';
-import { Modal } from '../Modal';
+import { Drawer } from '../Modal';
 import { bytes, date } from '../../lib/format';
 import { featureLabels, tenantStatus } from '../../lib/labels';
 
@@ -64,6 +64,7 @@ function TenantExtras({ detail }: { detail: TenantDetail }) {
         </p>
         <div className="form-row">
           <TextField
+            className="field--short"
             label={`Usuarios (plan: ${fmtCap(detail.plan?.maxUsers)})`}
             name="maxUsersOverride"
             type="number"
@@ -71,6 +72,7 @@ function TenantExtras({ detail }: { detail: TenantDetail }) {
             placeholder="Usar plan"
           />
           <TextField
+            className="field--short"
             label={`Socios (plan: ${fmtCap(detail.plan?.maxMembers)})`}
             name="maxMembersOverride"
             type="number"
@@ -78,6 +80,7 @@ function TenantExtras({ detail }: { detail: TenantDetail }) {
             placeholder="Usar plan"
           />
           <TextField
+            className="field--short"
             label={`Almacenamiento (plan: ${fmtCap(detail.plan?.storageMb, ' MB')})`}
             name="storageMbOverride"
             type="number"
@@ -125,6 +128,7 @@ export function TenantsTab() {
             caption="Bandas registradas"
             rows={list.data.data}
             rowKey={(t) => t.id}
+            onRowClick={setEditing}
             columns={[
               { key: 'n', header: 'Banda', render: (t) => <Link to={`/admin/tenants/${t.id}`} aria-label={`Ficha de ${t.name}`}><Person name={t.name} detail={t.slug} /></Link> },
               { key: 'p', header: 'Plan', render: (t) => t.plan?.name ?? '—' },
@@ -136,9 +140,7 @@ export function TenantsTab() {
                 key: 'a',
                 header: 'Acciones',
                 render: (t) => (
-                  <Button size="sm" variant="ghost" onClick={() => setEditing(t)} aria-label={`Gestionar ${t.name}`}>
-                    Gestionar
-                  </Button>
+                  <IconButton icon="settings" label={`Gestionar ${t.name}`} onClick={() => setEditing(t)} />
                 ),
               },
             ]}
@@ -146,7 +148,7 @@ export function TenantsTab() {
           <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onPage={setPage} />
         </Card>
       )}
-      <Modal open={!!editing} onClose={() => setEditing(null)} title={`Gestionar ${editing?.name ?? ''}`}>
+      <Drawer open={!!editing} onClose={() => setEditing(null)} title={`Gestionar ${editing?.name ?? ''}`}>
         <form
           className="form"
           key={editing?.id}
@@ -165,8 +167,9 @@ export function TenantsTab() {
             if (editing) update.mutate({ id: editing.id, body: { status: v.status, planCode: v.planCode as PlanCode, ...extras } });
           }}
         >
-          <SelectField label="Estado" name="status" defaultValue={editing?.status} options={Object.entries(tenantStatus).map(([value, { label }]) => ({ value, label }))} />
+          <SelectField className="field--medium" label="Estado" name="status" defaultValue={editing?.status} options={Object.entries(tenantStatus).map(([value, { label }]) => ({ value, label }))} />
           <SelectField
+            className="field--medium"
             label="Plan (asignación manual, sin Stripe)"
             name="planCode"
             defaultValue={editing?.plan?.code}
@@ -185,7 +188,7 @@ export function TenantsTab() {
             </Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </div>
   );
 }

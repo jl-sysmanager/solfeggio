@@ -5,12 +5,13 @@ import type { Listing } from '../../api/types';
 import type { MarketPending, ModerationKpis } from '../../api/types-admin-support';
 import { date, money } from '../../lib/format';
 import { condition } from '../../lib/labels';
-import { Button } from '../Button';
+import { Button, IconButton } from '../Button';
 import { StatCard } from '../Card';
 import { Chip } from '../Chip';
 import { EmptyState, ErrorNote, Loading } from '../EmptyState';
 import { FormError, TextAreaField, formValues } from '../Field';
-import { Modal } from '../Modal';
+import { Drawer } from '../Modal';
+import { UrlTabs } from '../Tabs';
 import { ReinforcementReports } from './support/ReinforcementReports';
 import { UserBlocking } from './support/UserBlocking';
 import { KpiRow, hoursLabel } from './support/shared';
@@ -56,13 +57,13 @@ function MarketQueue() {
             {l.imageUrls?.[0] && <img className="thumb" src={l.imageUrls[0]} alt={`Foto de ${l.title}`} loading="lazy" />}
             <p className="small" style={{ whiteSpace: 'pre-wrap' }}>{l.description}</p>
             <div className="row">
-              <Button size="sm" onClick={() => moderate.mutate({ id: l.id, approve: true })} disabled={moderate.isPending}>Publicar</Button>
-              <Button size="sm" variant="ghost" onClick={() => setRejecting(l)}>Rechazar</Button>
+              <IconButton icon="check" label={`Publicar ${l.title}`} onClick={() => moderate.mutate({ id: l.id, approve: true })} disabled={moderate.isPending} />
+              <IconButton icon="close" label={`Rechazar ${l.title}`} onClick={() => setRejecting(l)} />
             </div>
           </li>
         ))}
       </ul>
-      <Modal open={!!rejecting} onClose={() => setRejecting(null)} title="Rechazar anuncio">
+      <Drawer open={!!rejecting} onClose={() => setRejecting(null)} title="Rechazar anuncio">
         <form
           className="form"
           onSubmit={(e) => {
@@ -78,7 +79,7 @@ function MarketQueue() {
             <Button type="submit" loading={moderate.isPending}>Rechazar</Button>
           </div>
         </form>
-      </Modal>
+      </Drawer>
     </>
   );
 }
@@ -97,15 +98,14 @@ export function ModerationTab() {
           <StatCard label="Denuncias abiertas" value={k.reports.listings + k.reports.reinforcements} hint={`${k.reports.listings} BandMarket · ${k.reports.reinforcements} refuerzos`} />
         </KpiRow>
       )}
-      <section className="stack" aria-labelledby="mod-market">
-        <h2 id="mod-market" className="card__title">BandMarket</h2>
-        <MarketQueue />
-      </section>
-      <section className="stack" aria-labelledby="mod-reinf">
-        <h2 id="mod-reinf" className="card__title">Bolsa de refuerzos</h2>
-        <ReinforcementReports />
-      </section>
-      <UserBlocking />
+      <UrlTabs
+        label="Moderación"
+        tabs={[
+          { id: 'market', label: 'BandMarket', content: <MarketQueue /> },
+          { id: 'reinforcements', label: 'Refuerzos', content: <ReinforcementReports /> },
+          { id: 'users', label: 'Usuarios', content: <UserBlocking /> },
+        ]}
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { ApiError, del, post, put } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
 import type { IntegrationCategory, IntegrationField, IntegrationProvider, Paginated, PlatformAuditEntry } from '../api/types';
 import { Button } from '../components/Button';
+import { UrlTabs } from '../components/Tabs';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { ErrorNote, Loading } from '../components/EmptyState';
@@ -185,7 +186,7 @@ function IntegrationCard({ cat }: { cat: IntegrationCategory }) {
               Al guardar con otro proveedor se descartan los secretos de {cat.providers.find((p) => p.id === cat.current.provider)?.label}.
             </p>
           )}
-          <div className="form-row">
+          <div className="fields-fit">
             {provider.fields.map((f) => (
               <Field key={f.key} field={f} cat={cat} provider={provider} error={errors[f.key]} />
             ))}
@@ -289,20 +290,28 @@ export function IntegrationsTab() {
         Los secretos se guardan cifrados (AES-256-GCM) y nunca se muestran; sólo los últimos caracteres para identificarlos. Los cambios se aplican en
         menos de 30 segundos en la API y el worker, sin reiniciar.
       </p>
-      {(['income', 'communication', 'storage'] as const).map((group) => {
-        const categories = (q.data ?? []).filter((category) => category.group === group);
-        if (!categories.length) return null;
-        return (
-          <section key={group} className="stack" aria-labelledby={`integration-group-${group}`}>
-            <h2 id={`integration-group-${group}`}>{GROUPS[group]}</h2>
-            {categories.map((category) => <IntegrationCard key={category.id} cat={category} />)}
-          </section>
-        );
-      })}
+      <UrlTabs
+        label="Integraciones"
+        tabs={[
+          ...(['income', 'communication', 'storage'] as const).map((group) => ({
+            id: group,
+            label: GROUPS[group],
+            content: (
+              <div className="stack">
+                {(q.data ?? []).filter((category) => category.group === group).map((category) => <IntegrationCard key={category.id} cat={category} />)}
+              </div>
+            ),
+          })),
+          {
+            id: 'history',
+            label: 'Historial',
+            content: <History />,
+          },
+        ]}
+      />
       {(q.data ?? [])
         .filter((category) => category.group !== 'income' && category.group !== 'communication' && category.group !== 'storage')
         .map((category) => <IntegrationCard key={category.id} cat={category} />)}
-      <History />
     </div>
   );
 }

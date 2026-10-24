@@ -1,4 +1,5 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { ApiError } from '../api/client';
 import type { IntegrationCategory, IntegrationProvider } from '../api/types';
@@ -84,9 +85,11 @@ describe('pantalla de integraciones', () => {
       return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
     }));
     renderWithProviders(<IntegrationsTab />, { session: makeSession({ user: { id: 'a1', email: 'admin@test', name: 'Admin', mfaEnabled: false, isPlatformAdmin: true } }) });
-    expect(await screen.findByRole('heading', { name: 'Ingresos' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Comunicación' })).toBeInTheDocument();
-    await waitFor(() => expect(screen.getAllByRole('button', { name: 'Guardar' })).toHaveLength(2));
+    expect(await screen.findByRole('tab', { name: 'Ingresos' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Comunicación' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Guardar' })).toHaveLength(1);
+    await userEvent.click(screen.getByRole('tab', { name: 'Comunicación' }));
+    expect(await screen.findByRole('heading', { name: 'Envío de correo' })).toBeInTheDocument();
   });
 });
 
