@@ -240,19 +240,19 @@ function UsersTab() {
   return (
     <div className="stack" style={{ gap: 24 }}>
       <div className="row between">
-        <p className="small">Personas con acceso a la banda. El número de usuarios depende del plan.</p>
-        <Button onClick={() => setInviting(true)}>Invitar usuario</Button>
+        <p className="small">El número de miembros depende del plan.</p>
+        <Button onClick={() => setInviting(true)}>Invitar miembro</Button>
       </div>
       {users.isLoading && <Loading />}
       {users.error && <ErrorNote error={users.error} />}
       {users.data && (
         <Card>
           <DataTable
-            caption="Usuarios de la banda"
+            caption="Miembros de la banda"
             rows={rows}
             rowKey={(u) => u.id}
             columns={[
-              { key: 'n', header: 'Usuario', render: (u) => <Person name={u.user.name} detail={u.user.email} /> },
+              { key: 'n', header: 'Miembro', render: (u) => <Person name={u.user.name} detail={u.user.email} /> },
               {
                 key: 'r',
                 header: 'Rol',
@@ -318,7 +318,7 @@ function UsersTab() {
           />
         </Card>
       )}
-      <Modal open={inviting} onClose={() => setInviting(false)} title="Invitar usuario">
+      <Modal open={inviting} onClose={() => setInviting(false)} title="Invitar miembro">
         <form
           className="form"
           onSubmit={(e) => {
@@ -425,12 +425,20 @@ function AuditTab() {
   );
 }
 
+/** Personas con cuenta en la banda. Vive en Gestión, no en Ajustes. */
+export function BandMembersPage() {
+  return (
+    <Page header={<PageHeader eyebrow="Gestión" title="Miembros" description="Personas con acceso a la banda: invitación, rol y suspensión." />}>
+      <UsersTab />
+    </Page>
+  );
+}
+
 export default function SettingsPage() {
   const { can } = useAuth();
   const tabs: TabDef[] = [];
   if (can('tenant:manage')) tabs.push({ id: 'tenant', label: 'Banda', content: <TenantTab /> });
   if (can('tenant:manage') || can('members:write')) tabs.push({ id: 'sections', label: 'Secciones', content: <SectionsTab /> });
-  if (can('users:manage')) tabs.push({ id: 'users', label: 'Usuarios', content: <UsersTab /> });
   if (can('roles:manage')) tabs.push({ id: 'roles', label: 'Roles y permisos', content: <RolesTab /> });
   if (can('audit:read')) tabs.push({ id: 'audit', label: 'Auditoría', content: <AuditTab /> });
   return (

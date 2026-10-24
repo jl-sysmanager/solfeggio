@@ -80,6 +80,12 @@ describe('gating de navegación', () => {
       expect(l).not.toContain('Portal de familias');
     });
 
+    it('quien gestiona el acceso ve Miembros en Gestión, no en Ajustes', () => {
+      const l = labels(['users:manage']);
+      expect(l).toContain('Miembros');
+      expect(l).not.toContain('Ajustes');
+    });
+
     it('un archivero ve el archivo y los ensayos, no la gestión', () => {
       const l = labels(['archive:read', 'archive:write', 'events:read', 'attendance:self', 'governance:read']);
       expect(l).toEqual(expect.arrayContaining(['Archivo musical', 'Ensayos y actuaciones', 'Gobierno']));

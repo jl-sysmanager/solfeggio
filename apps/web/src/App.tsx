@@ -23,6 +23,7 @@ const Market = lazy(() => import('./pages/Market'));
 const Communications = lazy(() => import('./pages/Communications'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Settings = lazy(() => import('./pages/Settings'));
+const BandMembers = lazy(() => import('./pages/Settings').then((m) => ({ default: m.BandMembersPage })));
 const Billing = lazy(() => import('./pages/Billing'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Incidents = lazy(() => import('./pages/Incidents'));
@@ -77,6 +78,7 @@ export function App() {
       <Route path="/security" element={<Shell tenant={false}><Security /></Shell>} />
 
       <Route path="/members" element={<Mod perm={['members:read']} feature="members" title="Socios"><Members /></Mod>} />
+      <Route path="/access" element={<Shell><Guard perm={['users:manage']}><BandMembers /></Guard></Shell>} />
       <Route path="/members/:id" element={<Mod perm={['members:read']} feature="members" title="Socio"><MemberDetail /></Mod>} />
       <Route path="/communications" element={<Mod perm={['communications:send']} feature="communications" title="Comunicaciones"><Communications /></Mod>} />
       <Route path="/documents" element={<Mod perm={['documents:read']} feature="members" title="Documentos"><Documents /></Mod>} />
@@ -103,7 +105,7 @@ export function App() {
       <Route path="/governance" element={<Mod perm={['governance:read']} feature="governance" title="Gobierno"><Governance /></Mod>} />
       <Route path="/governance/assemblies/:id" element={<Mod perm={['governance:read']} feature="governance" title="Asamblea"><AssemblyDetail /></Mod>} />
 
-      <Route path="/settings" element={<Shell><Guard perm={['tenant:manage', 'roles:manage', 'users:manage', 'audit:read']}><Settings /></Guard></Shell>} />
+      <Route path="/settings" element={<Shell><Guard perm={['tenant:manage', 'roles:manage', 'audit:read']}><Settings /></Guard></Shell>} />
       <Route path="/billing" element={<Shell><Guard perm={['billing:manage']}><Billing /></Guard></Shell>} />
       <Route path="/incidents" element={<Shell><Guard perm={['incidents:write']}><Incidents /></Guard></Shell>} />
       <Route path="/admin" element={<Navigate to="/admin/metrics" replace />} />

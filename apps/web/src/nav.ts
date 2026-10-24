@@ -45,6 +45,7 @@ export const NAV: NavGroup[] = [
     label: 'Gestión',
     items: [
       { to: '/members', icon: 'users', label: 'Socios', perm: ['members:read'], feature: 'members' },
+      { to: '/access', icon: 'user', label: 'Miembros', perm: ['users:manage'] },
       { to: '/communications', icon: 'megaphone', label: 'Comunicaciones', perm: ['communications:send'], feature: 'communications' },
       { to: '/documents', icon: 'file', label: 'Documentos', perm: ['documents:read'], feature: 'members' },
       { to: '/treasury', icon: 'wallet', label: 'Tesorería', perm: ['finance:read'], feature: 'treasury' },
@@ -63,7 +64,7 @@ export const NAV: NavGroup[] = [
   {
     label: 'Cuenta',
     items: [
-      { to: '/settings', icon: 'settings', label: 'Ajustes', perm: ['tenant:manage', 'roles:manage', 'users:manage', 'audit:read'] },
+      { to: '/settings', icon: 'settings', label: 'Ajustes', perm: ['tenant:manage', 'roles:manage', 'audit:read'] },
       { to: '/billing', icon: 'card', label: 'Plan y facturación', perm: ['billing:manage'] },
       { to: '/incidents', icon: 'lifebuoy', label: 'Soporte', perm: ['incidents:write'] },
       { to: '/security', icon: 'shield', label: 'Seguridad de la cuenta' },
