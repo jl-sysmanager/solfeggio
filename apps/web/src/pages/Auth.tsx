@@ -1,9 +1,9 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ApiError, api } from '../api/client';
 import type { Session } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
-import { Button } from '../components/Button';
+import { Button, ButtonLink } from '../components/Button';
 import { FormError, TextField, formValues } from '../components/Field';
 import { BrandMark } from '../components/Logo';
 
@@ -69,12 +69,60 @@ export function useAfterLogin() {
   };
 }
 
+const BAND_PATHS = [
+  { id: 'enter', title: 'Entrar en mi banda', hint: 'Ya tengo cuenta' },
+  { id: 'create', title: 'Crear una banda', hint: 'Todavía no está en Solfeamos' },
+] as const;
+
+type BandPath = (typeof BAND_PATHS)[number]['id'];
+
+/** Dos caminos visibles: una banda que ya existe, o una que hay que dar de alta. */
+function BandPathChoice({ path, onChange }: { path: BandPath; onChange: (next: BandPath) => void }) {
+  const enterRef = useRef<HTMLButtonElement>(null);
+  const createRef = useRef<HTMLButtonElement>(null);
+
+  function move(from: BandPath, event: KeyboardEvent<HTMLButtonElement>) {
+    const forward = event.key === 'ArrowRight' || event.key === 'ArrowDown';
+    const back = event.key === 'ArrowLeft' || event.key === 'ArrowUp';
+    if (!forward && !back) return;
+    event.preventDefault();
+    const next: BandPath = from === 'enter' ? 'create' : 'enter';
+    onChange(next);
+    (next === 'enter' ? enterRef : createRef).current?.focus();
+  }
+
+  return (
+    <div className="auth-paths" role="radiogroup" aria-label="Elige cómo continuar">
+      {BAND_PATHS.map((option) => {
+        const selected = path === option.id;
+        return (
+          <button
+            key={option.id}
+            ref={option.id === 'enter' ? enterRef : createRef}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            tabIndex={selected ? 0 : -1}
+            className={selected ? 'auth-path auth-path--on' : 'auth-path'}
+            onClick={() => onChange(option.id)}
+            onKeyDown={(event) => move(option.id, event)}
+          >
+            <span className="auth-path__title">{option.title}</span>
+            <span className="auth-path__hint">{option.hint}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function LoginPage() {
   const location = useLocation();
   const resetDone = (location.state as { reset?: boolean } | null)?.reset;
   const { login } = useAuth();
   const afterLogin = useAfterLogin();
   const [step, setStep] = useState<'credentials' | 'mfa'>('credentials');
+  const [path, setPath] = useState<BandPath>('enter');
   const [creds, setCreds] = useState({ email: '', password: '' });
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
@@ -105,20 +153,32 @@ export function LoginPage() {
     }
   }
 
+  const choosing = step === 'credentials';
+
   return (
-    <AuthLayout title={step === 'mfa' ? 'Verificación en dos pasos' : 'Entrar'} lead={step === 'mfa' ? 'Introduce el código de tu aplicación de autenticación.' : 'Accede con el email de tu cuenta.'}>
-      {resetDone && step === 'credentials' && <p className="small">Contraseña actualizada. Entra con la nueva.</p>}
-      <form className="form" onSubmit={submit} noValidate={false}>
-        {step === 'credentials' ? (
-          <>
-            <TextField label="Email" name="email" type="email" autoComplete="email" required autoFocus />
-            <TextField label="Contraseña" name="password" type="password" autoComplete="current-password" required />
-            <p className="small">
-              <Link to="/forgot-password">He olvidado mi contraseña</Link>
-            </p>
-          </>
-        ) : (
-          <>
+    <AuthLayout
+      title={step === 'mfa' ? 'Verificación en dos pasos' : 'Entra o crea tu banda'}
+      lead={step === 'mfa' ? 'Introduce el código de tu aplicación de autenticación.' : undefined}
+    >
+      {choosing && <BandPathChoice path={path} onChange={setPath} />}
+      {resetDone && choosing && path === 'enter' && <p className="small">Contraseña actualizada. Entra con la nueva.</p>}
+      {choosing && path === 'create' ? (
+        <div className="auth-next" id="band-path-create">
+          <p>Crearás tu cuenta y, en el paso siguiente, darás de alta la banda. Sus datos quedan separados de las demás.</p>
+          <ButtonLink to="/register">Crear la banda</ButtonLink>
+          <p className="small muted">Si te han invitado a una banda que ya existe, elige «Entrar en mi banda».</p>
+        </div>
+      ) : (
+        <form className="form" onSubmit={submit} noValidate={false} id="band-path-enter">
+          {step === 'credentials' ? (
+            <>
+              <TextField label="Email" name="email" type="email" autoComplete="email" required autoFocus />
+              <TextField label="Contraseña" name="password" type="password" autoComplete="current-password" required />
+              <p className="small">
+                <Link to="/forgot-password">He olvidado mi contraseña</Link>
+              </p>
+            </>
+          ) : (
             <TextField
               label="Código"
               name="mfaCode"
@@ -129,22 +189,18 @@ export function LoginPage() {
               required
               autoFocus
             />
-          </>
-        )}
-        <FormError error={error} />
-        <Button type="submit" loading={loading}>
-          {step === 'mfa' ? 'Verificar' : 'Entrar'}
-        </Button>
-        {step === 'mfa' ? (
-          <button type="button" className="link-arrow" onClick={() => setStep('credentials')}>
-            Volver
-          </button>
-        ) : (
-          <p className="small">
-            ¿Tu banda aún no usa Solfeamos? <Link to="/register">Crea una cuenta</Link>
-          </p>
-        )}
-      </form>
+          )}
+          <FormError error={error} />
+          <Button type="submit" loading={loading}>
+            {step === 'mfa' ? 'Verificar' : 'Entrar'}
+          </Button>
+          {step === 'mfa' && (
+            <button type="button" className="link-arrow" onClick={() => setStep('credentials')}>
+              Volver
+            </button>
+          )}
+        </form>
+      )}
     </AuthLayout>
   );
 }
