@@ -319,6 +319,8 @@ model Membership {
   calendarToken String           @unique @default(uuid()) @db.Uuid
   /// Última petición autenticada en esta banda (como mucho se actualiza una vez por hora).
   lastSeenAt    DateTime?
+  /// El propietario pidió no abrir la guía de puesta en marcha al entrar.
+  setupGuideDismissedAt DateTime?
   createdAt     DateTime         @default(now())
 
   @@unique([tenantId, userId])

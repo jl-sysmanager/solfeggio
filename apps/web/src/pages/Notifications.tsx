@@ -1,15 +1,20 @@
 import { Link } from 'react-router-dom';
 import { post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { NotificationItem } from '../api/types';
+import type { NotificationItem, SetupGuide } from '../api/types';
+import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState, ErrorNote, Loading } from '../components/EmptyState';
 import { Page, PageHeader } from '../components/PageHeader';
+import { pendingSteps, setupPendingCopy } from '../components/SetupGuide';
 import { dateTime } from '../lib/format';
 
 export default function NotificationsPage() {
+  const { session } = useAuth();
   const q = useApi<NotificationItem[]>('/notifications');
+  const guide = useApi<SetupGuide>(session?.role?.key === 'owner' ? '/setup-guide' : null);
+  const pending = pendingSteps(guide.data);
   const read = useApiMutation((id: string) => post(`/notifications/${id}/read`), { invalidate: ['/notifications'] });
   const readAll = useApiMutation(() => post('/notifications/read-all'), { success: 'Todas marcadas como leídas', invalidate: ['/notifications'] });
   const unread = q.data?.filter((n) => !n.readAt).length ?? 0;
@@ -24,11 +29,22 @@ export default function NotificationsPage() {
         />
       }
     >
+      {pending.length > 0 && guide.data && (
+        <Card>
+          <div className="row between" style={{ alignItems: 'center' }}>
+            <div>
+              <p><strong>Configuración pendiente</strong></p>
+              <p className="small">{setupPendingCopy(pending.length, guide.data.steps.length)}</p>
+            </div>
+            <Link className="btn" to="/?guia=1">Continuar</Link>
+          </div>
+        </Card>
+      )}
       {q.isLoading && <Loading />}
       {q.error && <ErrorNote error={q.error} />}
       {q.data &&
         (q.data.length === 0 ? (
-          <EmptyState title="Todo al día">No tienes notificaciones.</EmptyState>
+          pending.length > 0 ? null : <EmptyState title="Todo al día">No tienes notificaciones.</EmptyState>
         ) : (
           <Card>
             <ul className="list-plain list-divided">

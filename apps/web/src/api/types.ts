@@ -403,6 +403,19 @@ export interface Tenant {
   logoVersion?: string | null;
 }
 
+export interface SetupStep {
+  id: string;
+  title: string;
+  detail: string;
+  to: string;
+  done: boolean;
+}
+
+export interface SetupGuide {
+  dismissed: boolean;
+  steps: SetupStep[];
+}
+
 export interface NotificationItem {
   id: string;
   type: string;

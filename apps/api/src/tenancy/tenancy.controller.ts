@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
-import { Ctx, NoTenant, Perm, Public } from '../auth/decorators';
+import { AllowReadOnly, Ctx, NoTenant, Perm, Public } from '../auth/decorators';
 import { zod } from '../common/zod.pipe';
 import { env } from '../config/env';
 import { FEATURE_MODULES } from '../billing/feature-catalog';
@@ -86,6 +86,17 @@ export class TenancyController {
       maxAge: env().JWT_REFRESH_TTL_DAYS * 86_400_000,
     });
     return { accessToken, session };
+  }
+
+  @Get('setup-guide')
+  setupGuide(@Ctx() ctx: RequestContext) {
+    return this.onboarding.guide(ctx);
+  }
+
+  @AllowReadOnly()
+  @Patch('setup-guide')
+  dismissSetupGuide(@Ctx() ctx: RequestContext, @Body(zod(z.object({ dismissed: z.boolean() }))) body: { dismissed: boolean }) {
+    return this.onboarding.setDismissed(ctx, body.dismissed);
   }
 
   @Get('tenant')

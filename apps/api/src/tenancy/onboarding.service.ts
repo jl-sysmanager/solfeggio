@@ -1,8 +1,10 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { Db } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { SYSTEM_ROLES } from '../iam/permissions';
 import { AuthService } from '../auth/auth.service';
+import type { RequestContext } from '../auth/context';
+import { buildSetupGuide } from './setup-guide';
 
 const RESERVED_SLUGS = new Set(['admin', 'api', 'app', 'www', 'solfeggio', 'solfeamos', 'market', 'billing', 'help', 'status']);
 
@@ -57,5 +59,44 @@ export class OnboardingService {
     });
 
     return this.auth.issue(userId, tenant.id);
+  }
+
+  /** Guía del propietario. El avance sale de los datos de la banda. */
+  async guide(ctx: RequestContext) {
+    this.ownerOnly(ctx);
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const [tenant, memberCount, userCount, invites, eventCount, membership, user] = await Promise.all([
+        tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { legalName: true, taxId: true, logoKey: true, region: true } }),
+        tx.member.count({ where: { tenantId: ctx.tenantId, status: { not: 'LEFT' } } }),
+        tx.membership.count({ where: { tenantId: ctx.tenantId, status: 'ACTIVE' } }),
+        tx.invitation.count({ where: { tenantId: ctx.tenantId, acceptedAt: null, expiresAt: { gt: new Date() } } }),
+        tx.event.count({ where: { tenantId: ctx.tenantId } }),
+        tx.membership.findUniqueOrThrow({ where: { id: ctx.membershipId }, select: { setupGuideDismissedAt: true } }),
+        tx.user.findUniqueOrThrow({ where: { id: ctx.userId }, select: { mfaEnabled: true } }),
+      ]);
+      return buildSetupGuide({
+        features: ctx.features,
+        bandReady: !!(tenant.legalName || tenant.taxId || tenant.logoKey || tenant.region),
+        memberCount,
+        extraAccess: userCount > 1 || invites > 0,
+        eventCount,
+        mfaEnabled: user.mfaEnabled,
+        dismissed: !!membership.setupGuideDismissedAt,
+      });
+    });
+  }
+
+  async setDismissed(ctx: RequestContext, dismissed: boolean) {
+    this.ownerOnly(ctx);
+    await this.db.tenant(ctx.tenantId, (tx) =>
+      tx.membership.update({ where: { id: ctx.membershipId }, data: { setupGuideDismissedAt: dismissed ? new Date() : null } }),
+    );
+    return this.guide(ctx);
+  }
+
+  private ownerOnly(ctx: RequestContext) {
+    if (ctx.roleKey !== 'owner') {
+      throw new ForbiddenException({ message: 'La guía de puesta en marcha es del propietario', code: 'OWNER_ONLY' });
+    }
   }
 }

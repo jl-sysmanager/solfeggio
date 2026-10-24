@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
 import { adminMenu, visibleItems, type NavItem } from '../nav';
-import { useApi } from '../api/hooks';
-import type { AdminSummary, NotificationItem } from '../api/types';
+import { patch } from '../api/client';
+import { useApi, useApiMutation } from '../api/hooks';
+import type { AdminSummary, NotificationItem, SetupGuide } from '../api/types';
+import { pendingSteps, SetupGuideModal } from './SetupGuide';
 import { AnnouncementBanner } from './admin/AnnouncementBanner';
 import { ImpersonationBanner } from './admin/ImpersonationBanner';
 import { Avatar } from './Avatar';
@@ -79,16 +81,54 @@ export function AppShell({ children }: { children: ReactNode }) {
   const sections = useNavSections(groups, location.pathname);
   const unread = useApi<NotificationItem[]>(session?.tenant && !adminMode ? '/notifications' : null, { unread: true });
   const unreadCount = unread.data?.length ?? 0;
+  const isOwner = session?.role?.key === 'owner' && !!session.tenant && !adminMode;
+  const guide = useApi<SetupGuide>(isOwner ? '/setup-guide' : null);
+  const setupPending = pendingSteps(guide.data).length;
+  const setupLabel = setupPending === 1 ? '1 paso de configuración' : `${setupPending} pasos de configuración`;
+  const noticeCount = unreadCount + (setupPending > 0 ? 1 : 0);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const dismissGuide = useApiMutation((dismissed: boolean) => patch('/setup-guide', { dismissed }), { invalidate: ['/setup-guide'] });
   const summary = useApi<AdminSummary>(adminMode ? '/admin/summary' : null);
   /** Pendientes que se muestran junto a cada entrada del menú. */
   const countFor = (i: NavItem) =>
-    i.to === '/notifications' ? unreadCount : i.badge === 'support' ? summary.data?.support.open ?? 0 : i.badge === 'moderation' ? summary.data?.moderation.pending ?? 0 : 0;
+    i.to === '/notifications' ? noticeCount : i.badge === 'support' ? summary.data?.support.open ?? 0 : i.badge === 'moderation' ? summary.data?.moderation.pending ?? 0 : 0;
   const homeTo = adminMode ? '/admin/metrics' : '/';
   const openPalette = useCallback(() => setPalette(true), []);
   useCommandPaletteShortcut(openPalette);
   useRouteFocus(location.pathname);
 
   useEffect(() => setOpen(false), [location.pathname]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('guia') !== '1') return;
+    setGuideOpen(true);
+    params.delete('guia');
+    const search = params.toString();
+    navigate({ pathname: location.pathname, search: search ? `?${search}` : '' }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
+
+  const setupKey = session?.tenant && session.user ? `sf-setup:${session.user.id}:${session.tenant.id}` : '';
+  useEffect(() => {
+    const data = guide.data;
+    if (!data || !setupKey || data.dismissed || !data.steps.some((s) => !s.done)) return;
+    try {
+      if (sessionStorage.getItem(setupKey)) return;
+    } catch {
+      /* se muestra igualmente */
+    }
+    setGuideOpen(true);
+  }, [guide.data, setupKey]);
+  const closeGuide = () => {
+    setGuideOpen(false);
+    if (!setupKey) return;
+    try {
+      sessionStorage.setItem(setupKey, '1');
+    } catch {
+      /* la próxima carga volverá a abrirla */
+    }
+  };
+
   const signOut = () => logout().then(() => navigate('/login'));
 
   // Aviso sólo cuando hay algo que hacer (el nombre de la banda ya está en la barra lateral).
@@ -184,7 +224,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       {countFor(i) > 0 && (
                         <span
                           className={`sidenav__count${i.badge === 'support' && (summary.data?.support.overdue ?? 0) > 0 ? ' sidenav__count--alert' : ''}`}
-                          aria-label={`${countFor(i)} ${i.to === '/notifications' ? 'sin leer' : i.badge === 'support' && (summary.data?.support.overdue ?? 0) > 0 ? `abiertas, ${summary.data?.support.overdue} fuera de plazo` : 'pendientes'}`}
+                          aria-label={`${countFor(i)} ${i.to === '/notifications' ? (setupPending > 0 ? `avisos, ${setupLabel}` : 'sin leer') : i.badge === 'support' && (summary.data?.support.overdue ?? 0) > 0 ? `abiertas, ${summary.data?.support.overdue} fuera de plazo` : 'pendientes'}`}
                         >
                           {countFor(i)}
                         </span>
@@ -219,10 +259,10 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
               <div className="topbar__actions">
                 {session?.tenant && !adminMode && (
-                  <Link to="/notifications" className="btn btn--ghost btn--icon icon-badge" aria-label={`Avisos: ${unreadCount} sin leer`}>
+                  <Link to="/notifications" className="btn btn--ghost btn--icon icon-badge" aria-label={`Avisos: ${unreadCount} sin leer${setupPending > 0 ? `, ${setupLabel}` : ''}`}>
                     <Icon name="bell" size={18} />
                     {/* Breeze: punto primario; el número va en el nombre accesible */}
-                    {unreadCount > 0 && <span className="icon-badge__count" aria-hidden="true" />}
+                    {noticeCount > 0 && <span className="icon-badge__count" aria-hidden="true" />}
                   </Link>
                 )}
                 {session && (
@@ -259,6 +299,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </div>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
+      {guide.data && (
+        <SetupGuideModal guide={guide.data} open={guideOpen && guide.data.steps.some((s) => !s.done)} onClose={closeGuide} onDismiss={(dismissed) => dismissGuide.mutate(dismissed)} />
+      )}
     </div>
   );
 }

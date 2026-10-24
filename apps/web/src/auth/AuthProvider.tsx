@@ -177,6 +177,13 @@ export function AuthProvider({ children, initialSession }: { children: ReactNode
       }
       await api('/auth/logout', { method: 'POST', body: {}, noRefresh: true });
     } finally {
+      try {
+        for (const key of Object.keys(sessionStorage)) {
+          if (key.startsWith('sf-setup:')) sessionStorage.removeItem(key);
+        }
+      } catch {
+        /* almacenamiento no disponible */
+      }
       setAccessToken(null);
       setSession(null);
       setStatus('anonymous');

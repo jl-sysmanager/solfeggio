@@ -763,7 +763,16 @@ input[type='file'].input { padding: 6px 12px; line-height: 22px; }
 }
 .modal__header { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
 .modal__header h2 { font-size: var(--text-lg); }
-.modal__footer { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-6); flex-wrap: wrap; }
+.modal__footer { display: flex; justify-content: flex-end; align-items: center; gap: var(--space-3); margin-top: var(--space-6); flex-wrap: wrap; }
+.modal__footer .checkbox { margin-right: auto; }
+
+.setup-progress { height: 4px; margin: var(--space-4) 0; background: var(--cobalt-100); border-radius: 999px; overflow: hidden; }
+.setup-progress > span { display: block; height: 100%; background: var(--cobalt-700); }
+.setup-steps { list-style: none; margin: 0; padding: 0; }
+.setup-step { display: grid; grid-template-columns: 28px 1fr auto; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border-color); }
+.setup-step__mark { width: 28px; height: 28px; border-radius: 6px; border: 1.5px solid var(--cobalt-700); display: grid; place-items: center; font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--cobalt-700); }
+.setup-step--done .setup-step__mark { background: var(--cobalt-700); color: #fff; }
+.setup-step__title { font-weight: var(--weight-semibold); margin: 0; }
 
 /* ── Avisos (toasts): esquina inferior derecha, bottom 1.5rem ── */
 .toasts {
