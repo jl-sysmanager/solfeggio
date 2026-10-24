@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { post } from '../api/client';
 import { useApiMutation } from '../api/hooks';
 import { useAuth } from '../auth/AuthProvider';
+import { passwordIssue } from './Auth';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
@@ -23,11 +24,48 @@ export default function SecurityPage() {
     success: 'Verificación en dos pasos desactivada',
     onSuccess: () => reload(),
   });
+  const [formKey, setFormKey] = useState(0);
+  const [passwordError, setPasswordError] = useState<unknown>(null);
+  const changePassword = useApiMutation(
+    (body: { currentPassword: string; newPassword: string }) => post('/auth/password/change', body),
+    { success: 'Contraseña actualizada', onSuccess: () => setFormKey((k) => k + 1) },
+  );
   const enabled = session?.user.mfaEnabled;
   const secret = setup ? new URL(setup.otpauthUrl).searchParams.get('secret') : null;
 
   return (
     <Page header={<PageHeader tone="cream" eyebrow="Tu cuenta" title="Seguridad" description={session?.user.email} />}>
+      <Card title="Contraseña">
+        <form
+          key={formKey}
+          className="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const v = formValues(e.currentTarget);
+            const issue = passwordIssue(v.newPassword ?? '', v.newPassword2 ?? '');
+            if (issue) {
+              setPasswordError(new Error(issue));
+              return;
+            }
+            if (v.currentPassword === v.newPassword) {
+              setPasswordError(new Error('La nueva contraseña debe ser distinta.'));
+              return;
+            }
+            setPasswordError(null);
+            changePassword.mutate({ currentPassword: v.currentPassword ?? '', newPassword: v.newPassword ?? '' });
+          }}
+        >
+          <TextField label="Contraseña actual" name="currentPassword" type="password" autoComplete="current-password" required />
+          <TextField label="Nueva contraseña" name="newPassword" type="password" autoComplete="new-password" minLength={10} required hint="Mínimo 10 caracteres, con letras y números." />
+          <TextField label="Repite la nueva contraseña" name="newPassword2" type="password" autoComplete="new-password" required />
+          <FormError error={passwordError ?? changePassword.error} />
+          <div>
+            <Button type="submit" loading={changePassword.isPending}>
+              Cambiar contraseña
+            </Button>
+          </div>
+        </form>
+      </Card>
       <Card title="Verificación en dos pasos (MFA)" actions={<Chip tone={enabled ? 'success' : 'warning'}>{enabled ? 'Activada' : 'Desactivada'}</Chip>}>
         {enabled ? (
           <form

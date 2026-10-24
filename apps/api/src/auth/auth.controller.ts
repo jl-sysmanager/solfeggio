@@ -26,6 +26,11 @@ const loginSchema = z.object({ email: z.string().email(), password: z.string().m
 const switchSchema = z.object({ tenantId: z.string().uuid() });
 const codeSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
 const acceptSchema = z.object({ token: z.string().min(20), name: z.string().trim().min(2).max(120).optional(), password: passwordSchema.optional() });
+const changePasswordSchema = z
+  .object({ currentPassword: z.string().min(1).max(128), newPassword: passwordSchema })
+  .refine((b) => b.currentPassword !== b.newPassword, { message: 'La nueva contraseña debe ser distinta', path: ['newPassword'] });
+const forgotSchema = z.object({ email: z.string().email().max(254) });
+const resetSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
 
 @ApiTags('auth')
 @Controller('auth')
@@ -122,6 +127,32 @@ export class AuthController {
   @Post('mfa/disable')
   async mfaDisable(@Ctx() ctx: RequestContext, @Body(zod(codeSchema)) body: z.infer<typeof codeSchema>) {
     await this.auth.mfaDisable(ctx.userId, body.code);
+  }
+
+  @ApiBearerAuth()
+  @NoTenant()
+  @HttpCode(204)
+  @Post('password/change')
+  async changePassword(@Ctx() ctx: RequestContext, @Body(zod(changePasswordSchema)) body: z.infer<typeof changePasswordSchema>, @Res({ passthrough: true }) res: Response) {
+    await this.auth.changePassword(ctx.userId, body.currentPassword, body.newPassword);
+    this.setCookie(res, await this.tokens.issueRefresh(ctx.userId, ctx.tenantId || null));
+  }
+
+  @Public()
+  @Throttle({ default: { limit: env().RATE_LIMIT_AUTH_MAX, ttl: env().RATE_LIMIT_TTL_MS } })
+  @HttpCode(200)
+  @Post('password/forgot')
+  async forgotPassword(@Body(zod(forgotSchema)) body: z.infer<typeof forgotSchema>) {
+    await this.auth.requestPasswordReset(body.email);
+    return { accepted: true };
+  }
+
+  @Public()
+  @Throttle({ default: { limit: env().RATE_LIMIT_AUTH_MAX, ttl: env().RATE_LIMIT_TTL_MS } })
+  @HttpCode(204)
+  @Post('password/reset')
+  async resetPassword(@Body(zod(resetSchema)) body: z.infer<typeof resetSchema>) {
+    await this.auth.resetPassword(body.token, body.password);
   }
 
   /** Pública: el usuario puede no existir aún. Si hay sesión, se valida que el email coincida. */

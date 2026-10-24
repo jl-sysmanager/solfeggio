@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>Solfeamos · Azulejo</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0}
+body{width:1440px;height:900px;overflow:hidden;font:14px/1.45 Archivo,sans-serif;color:#141A2E;background:#F6F7F4;display:grid;grid-template-columns:248px 1fr}
+.rail{background:#16275E;color:#DCE3F5;padding:16px 12px;display:flex;flex-direction:column;gap:20px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px;font-weight:800;font-size:18px;color:#fff;font-stretch:90%}
+.brand i{width:32px;height:32px;border-radius:6px;background:#F6F7F4;color:#16275E;display:grid;place-items:center;font-style:normal;box-shadow:inset 0 0 0 2px #F6F7F4,inset 0 0 0 4px #16275E}
+.band{background:#23408E;border-radius:8px;padding:10px;display:flex;gap:10px;align-items:center;font-size:13px}
+.band b{display:block;color:#fff}
+.grp h6{font:700 11px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#8FA2D6;padding:0 8px 6px}
+.grp a{display:flex;gap:10px;align-items:center;padding:7px 8px;border-radius:6px;color:#DCE3F5;text-decoration:none}
+.grp a.on{background:#F6F7F4;color:#16275E;font-weight:700;box-shadow:inset 3px 0 0 #D9A21B}
+.grp a span{width:16px;height:16px;border:1.5px solid currentColor;border-radius:4px;opacity:.8}
+.grp a em{margin-left:auto;font-style:normal;background:#D9A21B;color:#16275E;font-weight:800;font-size:11px;border-radius:999px;padding:0 7px}
+main{display:flex;flex-direction:column;min-width:0}
+.top{height:64px;border-bottom:1px solid #DADDE5;display:flex;align-items:center;gap:16px;padding:0 32px;background:#fff}
+.search{flex:0 0 420px;height:40px;border:1px solid #9AA3B8;border-radius:8px;display:flex;align-items:center;padding:0 12px;color:#5B6478;gap:8px}
+.search kbd{margin-left:auto;font:600 11px Archivo;border:1px solid #C9CEDA;border-radius:4px;padding:1px 6px}
+.top .sp{flex:1}
+.av{width:36px;height:36px;border-radius:50%;background:#6B3F69;color:#fff;display:grid;place-items:center;font-weight:700}
+.page{padding:24px 32px;display:grid;grid-template-columns:1fr 360px;gap:24px;align-content:start}
+.crumb{font-size:12px;color:#5B6478;grid-column:1/-1}
+.head{grid-column:1/-1;display:flex;align-items:end;justify-content:space-between}
+h1{font-size:32px;font-weight:800;font-stretch:88%;letter-spacing:-.01em}
+.btn{height:40px;padding:0 16px;border-radius:8px;border:0;background:#23408E;color:#fff;font:700 14px Archivo;display:inline-flex;align-items:center}
+.btn.g{background:#fff;color:#23408E;border:1px solid #9AA3B8}
+/* Placa esmaltada: campo cobalto, filete blanco interior */
+.plaque{background:#23408E;color:#fff;border-radius:10px;padding:20px 24px;box-shadow:inset 0 0 0 4px #23408E,inset 0 0 0 5.5px #F6F7F4;display:grid;grid-template-columns:1fr auto;gap:8px 24px}
+.plaque small{font:700 11px Archivo;letter-spacing:.1em;text-transform:uppercase;color:#C9D4F2}
+.plaque h2{font-size:28px;font-weight:800;font-stretch:85%;line-height:1.1}
+.plaque p{color:#DCE3F5}
+.plaque .act{display:flex;gap:8px;align-self:end}
+.plaque .yes{background:#2F7D5B;color:#fff}.plaque .no{background:#F6F7F4;color:#16275E}
+.card{background:#fff;border:1px solid #DADDE5;border-radius:10px;padding:20px}
+.card h3{font-size:16px;font-weight:800;margin-bottom:12px;display:flex;justify-content:space-between}
+.card h3 a{font-size:13px;font-weight:600;color:#23408E}
+.tiles{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.tile{aspect-ratio:1/1;border-radius:6px;background:#EEF0F5;padding:8px;display:flex;flex-direction:column;justify-content:space-between;font-size:12px;color:#5B6478}
+.tile b{font-size:20px;color:#141A2E;font-variant-numeric:tabular-nums}
+.tile.e{background:#23408E;color:#C9D4F2}.tile.e b{color:#fff}
+.tile.a{background:#D9A21B;color:#3C2A00}.tile.a b{color:#241900}
+.tile.s{background:#6B3F69;color:#E9D7E8}.tile.s b{color:#fff}
+.tile.t{box-shadow:inset 0 0 0 2px #141A2E}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;grid-column:1}
+.stat small{font:700 11px Archivo;letter-spacing:.08em;text-transform:uppercase;color:#5B6478}
+.stat b{display:block;font-size:32px;font-weight:700;font-variant-numeric:tabular-nums;font-stretch:90%;margin:4px 0}
+.stat i{font-style:normal;font-size:12px;color:#2F7D5B;font-weight:700}
+.stat i.w{color:#9A6B00}
+.list li{list-style:none;display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid #EEF0F5}
+.list li:first-child{border:0}
+.chip{font:700 11px Archivo;border-radius:999px;padding:2px 8px;white-space:nowrap}
+.chip.a{background:#FBEFCF;color:#6E4C00}.chip.v{background:#DCEFE5;color:#1F5A40}.chip.r{background:#FBE1DE;color:#9B1C12}
+.list span{flex:1}.list em{font-style:normal;color:#5B6478;font-size:12px}
+.legend{display:flex;gap:14px;font-size:12px;color:#5B6478;margin-top:12px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+</style></head><body>
+<aside class="rail">
+  <div class="brand"><i>S</i>Solfeamos</div>
+  <div class="band"><div class="av" style="width:32px;height:32px;background:#D9A21B;color:#16275E">UM</div><div><b>Unió Musical de Llíria</b>Propietario · Plan Pro</div></div>
+  <div class="grp"><h6>General</h6><a class="on"><span></span>Inicio</a><a><span></span>Agenda</a><a><span></span>Notificaciones<em>3</em></a></div>
+  <div class="grp"><h6>Música</h6><a><span></span>Archivo musical</a><a><span></span>Ensayos y actuaciones</a><a><span></span>Asistencia</a><a><span></span>Contrataciones</a></div>
+  <div class="grp"><h6>Gestión</h6><a><span></span>Socios</a><a><span></span>Tesorería<em>5</em></a><a><span></span>Mayordomía</a><a><span></span>Instrumentación</a><a><span></span>Gobierno</a></div>
+</aside>
+<main>
+  <div class="top"><div class="search">Buscar socios, obras, acciones… <kbd>⌘K</kbd></div><div class="sp"></div><div class="av">JL</div></div>
+  <div class="page">
+    <div class="crumb">Inicio</div>
+    <div class="head"><h1>Buenas tardes, Jose Luis</h1><div style="display:flex;gap:8px"><span class="btn g">Pasar lista</span><span class="btn">Planificar ensayo</span></div></div>
+    <div class="stack" style="display:grid;gap:24px">
+      <div class="plaque">
+        <small>Próxima convocatoria · hoy 20:30 · Sede social</small><div></div>
+        <h2>Ensayo general · Certamen de Valencia</h2><div></div>
+        <p>El Turia (F. Tamarit) · Suite Mediterránea · 58 de 72 músicos confirmados</p>
+        <div class="act"><span class="btn no">No asisto</span><span class="btn yes">Asisto</span></div>
+      </div>
+      <div class="stats">
+        <div class="card stat"><small>Socios activos</small><b>184</b><i>+6 este trimestre</i></div>
+        <div class="card stat"><small>Cuotas cobradas</small><b>87 %</b><i class="w">24 recibos pendientes</i></div>
+        <div class="card stat"><small>Asistencia media</small><b>81 %</b><i>Últimos 8 ensayos</i></div>
+      </div>
+      <div class="card"><h3>Esta semana <a>Abrir agenda</a></h3>
+        <div class="tiles">
+          <div class="tile"><span>Lun</span><b>12</b></div>
+          <div class="tile e t"><span>Mar · Ensayo</span><b>13</b></div>
+          <div class="tile s"><span>Mié · Escuela</span><b>14</b></div>
+          <div class="tile e"><span>Jue · Ensayo</span><b>15</b></div>
+          <div class="tile"><span>Vie</span><b>16</b></div>
+          <div class="tile a"><span>Sáb · Pasacalle</span><b>17</b></div>
+          <div class="tile a"><span>Dom · Procesión</span><b>18</b></div>
+        </div>
+        <div class="legend"><span><i style="background:#23408E"></i>Ensayo</span><span><i style="background:#D9A21B"></i>Actuación</span><span><i style="background:#6B3F69"></i>Escuela</span></div>
+      </div>
+    </div>
+    <div class="card"><h3>Pendiente de la junta <a>Ver todo</a></h3>
+      <ul class="list" style="padding:0">
+        <li><span class="chip r">Vence hoy</span><span>Justificar subvención Diputació</span></li>
+        <li><span class="chip a">Revisar</span><span>4 justificaciones de falta</span></li>
+        <li><span class="chip a">Revisar</span><span>2 altas de socio por firmar</span></li>
+        <li><span class="chip a">Cobro</span><span>24 recibos de cuota trimestral</span></li>
+        <li><span class="chip v">Listo</span><span>Contrato fiestas de Bétera</span><em>firmado</em></li>
+        <li><span class="chip a">Préstamo</span><span>Particellas a la Primitiva</span><em>vence 20/10</em></li>
+      </ul>
+    </div>
+  </div>
+</main>
+</body></html>

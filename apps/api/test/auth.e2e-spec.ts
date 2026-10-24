@@ -110,6 +110,46 @@ describe('Autenticación', () => {
     expect(sw.body.session.tenant.slug).toBe('multi-dos');
   });
 
+  it('cambia la contraseña, rechaza la anterior y cierra las otras sesiones', async () => {
+    const email = 'pwd@test.local';
+    const next = 'Otra-clave-234';
+    await ctx.http().post('/api/v1/auth/register').send({ email, password: PASSWORD, name: 'Pwd' }).expect(201);
+    const login = await ctx.http().post('/api/v1/auth/login').send({ email, password: PASSWORD }).expect(200);
+    const cookie = cookieOf(login);
+    await ctx.http().post('/api/v1/auth/password/change').send({ currentPassword: PASSWORD, newPassword: next }).expect(401);
+    await ctx.http().post('/api/v1/auth/password/change').set(auth(login.body.accessToken)).send({ currentPassword: 'mal-123456', newPassword: next }).expect(400);
+    await ctx.http().post('/api/v1/auth/password/change').set(auth(login.body.accessToken)).send({ currentPassword: PASSWORD, newPassword: 'corta' }).expect(400);
+    await ctx.http().post('/api/v1/auth/password/change').set(auth(login.body.accessToken)).send({ currentPassword: PASSWORD, newPassword: PASSWORD }).expect(400);
+    const changed = await ctx.http().post('/api/v1/auth/password/change').set(auth(login.body.accessToken)).send({ currentPassword: PASSWORD, newPassword: next }).expect(204);
+    expect(cookieOf(changed)).toMatch(/sf_rt=/);
+    await ctx.http().post('/api/v1/auth/refresh').set('Cookie', cookie).expect(401);
+    await ctx.http().post('/api/v1/auth/login').send({ email, password: PASSWORD }).expect(401);
+    await ctx.http().post('/api/v1/auth/login').send({ email, password: next }).expect(200);
+  });
+
+  it('recupera la contraseña sin revelar si el email existe y el enlace es de un solo uso', async () => {
+    const email = 'pwd@test.local';
+    const unknown = await ctx.http().post('/api/v1/auth/password/forgot').send({ email: 'nadie@test.local' }).expect(200);
+    const known = await ctx.http().post('/api/v1/auth/password/forgot').send({ email }).expect(200);
+    expect(unknown.body).toEqual({ accepted: true });
+    expect(known.body).toEqual(unknown.body);
+    expect(ctx.jobs.of('email.send').some((j) => j.data.to === 'nadie@test.local')).toBe(false);
+
+    const first = ctx.jobs.of('email.send').filter((j) => j.data.to === email).at(-1)!;
+    const stale = /reset-password\/([\w-]+)/.exec(first.data.text)![1];
+    await ctx.http().post('/api/v1/auth/password/forgot').send({ email }).expect(200);
+    await ctx.http().post('/api/v1/auth/password/reset').send({ token: stale, password: 'Tercera-clave-5' }).expect(400);
+
+    const latest = ctx.jobs.of('email.send').filter((j) => j.data.to === email).at(-1)!;
+    const token = /reset-password\/([\w-]+)/.exec(latest.data.text)![1];
+    expect(token).not.toBe(stale);
+    await ctx.http().post('/api/v1/auth/password/reset').send({ token: 'x'.repeat(24), password: 'Tercera-clave-5' }).expect(400);
+    await ctx.http().post('/api/v1/auth/password/reset').send({ token, password: 'Tercera-clave-5' }).expect(204);
+    await ctx.http().post('/api/v1/auth/password/reset').send({ token, password: 'Tercera-clave-6' }).expect(400);
+    await ctx.http().post('/api/v1/auth/login').send({ email, password: 'Otra-clave-234' }).expect(401);
+    await ctx.http().post('/api/v1/auth/login').send({ email, password: 'Tercera-clave-5' }).expect(200);
+  });
+
   it('el slug de banda es único y no admite reservados', async () => {
     const band = await signupBand(ctx, 'slug-band');
     await ctx.http().post('/api/v1/onboarding').set(auth(band.token)).send({ bandName: 'Banda X', slug: 'slug-band' }).expect(409);

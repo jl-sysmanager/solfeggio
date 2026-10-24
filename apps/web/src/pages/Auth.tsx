@@ -70,6 +70,8 @@ export function useAfterLogin() {
 }
 
 export function LoginPage() {
+  const location = useLocation();
+  const resetDone = (location.state as { reset?: boolean } | null)?.reset;
   const { login } = useAuth();
   const afterLogin = useAfterLogin();
   const [step, setStep] = useState<'credentials' | 'mfa'>('credentials');
@@ -105,11 +107,15 @@ export function LoginPage() {
 
   return (
     <AuthLayout title={step === 'mfa' ? 'Verificación en dos pasos' : 'Entrar'} lead={step === 'mfa' ? 'Introduce el código de tu aplicación de autenticación.' : 'Accede con el email de tu cuenta.'}>
+      {resetDone && step === 'credentials' && <p className="small">Contraseña actualizada. Entra con la nueva.</p>}
       <form className="form" onSubmit={submit} noValidate={false}>
         {step === 'credentials' ? (
           <>
             <TextField label="Email" name="email" type="email" autoComplete="email" required autoFocus />
             <TextField label="Contraseña" name="password" type="password" autoComplete="current-password" required />
+            <p className="small">
+              <Link to="/forgot-password">He olvidado mi contraseña</Link>
+            </p>
           </>
         ) : (
           <>
@@ -190,6 +196,99 @@ export function RegisterPage() {
         <p className="small">
           ¿Ya tienes cuenta? <Link to="/login">Entra</Link>
         </p>
+      </form>
+    </AuthLayout>
+  );
+}
+
+/** Reglas alineadas con `passwordSchema` del API. */
+export function passwordIssue(password: string, confirm?: string): string | null {
+  if (password.length < 10 || password.length > 128) return 'La contraseña debe tener entre 10 y 128 caracteres.';
+  if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) return 'La contraseña debe incluir letras y números.';
+  if (confirm !== undefined && password !== confirm) return 'Las contraseñas no coinciden.';
+  return null;
+}
+
+export function ForgotPasswordPage() {
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const v = formValues(e.currentTarget);
+    setError(null);
+    setLoading(true);
+    try {
+      await api('/auth/password/forgot', { method: 'POST', body: { email: v.email }, noRefresh: true });
+      setSent(true);
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthLayout title="Recuperar contraseña" lead="Te enviaremos un enlace para elegir una contraseña nueva.">
+      {sent ? (
+        <div className="stack">
+          <p>Si hay una cuenta con ese email, recibirás un enlace en los próximos minutos. Caduca en una hora y sólo puede usarse una vez.</p>
+          <p className="small">
+            <Link to="/login">Volver a entrar</Link>
+          </p>
+        </div>
+      ) : (
+        <form className="form" onSubmit={submit}>
+          <TextField label="Email" name="email" type="email" autoComplete="email" required autoFocus />
+          <FormError error={error} />
+          <Button type="submit" loading={loading}>
+            Enviar enlace
+          </Button>
+          <p className="small">
+            <Link to="/login">Volver a entrar</Link>
+          </p>
+        </form>
+      )}
+    </AuthLayout>
+  );
+}
+
+export function ResetPasswordPage() {
+  const { token } = useParams();
+  const navigate = useNavigate();
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const v = formValues(e.currentTarget);
+    const issue = passwordIssue(v.password ?? '', v.password2 ?? '');
+    if (issue) {
+      setError(new Error(issue));
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      await api('/auth/password/reset', { method: 'POST', body: { token, password: v.password }, noRefresh: true });
+      navigate('/login', { replace: true, state: { reset: true } });
+    } catch (err) {
+      setError(err instanceof ApiError && err.code === 'RESET_INVALID' ? new Error('El enlace no es válido o ha caducado. Pide otro.') : err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthLayout title="Nueva contraseña" lead="Elige una contraseña que no hayas usado en esta cuenta.">
+      <form className="form" onSubmit={submit}>
+        <TextField label="Nueva contraseña" name="password" type="password" autoComplete="new-password" minLength={10} required autoFocus hint="Mínimo 10 caracteres, con letras y números." />
+        <TextField label="Repite la contraseña" name="password2" type="password" autoComplete="new-password" required />
+        <FormError error={error} />
+        <Button type="submit" loading={loading}>
+          Guardar contraseña
+        </Button>
       </form>
     </AuthLayout>
   );

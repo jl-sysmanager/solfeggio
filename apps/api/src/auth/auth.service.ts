@@ -2,14 +2,17 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import * as argon2 from 'argon2';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
-import { decrypt, encrypt, sha256 } from '../common/crypto';
+import { decrypt, encrypt, randomToken, sha256 } from '../common/crypto';
+import { env } from '../config/env';
 import { Db } from '../db/db.service';
+import { Jobs } from '../jobs/jobs.service';
 import { Audit } from '../audit/audit.service';
 import { SessionService } from './session.service';
 import { TokensService } from './tokens.service';
 
 const MAX_FAILED = 5;
 const LOCK_MINUTES = 15;
+const RESET_TTL_MS = 60 * 60 * 1000;
 // Hash ficticio para igualar tiempos cuando el email no existe.
 let dummyHash: Promise<string> | undefined;
 
@@ -24,6 +27,7 @@ export class AuthService {
     private readonly tokens: TokensService,
     private readonly sessions: SessionService,
     private readonly audit: Audit,
+    private readonly jobs: Jobs,
   ) {}
 
   async register(email: string, password: string, name: string) {
@@ -162,5 +166,64 @@ export class AuthService {
       await this.audit.log(tx, { tenantId: inv.tenantId, userId }, 'invitation.accepted', 'membership', membership.id);
     });
     return this.issue(userId, inv.tenantId);
+  }
+
+  /** Cambia la contraseña de la sesión actual y cierra el resto de sesiones. */
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.db.system.user.findUniqueOrThrow({ where: { id: userId } });
+    const ok = await argon2.verify(user.passwordHash, currentPassword).catch(() => false);
+    if (!ok) throw new BadRequestException({ message: 'La contraseña actual no es correcta', code: 'INVALID_CREDENTIALS' });
+    await this.db.system.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashPassword(newPassword), failedLogins: 0, lockedUntil: null },
+    });
+    await this.invalidateResets(userId);
+    await this.tokens.revokeAllForUser(userId);
+  }
+
+  /**
+   * Pide un enlace de recuperación. La respuesta es siempre la misma: no indica si el email existe.
+   * Una cuenta bloqueada por moderación no recibe enlace.
+   */
+  async requestPasswordReset(email: string) {
+    const user = await this.db.system.user.findUnique({ where: { email: email.trim().toLowerCase() } });
+    if (!user || user.blockedAt) return;
+    await this.invalidateResets(user.id);
+    const token = randomToken(32);
+    await this.db.system.passwordResetToken.create({
+      data: { userId: user.id, tokenHash: sha256(token), expiresAt: new Date(Date.now() + RESET_TTL_MS) },
+    });
+    await this.jobs.add('email.send', {
+      to: user.email,
+      subject: 'Recupera tu contraseña de Solfeamos',
+      text:
+        `Hemos recibido una solicitud para cambiar la contraseña de tu cuenta.\n\n` +
+        `Elige una nueva aquí (el enlace caduca en 1 hora y sólo puede usarse una vez):\n${env().APP_URL}/reset-password/${token}\n\n` +
+        `Si no has sido tú, ignora este mensaje. Tu contraseña no cambia.`,
+    });
+  }
+
+  /** Aplica una contraseña nueva a partir del enlace y cierra todas las sesiones. */
+  async resetPassword(token: string, password: string) {
+    const row = await this.db.system.passwordResetToken.findUnique({ where: { tokenHash: sha256(token) } });
+    if (!row || row.usedAt || row.expiresAt < new Date()) {
+      throw new BadRequestException({ message: 'El enlace no es válido o ha caducado', code: 'RESET_INVALID' });
+    }
+    const user = await this.db.system.user.findUnique({ where: { id: row.userId }, select: { blockedAt: true } });
+    if (user?.blockedAt) throw new ForbiddenException({ message: 'Cuenta bloqueada', code: 'ACCOUNT_BLOCKED' });
+    const hash = await hashPassword(password);
+    await this.db.system.$transaction(async (tx) => {
+      const claimed = await tx.passwordResetToken.updateMany({
+        where: { id: row.id, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new BadRequestException({ message: 'El enlace no es válido o ha caducado', code: 'RESET_INVALID' });
+      await tx.user.update({ where: { id: row.userId }, data: { passwordHash: hash, failedLogins: 0, lockedUntil: null } });
+      await tx.refreshToken.updateMany({ where: { userId: row.userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    });
+  }
+
+  private invalidateResets(userId: string) {
+    return this.db.system.passwordResetToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
   }
 }
