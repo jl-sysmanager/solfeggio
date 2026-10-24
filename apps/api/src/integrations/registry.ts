@@ -41,6 +41,7 @@ export interface ResolvedIntegration {
 
 export interface CategoryDef {
   id: CategoryId;
+  group: 'income' | 'communication' | 'storage';
   label: string;
   description: string;
   /** Qué ocurre cuando la integración está deshabilitada (se muestra en la UI). */
@@ -50,7 +51,7 @@ export interface CategoryDef {
   envFallback: () => Omit<ResolvedIntegration, 'source'> | null;
 }
 
-export type CategoryId = 'payments' | 'email';
+export type CategoryId = 'payments' | 'email' | 'backups';
 
 const senderFields: FieldDef[] = [
   { key: 'fromAddress', label: 'Remitente (email)', type: 'email', required: true, placeholder: 'no-reply@tudominio.es' },
@@ -67,6 +68,7 @@ function parseFrom(value: string) {
 export const CATEGORIES: CategoryDef[] = [
   {
     id: 'payments',
+    group: 'income',
     label: 'Pagos y suscripciones',
     description: 'Cobro de los planes de pago: Checkout, Customer Portal, facturas y webhooks.',
     disabledBehavior: 'Las bandas no pueden contratar ni gestionar planes de pago; la facturación responde 503 y la web oculta los botones de pago. Las suscripciones existentes en el proveedor no se cancelan.',
@@ -97,6 +99,7 @@ export const CATEGORIES: CategoryDef[] = [
   },
   {
     id: 'email',
+    group: 'communication',
     label: 'Envío de correo',
     description: 'Invitaciones, convocatorias, recordatorios, comunicaciones y avisos de facturación.',
     disabledBehavior: 'No se envía ningún correo: las notificaciones dentro de la app siguen funcionando y los envíos se descartan con un aviso en los logs del worker.',
@@ -178,6 +181,30 @@ export const CATEGORIES: CategoryDef[] = [
         secrets: (url.password ? { password: decodeURIComponent(url.password) } : {}) as Record<string, string>,
       };
     },
+  },
+  {
+    id: 'backups',
+    group: 'storage',
+    label: 'Destino de copias',
+    description: 'Bucket S3-compatible independiente para las copias cifradas y las exportaciones de bandas.',
+    disabledBehavior: 'No se generan nuevas copias ni exportaciones. Las copias existentes permanecen en el destino.',
+    providers: [
+      {
+        id: 's3-compatible',
+        label: 'S3 compatible',
+        description: 'Amazon S3, MinIO, Backblaze B2, Wasabi u otro servicio compatible con S3.',
+        fields: [
+          { key: 'endpoint', label: 'Endpoint', type: 'url', required: true, placeholder: 'https://s3.eu-west-1.amazonaws.com' },
+          { key: 'region', label: 'Región', type: 'text', required: true, default: 'eu-west-1', placeholder: 'eu-west-1' },
+          { key: 'bucket', label: 'Bucket', type: 'text', required: true, placeholder: 'solfeamos-backups', pattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$', patternMessage: 'Nombre de bucket no válido' },
+          { key: 'prefix', label: 'Prefijo', type: 'text', default: 'solfeamos', placeholder: 'solfeamos' },
+          { key: 'accessKeyId', label: 'Access key ID', type: 'secret', required: true },
+          { key: 'secretAccessKey', label: 'Secret access key', type: 'secret', required: true },
+          { key: 'forcePathStyle', label: 'Usar path-style', type: 'boolean', default: false, help: 'Actívalo para MinIO y otros proveedores que no usan subdominios de bucket.' },
+        ],
+      },
+    ],
+    envFallback: () => null,
   },
 ];
 

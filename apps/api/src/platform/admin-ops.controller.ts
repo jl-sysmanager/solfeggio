@@ -6,12 +6,15 @@ import type { RequestContext } from '../auth/context';
 import { Ctx, PlatformAdmin, Public } from '../auth/decorators';
 import { zod } from '../common/zod.pipe';
 import { env } from '../config/env';
+import { idParam } from '../common/schemas';
 import { Jobs } from '../jobs/jobs.service';
+import { SCHEDULE_CATALOG, scheduledTask } from '../jobs/schedules';
 import { HEARTBEAT_STALE_HOURS, OpsService } from './ops.service';
+import { TenantBackupService } from './tenant-backup.service';
 import { Db } from '../db/db.service';
 import { platformAudit } from './support.util';
 
-const CRON_NAMES = ['events.reminders', 'billing.grace-sweep', 'finance.overdue', 'storage.recount', 'platform.snapshot', 'support.sla-sweep', 'billing.reconcile-addons', 'ops.orphan-scan'];
+const CRON_NAMES = SCHEDULE_CATALOG.map((task) => task.key);
 /** Nombres reservados a los latidos internos del worker. */
 const RESERVED = /^(cron|storage)\./;
 const heartbeatName = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,59}$/i);
@@ -24,6 +27,13 @@ const deliveryEvent = z.object({
 const deliveryBody = z.union([deliveryEvent, z.array(deliveryEvent).min(1).max(100)]);
 const providerParam = z.string().regex(/^[a-z0-9-]{2,30}$/);
 const orphanDelete = z.object({ confirm: z.literal('ELIMINAR') });
+const restoreBody = z.object({ confirm: z.string().trim().min(2).max(80) });
+const scheduleParam = z.string().refine((value) => !!scheduledTask(value), 'Tarea no permitida');
+const scheduleBody = z.object({
+  pattern: z.string().trim().regex(/^(\S+\s+){4}\S+$/, 'La programación debe tener cinco campos cron').max(100),
+  timezone: z.literal('Europe/Madrid').default('Europe/Madrid'),
+  enabled: z.boolean(),
+});
 
 /** Comparación en tiempo constante del token recibido en cabecera (`x-ops-token` o Bearer). */
 function checkToken(expected: string | undefined, header?: string, bearer?: string) {
@@ -47,6 +57,7 @@ export class AdminOpsController {
     private readonly ops: OpsService,
     private readonly jobs: Jobs,
     private readonly db: Db,
+    private readonly backups: TenantBackupService,
   ) {}
 
   // ── Colas ────────────────────────────────────────────────────────────────
@@ -113,15 +124,66 @@ export class AdminOpsController {
   /** Tareas programadas: último latido de cada cron (el worker lo registra) y próxima ejecución según BullMQ. */
   @Get('admin/ops/schedules')
   async schedules() {
-    const [beats, repeatables] = await Promise.all([this.ops.heartbeats(), this.jobs.repeatables().catch(() => [])]);
-    return CRON_NAMES.map((name) => {
+    const [beats, repeatables, configured] = await Promise.all([this.ops.heartbeats(), this.jobs.repeatables().catch(() => []), this.db.system.scheduledTask.findMany()]);
+    return SCHEDULE_CATALOG.map((task) => {
+      const name = task.key;
       const beat = beats.find((b) => b.name === `cron.${name}`);
       const rep = repeatables.find((r) => r.name === name);
+      const config = configured.find((row) => row.key === name);
       return {
-        name, pattern: rep?.pattern ?? null, next: rep?.next ?? null,
+        name, label: task.label, description: task.description, pattern: config?.pattern ?? rep?.pattern ?? task.pattern,
+        timezone: config?.timezone ?? 'Europe/Madrid', enabled: config?.enabled ?? true, next: rep?.next ?? null,
         lastRunAt: beat?.lastRunAt ?? null, status: beat?.status ?? 'never', detail: beat?.detail ?? null,
       };
     });
+  }
+
+  @HttpCode(200)
+  @Post('admin/ops/schedules/:key')
+  async saveSchedule(@Ctx() ctx: RequestContext, @Param('key', zod(scheduleParam)) key: string, @Body(zod(scheduleBody)) body: z.infer<typeof scheduleBody>) {
+    const row = await this.db.system.scheduledTask.upsert({
+      where: { key },
+      create: { key, ...body, updatedBy: ctx.userId },
+      update: { ...body, updatedBy: ctx.userId },
+    });
+    await this.jobs.setSchedule(key as keyof import('../jobs/jobs.service').JobMap, row.pattern, row.timezone, row.enabled);
+    await platformAudit(this.db.system, ctx, 'ops.schedule.updated', 'scheduled_task', row.id, { key, pattern: row.pattern, enabled: row.enabled });
+    return row;
+  }
+
+  @HttpCode(202)
+  @Post('admin/ops/schedules/:key/run')
+  async runSchedule(@Ctx() ctx: RequestContext, @Param('key', zod(scheduleParam)) key: string) {
+    await this.jobs.add(key as keyof import('../jobs/jobs.service').JobMap, {} as never);
+    await platformAudit(this.db.system, ctx, 'ops.schedule.run', 'scheduled_task', key, { key });
+    return { queued: true };
+  }
+
+  @Get('admin/ops/tenants/:id/backups')
+  tenantBackups(@Param('id', zod(idParam)) id: string) {
+    return this.backups.list(id);
+  }
+
+  @HttpCode(201)
+  @Post('admin/ops/tenants/:id/backups')
+  async createTenantBackup(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    const backup = await this.backups.exportTenant(id, ctx.userId);
+    await platformAudit(this.db.system, ctx, 'ops.backup.created', 'tenant_backup', backup.id, { tenantId: id });
+    return backup;
+  }
+
+  /** Sustituye los datos actuales de la banda por la copia elegida. */
+  @HttpCode(200)
+  @Post('admin/ops/tenants/:id/backups/:backupId/restore')
+  async restoreTenantBackup(
+    @Ctx() ctx: RequestContext,
+    @Param('id', zod(idParam)) id: string,
+    @Param('backupId', zod(idParam)) backupId: string,
+    @Body(zod(restoreBody)) body: z.infer<typeof restoreBody>,
+  ) {
+    const result = await this.backups.restore(id, backupId, body.confirm);
+    await platformAudit(this.db.system, ctx, 'ops.backup.restored', 'tenant_backup', backupId, { tenantId: id, skipped: result.skipped });
+    return result;
   }
 
   /** Copias de seguridad y demás latidos externos; rojo si el último error o si supera 26 h. */

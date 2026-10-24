@@ -5,6 +5,7 @@ import { InsightsService } from '../src/platform/insights.service';
 import { OpsService } from '../src/platform/ops.service';
 import { SupportService } from '../src/platform/support.service';
 import { Processors } from '../src/jobs/processors';
+import { TenantBackupService } from '../src/platform/tenant-backup.service';
 import { auth, Band, createTestApp, resetDb, signupBand, TestCtx } from './helpers';
 import { resetEnvCache } from '../src/config/env';
 
@@ -21,7 +22,7 @@ describe('Salud técnica del panel global', () => {
   // El worker no forma parte de AppModule: se monta con los mismos servicios.
   const makeProcessors = () => {
     const g = <T>(t: new (...a: never[]) => T) => ctx.app.get(t, { strict: false });
-    return new Processors(ctx.db, ctx.jobs as never, g(BillingService), g(Mailer), g(InsightsService), g(SupportService), g(OpsService), g(BillingOpsService));
+    return new Processors(ctx.db, ctx.jobs as never, g(BillingService), g(Mailer), g(InsightsService), g(SupportService), g(OpsService), g(BillingOpsService), g(TenantBackupService));
   };
 
   beforeAll(async () => {
@@ -40,6 +41,7 @@ describe('Salud técnica del panel global', () => {
       failedJobs: async () => failed,
       retryFailed: async (id?: string) => (calls.push(`retry:${id ?? 'all'}`), id && id !== '7' ? 0 : failed.length),
       removeFailed: async (id: string) => (calls.push(`remove:${id}`), id === '7'),
+      setSchedule: async (name: string, pattern: string, timezone: string, enabled: boolean) => calls.push(`schedule:${name}:${pattern}:${timezone}:${enabled}`),
     });
   });
   afterAll(async () => {
@@ -138,6 +140,31 @@ describe('Salud técnica del panel global', () => {
     expect(s.find((x: any) => x.name === 'finance.overdue')).toMatchObject({ status: 'ok', lastRunAt: expect.any(String) });
     expect(s.find((x: any) => x.name === 'storage.recount').status).toBe('never');
     expect(s.find((x: any) => x.name === 'support.sla-sweep').next).toEqual(expect.any(String));
+  });
+
+  it('permite pausar, reprogramar y ejecutar una tarea del catálogo', async () => {
+    await http().post(`${O}/schedules/finance.overdue`).set(auth(admin.token)).send({ pattern: '0 6 * * *', enabled: false }).expect(200);
+    const row = await ctx.db.system.scheduledTask.findUniqueOrThrow({ where: { key: 'finance.overdue' } });
+    expect(row).toMatchObject({ pattern: '0 6 * * *', enabled: false, timezone: 'Europe/Madrid' });
+    expect(calls).toContain('schedule:finance.overdue:0 6 * * *:Europe/Madrid:false');
+    await http().post(`${O}/schedules/no.existe`).set(auth(admin.token)).send({ pattern: '0 6 * * *', enabled: true }).expect(400);
+    await http().post(`${O}/schedules/finance.overdue`).set(auth(band.token)).send({ pattern: '0 6 * * *', enabled: true }).expect(403);
+    await http().post(`${O}/schedules/finance.overdue/run`).set(auth(admin.token)).expect(202);
+  });
+
+  it('la restauración sustituye la banda original y no toca otra ni las cuentas', async () => {
+    await ctx.db.system.member.create({ data: { tenantId: band.tenantId, memberNumber: 1, firstName: 'Lucía', lastName: 'Pérez' } });
+    const created = await http().post(`${O}/tenants/${band.tenantId}/backups`).set(auth(admin.token)).expect(201);
+    await ctx.db.system.member.updateMany({ where: { tenantId: band.tenantId }, data: { firstName: 'Cambiada' } });
+    const other = await ctx.db.system.member.create({ data: { tenantId: admin.tenantId, memberNumber: 1, firstName: 'Ana', lastName: 'Ruiz' } });
+    const password = (await ctx.db.system.user.findUniqueOrThrow({ where: { id: band.userId } })).passwordHash;
+    await http().post(`${O}/tenants/${band.tenantId}/backups/${created.body.id}/restore`).set(auth(admin.token)).send({ confirm: 'no' }).expect(400);
+    await http().post(`${O}/tenants/${band.tenantId}/backups/${created.body.id}/restore`).set(auth(band.token)).send({ confirm: 'ops-band' }).expect(403);
+    await http().post(`${O}/tenants/${band.tenantId}/backups/${created.body.id}/restore`).set(auth(admin.token)).send({ confirm: 'ops-band' }).expect(200);
+    const restored = await ctx.db.system.member.findFirstOrThrow({ where: { tenantId: band.tenantId } });
+    expect(restored.firstName).toBe('Lucía');
+    expect(await ctx.db.system.member.findUnique({ where: { id: other.id } })).toMatchObject({ firstName: 'Ana' });
+    expect((await ctx.db.system.user.findUniqueOrThrow({ where: { id: band.userId } })).passwordHash).toBe(password);
   });
 
   it('almacenamiento: ranking y análisis de huérfanos sin borrar nada salvo confirmación', async () => {

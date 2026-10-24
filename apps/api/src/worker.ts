@@ -1,48 +1,50 @@
 import { Logger, Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { Worker } from 'bullmq';
+import { env } from './config/env';
 import { AuditModule } from './audit/audit.service';
 import { BillingOpsService } from './billing/billing-ops.service';
 import { BillingService } from './billing/billing.service';
 import { PlanSync } from './billing/plan-sync';
 import { StripeClient } from './billing/stripe.provider';
-import { DbModule } from './db/db.service';
+import { Db, DbModule } from './db/db.service';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { Jobs, JobsModule, QUEUE, redisConnection } from './jobs/jobs.service';
 import { Processors } from './jobs/processors';
+import { SCHEDULE_CATALOG } from './jobs/schedules';
 import { InsightsService } from './platform/insights.service';
 import { OpsService } from './platform/ops.service';
+import { TenantBackupService } from './platform/tenant-backup.service';
 import { SupportService } from './platform/support.service';
 import { StorageModule } from './storage/storage.service';
 
 @Module({
   imports: [DbModule, JobsModule, IntegrationsModule, StorageModule, AuditModule],
-  providers: [Processors, BillingService, PlanSync, StripeClient, BillingOpsService, InsightsService, SupportService, OpsService],
+  providers: [Processors, BillingService, PlanSync, StripeClient, BillingOpsService, InsightsService, SupportService, OpsService, TenantBackupService],
 })
 class WorkerModule {}
 
-/** Planificación de tareas periódicas. El `jobId` determinista evita duplicados entre réplicas. */
-const SCHEDULES = [
-  { name: 'events.reminders', pattern: '*/15 * * * *' },
-  { name: 'billing.grace-sweep', pattern: '5 * * * *' },
-  { name: 'finance.overdue', pattern: '30 3 * * *' },
-  { name: 'storage.recount', pattern: '0 4 * * *' },
-  { name: 'platform.snapshot', pattern: '30 2 * * *' },
-  { name: 'support.sla-sweep', pattern: '*/15 * * * *' },
-  { name: 'billing.reconcile-addons', pattern: '15 3 * * *' },
-  { name: 'ops.orphan-scan', pattern: '0 5 * * 0' },
-] as const;
-
 async function main() {
+  const systemUrl = env().SYSTEM_DATABASE_URL ?? env().DATABASE_MIGRATION_URL;
+  if (!systemUrl || new URL(systemUrl).username === new URL(env().DATABASE_URL).username) {
+    throw new Error('El worker requiere SYSTEM_DATABASE_URL con el rol propietario; no puede usar el rol de aplicación.');
+  }
   const app = await NestFactory.createApplicationContext(WorkerModule);
   const logger = new Logger('Worker');
   const processors = app.get(Processors);
   const jobs = app.get(Jobs);
+  const db = app.get(Db);
   const connection = redisConnection();
 
-  for (const s of SCHEDULES) {
-    await jobs.add(s.name, {}, { repeat: { pattern: s.pattern, tz: 'Europe/Madrid' }, jobId: `cron:${s.name}` });
+  for (const s of SCHEDULE_CATALOG) {
+    await db.system.scheduledTask.upsert({
+      where: { key: s.key },
+      create: { key: s.key, pattern: s.pattern },
+      update: {},
+    });
   }
+  const schedules = await db.system.scheduledTask.findMany({ where: { key: { in: SCHEDULE_CATALOG.map((s) => s.key) } } });
+  for (const schedule of schedules) await jobs.setSchedule(schedule.key as keyof import('./jobs/jobs.service').JobMap, schedule.pattern, schedule.timezone, schedule.enabled);
 
   const worker = new Worker(QUEUE, (job) => processors.handle(job, connection), { connection: redisConnection(), concurrency: 5 });
   worker.on('failed', (job, err) => logger.error(`${job?.name} (${job?.id}) falló: ${err.message}`));

@@ -21,6 +21,31 @@ const KIND_LABEL: Record<string, string> = {
   impersonation: 'Ver como', note: 'Nota',
 };
 
+function TenantRestore({ tenantId, slug }: { tenantId: string; slug: string }) {
+  const q = useApi<{ id: string; createdAt: string; bytes: number }[]>(`/admin/ops/tenants/${tenantId}/backups`);
+  const [backupId, setBackupId] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const create = useApiMutation(() => post(`/admin/ops/tenants/${tenantId}/backups`), {
+    success: 'Copia creada',
+    invalidate: [`/admin/ops/tenants/${tenantId}/backups`],
+  });
+  const restore = useApiMutation(() => post(`/admin/ops/tenants/${tenantId}/backups/${backupId}/restore`, { confirm }), {
+    success: 'Banda sustituida por la copia',
+    invalidate: ['/admin/insights/tenants', `/admin/ops/tenants/${tenantId}/backups`],
+  });
+  return (
+    <Card title="Copia de esta banda" actions={<Button size="sm" onClick={() => create.mutate()} loading={create.isPending}>Crear copia</Button>}>
+      <p className="small muted">Restaurar sustituye los datos actuales de esta banda. Se conservan su plan, su suscripción y las contraseñas de las cuentas.</p>
+      <form className="form" onSubmit={(event) => { event.preventDefault(); restore.mutate(); }}>
+        <SelectField label="Copia" value={backupId} onChange={(event) => setBackupId(event.target.value)} options={(q.data ?? []).map((backup) => ({ value: backup.id, label: dateTime(backup.createdAt) }))} placeholder="Elige una copia" />
+        <TextField label="Identificador de la banda" value={confirm} onChange={(event) => setConfirm(event.target.value)} hint={`Escribe ${slug} para confirmar la sustitución.`} autoComplete="off" />
+        <FormError error={restore.error} />
+        <div><Button type="submit" variant="danger" loading={restore.isPending} disabled={!backupId || confirm !== slug}>Sustituir la banda</Button></div>
+      </form>
+    </Card>
+  );
+}
+
 function ImpersonateModal({ tenantId, tenantName, open, onClose }: { tenantId: string; tenantName: string; open: boolean; onClose: () => void }) {
   const { startImpersonation } = useAuth();
   const navigate = useNavigate();
@@ -153,6 +178,8 @@ export default function AdminTenantPage() {
             </form>
           </Card>
         </div>
+
+        <TenantRestore tenantId={t.id} slug={t.slug} />
 
         <Card title="Notas internas">
           <form

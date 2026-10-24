@@ -15,6 +15,11 @@ const SOURCE: Record<IntegrationCategory['current']['source'], string> = {
   env: 'Heredada de variables de entorno',
   none: 'Sin configurar',
 };
+const GROUPS: Record<IntegrationCategory['group'], string> = {
+  income: 'Ingresos',
+  communication: 'Comunicación',
+  storage: 'Almacenamiento y copias',
+};
 
 /** Errores de validación del API ({ path: 'config.host' | 'secrets.apiKey', message }) por campo. */
 export function fieldErrors(error: unknown): Record<string, string> {
@@ -207,7 +212,7 @@ function IntegrationCard({ cat }: { cat: IntegrationCategory }) {
           <h3 className="card__title">Probar conexión</h3>
           <p className="small muted">
             Usa la configuración guardada, aunque esté deshabilitada.{' '}
-            {cat.id === 'email' ? 'Envía un correo de prueba.' : 'Consulta el saldo de la cuenta para validar la clave.'}
+            {cat.id === 'email' ? 'Envía un correo de prueba.' : cat.id === 'payments' ? 'Consulta el saldo de la cuenta para validar la clave.' : 'Comprueba que se puede acceder al bucket.'}
           </p>
           <div className="toolbar">
             {cat.id === 'email' && (
@@ -256,7 +261,7 @@ function History() {
             return (
               <li key={r.id} className="row between">
                 <span>
-                  <strong>{ACTIONS[r.action] ?? r.action}</strong> · {r.entityId === 'payments' ? 'Pagos' : 'Correo'}
+                  <strong>{ACTIONS[r.action] ?? r.action}</strong> · {r.entityId === 'payments' ? 'Pagos' : r.entityId === 'email' ? 'Correo' : 'Almacenamiento'}
                   {m.provider && ` · ${m.provider}`}
                   {m.enabled !== undefined && ` · ${m.enabled ? 'habilitada' : 'deshabilitada'}`}
                   {m.ok !== undefined && ` · ${m.ok ? 'correcta' : 'fallida'}`}
@@ -284,9 +289,16 @@ export function IntegrationsTab() {
         Los secretos se guardan cifrados (AES-256-GCM) y nunca se muestran; sólo los últimos caracteres para identificarlos. Los cambios se aplican en
         menos de 30 segundos en la API y el worker, sin reiniciar.
       </p>
-      {(q.data ?? []).map((c) => (
-        <IntegrationCard key={c.id} cat={c} />
-      ))}
+      {(['income', 'communication', 'storage'] as const).map((group) => {
+        const categories = (q.data ?? []).filter((category) => category.group === group);
+        if (!categories.length) return null;
+        return (
+          <section key={group} className="stack" aria-labelledby={`integration-group-${group}`}>
+            <h2 id={`integration-group-${group}`}>{GROUPS[group]}</h2>
+            {categories.map((category) => <IntegrationCard key={category.id} cat={category} />)}
+          </section>
+        );
+      })}
       <History />
     </div>
   );

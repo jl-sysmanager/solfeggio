@@ -118,7 +118,7 @@ SERVICE_ROLE=worker
 RUN_MIGRATIONS=false
 ```
 
-No necesita dominio, `PORT` ni ruta de healthcheck. Si las comparte mediante variables compartidas, basta con repetir `DATABASE_URL`, `REDIS_URL` y las de S3, que son de servicio.
+No necesita dominio, `PORT` ni ruta de healthcheck. Debe recibir las mismas variables que `api`, incluidas `SYSTEM_DATABASE_URL` (o `DATABASE_MIGRATION_URL`) con el rol propietario. El worker usa `DATABASE_URL` con el rol de aplicación para rutas aisladas y la URL de sistema para tareas globales; si falta, no arranca para evitar fallos de permisos en correo, facturación y recuentos.
 
 ### `web`
 

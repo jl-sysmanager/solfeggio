@@ -108,7 +108,11 @@ export interface OpsStorage {
 
 export interface OpsSchedule {
   name: string;
-  pattern: string | null;
+  label: string;
+  description: string;
+  pattern: string;
+  timezone: string;
+  enabled: boolean;
   next: string | null;
   lastRunAt: string | null;
   status: 'ok' | 'error' | 'never';

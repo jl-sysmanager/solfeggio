@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { HeadBucketCommand, S3Client } from '@aws-sdk/client-s3';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, PlatformAdmin } from '../auth/decorators';
@@ -12,7 +13,7 @@ import { IntegrationsService } from './integrations.service';
 import { Mailer } from './mailer.service';
 import { CategoryId } from './registry';
 
-const categoryParam = z.enum(['payments', 'email']);
+const categoryParam = z.enum(['payments', 'email', 'backups']);
 const saveSchema = z.object({
   provider: z.string().min(1).max(40),
   enabled: z.boolean(),
@@ -70,10 +71,26 @@ export class IntegrationsController {
           { ...cfg, enabled: true },
         );
         result = { ok: true, message: `Correo de prueba enviado a ${to} con ${cfg.provider}` };
-      } else {
+      } else if (id === 'payments') {
         if (!cfg.secrets.secretKey) return { ok: false, message: 'Falta la clave secreta' };
         const { livemode } = await this.stripe.check({ secretKey: cfg.secrets.secretKey });
         result = { ok: true, message: `Conexión con Stripe correcta (modo ${livemode ? 'producción' : 'pruebas'})` };
+      } else {
+        const config = cfg.config as Record<string, string | boolean | undefined>;
+        const endpoint = typeof config.endpoint === 'string' ? config.endpoint : null;
+        const region = typeof config.region === 'string' ? config.region : null;
+        const bucket = typeof config.bucket === 'string' ? config.bucket : null;
+        if (!endpoint || !region || !bucket || !cfg.secrets.accessKeyId || !cfg.secrets.secretAccessKey) {
+          return { ok: false, message: 'Falta la configuración del bucket' };
+        }
+        const client = new S3Client({
+          endpoint,
+          region,
+          forcePathStyle: config.forcePathStyle === true,
+          credentials: { accessKeyId: cfg.secrets.accessKeyId, secretAccessKey: cfg.secrets.secretAccessKey },
+        });
+        await client.send(new HeadBucketCommand({ Bucket: bucket }));
+        result = { ok: true, message: `Conexión con el bucket ${bucket} correcta` };
       }
     } catch (e) {
       result = { ok: false, message: (e as Error).message.slice(0, 300) };

@@ -9,12 +9,13 @@ import { TYPE_LABEL } from '../events/events.controller';
 import { Mailer } from '../integrations/mailer.service';
 import { InsightsService } from '../platform/insights.service';
 import { OpsService } from '../platform/ops.service';
+import { TenantBackupService } from '../platform/tenant-backup.service';
 import { SupportService } from '../platform/support.service';
 import { JobMap, Jobs } from './jobs.service';
 
 const REMINDER_TICK_MIN = 15;
 /** Tareas periódicas (coinciden con SCHEDULES del worker). */
-export const CRONS = new Set<string>(['events.reminders', 'billing.grace-sweep', 'finance.overdue', 'storage.recount', 'platform.snapshot', 'support.sla-sweep', 'billing.reconcile-addons', 'ops.orphan-scan']);
+export const CRONS = new Set<string>(['events.reminders', 'billing.grace-sweep', 'finance.overdue', 'storage.recount', 'platform.snapshot', 'support.sla-sweep', 'billing.reconcile-addons', 'ops.orphan-scan', 'backups.export-tenants']);
 
 @Injectable()
 export class Processors {
@@ -29,6 +30,7 @@ export class Processors {
     private readonly support: SupportService,
     private readonly ops: OpsService,
     private readonly billingOps: BillingOpsService,
+    private readonly backups: TenantBackupService,
   ) {}
 
   /** Cada tarea periódica deja su latido (`cron.<nombre>`) para el panel de salud técnica. */
@@ -78,6 +80,8 @@ export class Processors {
         return this.ops.scanOrphans();
       case 'billing.reconcile-addons':
         return this.billingOps.reconcileAddons();
+      case 'backups.export-tenants':
+        return this.backups.exportAll();
       default:
         this.logger.warn(`Trabajo desconocido: ${job.name}`);
     }

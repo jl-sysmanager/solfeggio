@@ -25,6 +25,7 @@ export type JobMap = {
   'support.sla-sweep': Record<string, never>;
   'ops.orphan-scan': Record<string, never>;
   'billing.reconcile-addons': Record<string, never>;
+  'backups.export-tenants': Record<string, never>;
 };
 
 /** Datos del trabajo sin cuerpos de mensajes: sólo claves cortas y escalares. */
@@ -59,6 +60,15 @@ export class Jobs implements OnModuleDestroy {
       // La cola no debe tumbar la petición: la notificación se reintenta en el siguiente barrido.
       this.logger.error(`No se pudo encolar ${name}: ${(e as Error).message}`);
     }
+  }
+
+  /** Sustituye una tarea periódica por nombre, evitando que quede activa su programación anterior. */
+  async setSchedule(name: keyof JobMap, pattern: string, timezone = 'Europe/Madrid', enabled = true) {
+    const repeatables = await this.q.getRepeatableJobs();
+    for (const repeatable of repeatables.filter((row) => row.name === name)) {
+      await this.q.removeRepeatableByKey(repeatable.key);
+    }
+    if (enabled) await this.q.add(name, {} as JobMap[keyof JobMap], { repeat: { pattern, tz: timezone }, jobId: `cron:${name}` });
   }
 
   /** Recuento de trabajos por estado (panel de salud técnica). */

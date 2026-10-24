@@ -44,6 +44,7 @@ import { AnnouncementsController } from './platform/announcements.controller';
 import { ImpersonationController } from './platform/impersonation.controller';
 import { InsightsService } from './platform/insights.service';
 import { OpsService } from './platform/ops.service';
+import { TenantBackupService } from './platform/tenant-backup.service';
 import { SupportService } from './platform/support.service';
 import { ArchiveExtrasController } from './archive/archive-extras.controller';
 import { GovernanceController } from './governance/governance.controller';
@@ -118,6 +119,7 @@ import { TreasuryExtrasController } from './treasury/treasury-extras.controller'
     InsightsService,
     SupportService,
     OpsService,
+    TenantBackupService,
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: AuthGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },

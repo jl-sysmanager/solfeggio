@@ -492,7 +492,8 @@ export interface IntegrationProvider {
 }
 
 export interface IntegrationCategory {
-  id: 'payments' | 'email';
+  id: 'payments' | 'email' | 'backups';
+  group: 'income' | 'communication' | 'storage';
   label: string;
   description: string;
   disabledBehavior: string;

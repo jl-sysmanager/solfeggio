@@ -8,7 +8,7 @@ import { Card, StatCard } from '../Card';
 import { Chip } from '../Chip';
 import { DataTable } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
-import { FormError, TextField } from '../Field';
+import { FormError, SelectField, TextField } from '../Field';
 import { ConfirmModal } from '../Modal';
 import { KpiRow } from './support/shared';
 
@@ -151,26 +151,74 @@ function StoragePanel() {
   );
 }
 
+const SCHEDULE_PRESETS = [
+  { value: '*/15 * * * *', label: 'Cada 15 minutos' },
+  { value: '0 * * * *', label: 'Cada hora' },
+  { value: '0 3 * * *', label: 'Todos los días, 03:00' },
+  { value: '0 5 * * 0', label: 'Cada domingo, 05:00' },
+  { value: '0 4 1 * *', label: 'El día 1 de cada mes, 04:00' },
+];
+
+function ScheduleEditor({ schedule }: { schedule: OpsSchedule }) {
+  const [pattern, setPattern] = useState(schedule.pattern);
+  const [enabled, setEnabled] = useState(schedule.enabled);
+  const save = useApiMutation(
+    () => post(`/admin/ops/schedules/${schedule.name}`, { pattern, timezone: 'Europe/Madrid', enabled }),
+    { success: 'Programación guardada', invalidate: ['/admin/ops/schedules', '/admin/ops/queues'] },
+  );
+  const run = useApiMutation(() => post(`/admin/ops/schedules/${schedule.name}/run`), { success: 'Tarea encolada', invalidate: ['/admin/ops/queues'] });
+  return (
+    <Card title={schedule.label} actions={<Chip tone={enabled ? 'success' : 'neutral'}>{enabled ? 'Activa' : 'Pausada'}</Chip>}>
+      <form
+        className="form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          save.mutate(undefined);
+        }}
+      >
+        <p className="small muted">{schedule.description}</p>
+        <div className="form-row">
+          <SelectField
+            label="Frecuencia"
+            name={`preset-${schedule.name}`}
+            value={SCHEDULE_PRESETS.some((preset) => preset.value === pattern) ? pattern : 'custom'}
+            onChange={(event) => setPattern(event.target.value === 'custom' ? pattern : event.target.value)}
+            options={[...SCHEDULE_PRESETS, { value: 'custom', label: 'Cron personalizado' }]}
+          />
+          <TextField label="Programación cron" value={pattern} onChange={(event) => setPattern(event.target.value)} hint="Cinco campos: minuto, hora, día, mes y semana." required />
+          <label className="field"><input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} /> Activar esta tarea</label>
+        </div>
+        <FormError error={save.error} />
+        <div className="row">
+          <Button type="submit" loading={save.isPending}>Guardar</Button>
+          <Button variant="ghost" type="button" onClick={() => run.mutate()} loading={run.isPending}>Ejecutar ahora</Button>
+        </div>
+      </form>
+    </Card>
+  );
+}
+
 function Schedules() {
   const q = useApi<OpsSchedule[]>('/admin/ops/schedules');
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
   return (
-    <Card title="Tareas programadas">
+    <section className="stack" aria-label="Tareas programadas">
       <DataTable
         caption="Tareas programadas"
         rows={q.data}
         rowKey={(s) => s.name}
         columns={[
-          { key: 'n', header: 'Tarea', render: (s) => <code>{s.name}</code> },
-          { key: 'p', header: 'Programación', render: (s) => s.pattern ?? '—' },
+          { key: 'n', header: 'Tarea', render: (s) => s.label },
+          { key: 'p', header: 'Programación', render: (s) => s.pattern },
           { key: 's', header: 'Último resultado', render: (s) => <Chip tone={s.status === 'ok' ? 'success' : s.status === 'error' ? 'danger' : 'neutral'}>{s.status === 'ok' ? 'Correcta' : s.status === 'error' ? 'Con error' : 'Sin ejecutar'}</Chip> },
           { key: 'l', header: 'Última ejecución', render: (s) => (s.lastRunAt ? dateTime(s.lastRunAt) : '—'), nowrap: true },
           { key: 'x', header: 'Próxima', render: (s) => (s.next ? dateTime(s.next) : '—'), nowrap: true },
           { key: 'e', header: 'Detalle', render: (s) => s.detail?.error ?? '' },
         ]}
       />
-    </Card>
+      {q.data.map((schedule) => <ScheduleEditor key={schedule.name} schedule={schedule} />)}
+    </section>
   );
 }
 
@@ -180,6 +228,9 @@ function Backups() {
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
   return (
     <Card title="Copias de seguridad">
+      <p className="small muted">
+        La copia completa del sistema se ejecuta fuera de la aplicación. Desde la ficha de cada banda se puede crear una copia y restaurarla: la restauración sustituye los datos de esa banda y conserva su plan, su suscripción y las cuentas.
+      </p>
       <DataTable
         caption="Copias de seguridad y latidos externos"
         rows={q.data.heartbeats}
