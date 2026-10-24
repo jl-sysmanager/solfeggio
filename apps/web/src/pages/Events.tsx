@@ -182,7 +182,7 @@ export default function EventsPage() {
           <div className="stack" style={{ gap: 24 }}>
             {groupByDay(q.data).map(([day, events]) => (
               <section key={day} aria-label={date(events[0].startsAt, { dateStyle: 'full' })} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', gap: 16 }}>
-                <div className="calendar-day" aria-hidden="true">
+                <div className={`calendar-day calendar-day--${events.every((e) => e.status === 'CANCELLED') ? 'CANCELLED' : events[0].type}`} aria-hidden="true">
                   <strong>{new Date(events[0].startsAt).getDate()}</strong>
                   <span>{new Date(events[0].startsAt).toLocaleDateString('es-ES', { weekday: 'short' })}</span>
                 </div>

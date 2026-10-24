@@ -49,7 +49,7 @@ export default function CommunicationsPage() {
     <Page
       header={
         <PageHeader
-          eyebrow="Secretaría"
+          eyebrow="Gestión"
           title="Comunicaciones"
           description="Avisos a los socios por email o dentro de la aplicación."
           actions={<Button onClick={() => setOpen(true)}>Nueva comunicación</Button>}

@@ -169,7 +169,7 @@ export default function MembersPage() {
     <Page
       header={
         <PageHeader
-          eyebrow="Secretaría"
+          eyebrow="Gestión"
           title="Socios"
           description="Altas, bajas, datos personales y consentimientos."
           actions={can('members:write') && <Button onClick={() => setCreating(true)}>Alta de socio</Button>}

@@ -1,0 +1,1312 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-24T11:21:28+02:00",
+  "title": "Design System: Solfeamos",
+  "extensions": {
+    "colorMeta": {
+      "cobalt-950": {
+        "role": "primary",
+        "displayName": "Deep Cobalt",
+        "canonical": "#0E1A42",
+        "tonalRamp": [
+          "oklch(15.0% 0.078 267.5)",
+          "oklch(26.4% 0.078 267.5)",
+          "oklch(37.9% 0.078 267.5)",
+          "oklch(49.3% 0.078 267.5)",
+          "oklch(60.7% 0.078 267.5)",
+          "oklch(72.1% 0.078 267.5)",
+          "oklch(83.6% 0.078 267.5)",
+          "oklch(95.0% 0.078 267.5)"
+        ]
+      },
+      "cobalt-900": {
+        "role": "primary",
+        "displayName": "Rail Cobalt",
+        "canonical": "#16275E",
+        "tonalRamp": [
+          "oklch(15.0% 0.101 267.0)",
+          "oklch(26.4% 0.101 267.0)",
+          "oklch(37.9% 0.101 267.0)",
+          "oklch(49.3% 0.101 267.0)",
+          "oklch(60.7% 0.101 267.0)",
+          "oklch(72.1% 0.101 267.0)",
+          "oklch(83.6% 0.101 267.0)",
+          "oklch(95.0% 0.101 267.0)"
+        ]
+      },
+      "cobalt-800": {
+        "role": "primary",
+        "displayName": "Cobalt Pressed",
+        "canonical": "#1C3577",
+        "tonalRamp": [
+          "oklch(15.0% 0.117 265.2)",
+          "oklch(26.4% 0.117 265.2)",
+          "oklch(37.9% 0.117 265.2)",
+          "oklch(49.3% 0.117 265.2)",
+          "oklch(60.7% 0.117 265.2)",
+          "oklch(72.1% 0.117 265.2)",
+          "oklch(83.6% 0.117 265.2)",
+          "oklch(95.0% 0.117 265.2)"
+        ]
+      },
+      "cobalt-700": {
+        "role": "primary",
+        "displayName": "Plaque Cobalt",
+        "canonical": "#23408E",
+        "tonalRamp": [
+          "oklch(15.0% 0.134 265.3)",
+          "oklch(26.4% 0.134 265.3)",
+          "oklch(37.9% 0.134 265.3)",
+          "oklch(49.3% 0.134 265.3)",
+          "oklch(60.7% 0.134 265.3)",
+          "oklch(72.1% 0.134 265.3)",
+          "oklch(83.6% 0.134 265.3)",
+          "oklch(95.0% 0.134 265.3)"
+        ]
+      },
+      "cobalt-100": {
+        "role": "primary",
+        "displayName": "Cobalt Wash",
+        "canonical": "#E3E8F6",
+        "tonalRamp": [
+          "oklch(15.0% 0.020 270.2)",
+          "oklch(26.4% 0.020 270.2)",
+          "oklch(37.9% 0.020 270.2)",
+          "oklch(49.3% 0.020 270.2)",
+          "oklch(60.7% 0.020 270.2)",
+          "oklch(72.1% 0.020 270.2)",
+          "oklch(83.6% 0.020 270.2)",
+          "oklch(95.0% 0.020 270.2)"
+        ]
+      },
+      "glaze": {
+        "role": "neutral",
+        "displayName": "Cold Glaze",
+        "canonical": "#F3F5F8",
+        "tonalRamp": [
+          "oklch(15.0% 0.005 258.3)",
+          "oklch(26.4% 0.005 258.3)",
+          "oklch(37.9% 0.005 258.3)",
+          "oklch(49.3% 0.005 258.3)",
+          "oklch(60.7% 0.005 258.3)",
+          "oklch(72.1% 0.005 258.3)",
+          "oklch(83.6% 0.005 258.3)",
+          "oklch(95.0% 0.005 258.3)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Enamel Ink",
+        "canonical": "#141A2E",
+        "tonalRamp": [
+          "oklch(15.0% 0.040 270.2)",
+          "oklch(26.4% 0.040 270.2)",
+          "oklch(37.9% 0.040 270.2)",
+          "oklch(49.3% 0.040 270.2)",
+          "oklch(60.7% 0.040 270.2)",
+          "oklch(72.1% 0.040 270.2)",
+          "oklch(83.6% 0.040 270.2)",
+          "oklch(95.0% 0.040 270.2)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Plaque White",
+        "canonical": "#FFFFFF",
+        "tonalRamp": [
+          "oklch(15.0% 0.000 89.9)",
+          "oklch(26.4% 0.000 89.9)",
+          "oklch(37.9% 0.000 89.9)",
+          "oklch(49.3% 0.000 89.9)",
+          "oklch(60.7% 0.000 89.9)",
+          "oklch(72.1% 0.000 89.9)",
+          "oklch(83.6% 0.000 89.9)",
+          "oklch(95.0% 0.000 89.9)"
+        ]
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Tile Grout",
+        "canonical": "#ECEEF3",
+        "tonalRamp": [
+          "oklch(15.0% 0.007 268.5)",
+          "oklch(26.4% 0.007 268.5)",
+          "oklch(37.9% 0.007 268.5)",
+          "oklch(49.3% 0.007 268.5)",
+          "oklch(60.7% 0.007 268.5)",
+          "oklch(72.1% 0.007 268.5)",
+          "oklch(83.6% 0.007 268.5)",
+          "oklch(95.0% 0.007 268.5)"
+        ]
+      },
+      "muted-ink": {
+        "role": "neutral",
+        "displayName": "Muted Ink",
+        "canonical": "#545D73",
+        "tonalRamp": [
+          "oklch(15.0% 0.037 267.5)",
+          "oklch(26.4% 0.037 267.5)",
+          "oklch(37.9% 0.037 267.5)",
+          "oklch(49.3% 0.037 267.5)",
+          "oklch(60.7% 0.037 267.5)",
+          "oklch(72.1% 0.037 267.5)",
+          "oklch(83.6% 0.037 267.5)",
+          "oklch(95.0% 0.037 267.5)"
+        ]
+      },
+      "muted-on-muted": {
+        "role": "neutral",
+        "displayName": "Ink On Grout",
+        "canonical": "#4A5268",
+        "tonalRamp": [
+          "oklch(15.0% 0.038 269.2)",
+          "oklch(26.4% 0.038 269.2)",
+          "oklch(37.9% 0.038 269.2)",
+          "oklch(49.3% 0.038 269.2)",
+          "oklch(60.7% 0.038 269.2)",
+          "oklch(72.1% 0.038 269.2)",
+          "oklch(83.6% 0.038 269.2)",
+          "oklch(95.0% 0.038 269.2)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Glaze Edge",
+        "canonical": "#DCDFE6",
+        "tonalRamp": [
+          "oklch(15.0% 0.010 267.4)",
+          "oklch(26.4% 0.010 267.4)",
+          "oklch(37.9% 0.010 267.4)",
+          "oklch(49.3% 0.010 267.4)",
+          "oklch(60.7% 0.010 267.4)",
+          "oklch(72.1% 0.010 267.4)",
+          "oklch(83.6% 0.010 267.4)",
+          "oklch(95.0% 0.010 267.4)"
+        ]
+      },
+      "input-border": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "canonical": "#7D869B",
+        "tonalRamp": [
+          "oklch(15.0% 0.033 267.0)",
+          "oklch(26.4% 0.033 267.0)",
+          "oklch(37.9% 0.033 267.0)",
+          "oklch(49.3% 0.033 267.0)",
+          "oklch(60.7% 0.033 267.0)",
+          "oklch(72.1% 0.033 267.0)",
+          "oklch(83.6% 0.033 267.0)",
+          "oklch(95.0% 0.033 267.0)"
+        ]
+      },
+      "surface-alt": {
+        "role": "neutral",
+        "displayName": "Cooler Glaze",
+        "canonical": "#F8F9FB",
+        "tonalRamp": [
+          "oklch(15.0% 0.003 264.5)",
+          "oklch(26.4% 0.003 264.5)",
+          "oklch(37.9% 0.003 264.5)",
+          "oklch(49.3% 0.003 264.5)",
+          "oklch(60.7% 0.003 264.5)",
+          "oklch(72.1% 0.003 264.5)",
+          "oklch(83.6% 0.003 264.5)",
+          "oklch(95.0% 0.003 264.5)"
+        ]
+      },
+      "chart-neutral": {
+        "role": "neutral",
+        "displayName": "Chart Grout",
+        "canonical": "#B9BFCC",
+        "tonalRamp": [
+          "oklch(15.0% 0.019 266.0)",
+          "oklch(26.4% 0.019 266.0)",
+          "oklch(37.9% 0.019 266.0)",
+          "oklch(49.3% 0.019 266.0)",
+          "oklch(60.7% 0.019 266.0)",
+          "oklch(72.1% 0.019 266.0)",
+          "oklch(83.6% 0.019 266.0)",
+          "oklch(95.0% 0.019 266.0)"
+        ]
+      },
+      "ochre": {
+        "role": "warning",
+        "displayName": "Attention Ochre",
+        "canonical": "#D9A21B",
+        "tonalRamp": [
+          "oklch(15.0% 0.147 83.0)",
+          "oklch(26.4% 0.147 83.0)",
+          "oklch(37.9% 0.147 83.0)",
+          "oklch(49.3% 0.147 83.0)",
+          "oklch(60.7% 0.147 83.0)",
+          "oklch(72.1% 0.147 83.0)",
+          "oklch(83.6% 0.147 83.0)",
+          "oklch(95.0% 0.147 83.0)"
+        ]
+      },
+      "ochre-ink": {
+        "role": "warning",
+        "displayName": "Ochre Ink",
+        "canonical": "#5A3E00",
+        "tonalRamp": [
+          "oklch(15.0% 0.080 79.8)",
+          "oklch(26.4% 0.080 79.8)",
+          "oklch(37.9% 0.080 79.8)",
+          "oklch(49.3% 0.080 79.8)",
+          "oklch(60.7% 0.080 79.8)",
+          "oklch(72.1% 0.080 79.8)",
+          "oklch(83.6% 0.080 79.8)",
+          "oklch(95.0% 0.080 79.8)"
+        ]
+      },
+      "ochre-strong": {
+        "role": "warning",
+        "displayName": "Ochre Strong",
+        "canonical": "#8F6300",
+        "tonalRamp": [
+          "oklch(15.0% 0.111 78.3)",
+          "oklch(26.4% 0.111 78.3)",
+          "oklch(37.9% 0.111 78.3)",
+          "oklch(49.3% 0.111 78.3)",
+          "oklch(60.7% 0.111 78.3)",
+          "oklch(72.1% 0.111 78.3)",
+          "oklch(83.6% 0.111 78.3)",
+          "oklch(95.0% 0.111 78.3)"
+        ]
+      },
+      "ochre-field-ink": {
+        "role": "warning",
+        "displayName": "Ochre Field Ink",
+        "canonical": "#241900",
+        "tonalRamp": [
+          "oklch(15.0% 0.045 86.5)",
+          "oklch(26.4% 0.045 86.5)",
+          "oklch(37.9% 0.045 86.5)",
+          "oklch(49.3% 0.045 86.5)",
+          "oklch(60.7% 0.045 86.5)",
+          "oklch(72.1% 0.045 86.5)",
+          "oklch(83.6% 0.045 86.5)",
+          "oklch(95.0% 0.045 86.5)"
+        ]
+      },
+      "copper": {
+        "role": "success",
+        "displayName": "Copper Green",
+        "canonical": "#2F7D5B",
+        "tonalRamp": [
+          "oklch(15.0% 0.094 161.7)",
+          "oklch(26.4% 0.094 161.7)",
+          "oklch(37.9% 0.094 161.7)",
+          "oklch(49.3% 0.094 161.7)",
+          "oklch(60.7% 0.094 161.7)",
+          "oklch(72.1% 0.094 161.7)",
+          "oklch(83.6% 0.094 161.7)",
+          "oklch(95.0% 0.094 161.7)"
+        ]
+      },
+      "manganese": {
+        "role": "school",
+        "displayName": "School Manganese",
+        "canonical": "#6B3F69",
+        "tonalRamp": [
+          "oklch(15.0% 0.086 328.5)",
+          "oklch(26.4% 0.086 328.5)",
+          "oklch(37.9% 0.086 328.5)",
+          "oklch(49.3% 0.086 328.5)",
+          "oklch(60.7% 0.086 328.5)",
+          "oklch(72.1% 0.086 328.5)",
+          "oklch(83.6% 0.086 328.5)",
+          "oklch(95.0% 0.086 328.5)"
+        ]
+      },
+      "critical": {
+        "role": "danger",
+        "displayName": "Critical Red",
+        "canonical": "#B42318",
+        "tonalRamp": [
+          "oklch(15.0% 0.182 29.5)",
+          "oklch(26.4% 0.182 29.5)",
+          "oklch(37.9% 0.182 29.5)",
+          "oklch(49.3% 0.182 29.5)",
+          "oklch(60.7% 0.182 29.5)",
+          "oklch(72.1% 0.182 29.5)",
+          "oklch(83.6% 0.182 29.5)",
+          "oklch(95.0% 0.182 29.5)"
+        ]
+      },
+      "plaque-muted": {
+        "role": "neutral",
+        "displayName": "Plaque Mist",
+        "canonical": "#C9D4F2",
+        "tonalRamp": [
+          "oklch(15.0% 0.043 269.5)",
+          "oklch(26.4% 0.043 269.5)",
+          "oklch(37.9% 0.043 269.5)",
+          "oklch(49.3% 0.043 269.5)",
+          "oklch(60.7% 0.043 269.5)",
+          "oklch(72.1% 0.043 269.5)",
+          "oklch(83.6% 0.043 269.5)",
+          "oklch(95.0% 0.043 269.5)"
+        ]
+      },
+      "sidebar-text": {
+        "role": "neutral",
+        "displayName": "Rail Text",
+        "canonical": "#C9D3F0",
+        "tonalRamp": [
+          "oklch(15.0% 0.042 270.4)",
+          "oklch(26.4% 0.042 270.4)",
+          "oklch(37.9% 0.042 270.4)",
+          "oklch(49.3% 0.042 270.4)",
+          "oklch(60.7% 0.042 270.4)",
+          "oklch(72.1% 0.042 270.4)",
+          "oklch(83.6% 0.042 270.4)",
+          "oklch(95.0% 0.042 270.4)"
+        ]
+      },
+      "sidebar-label": {
+        "role": "neutral",
+        "displayName": "Rail Label",
+        "canonical": "#93A5D8",
+        "tonalRamp": [
+          "oklch(15.0% 0.077 269.4)",
+          "oklch(26.4% 0.077 269.4)",
+          "oklch(37.9% 0.077 269.4)",
+          "oklch(49.3% 0.077 269.4)",
+          "oklch(60.7% 0.077 269.4)",
+          "oklch(72.1% 0.077 269.4)",
+          "oklch(83.6% 0.077 269.4)",
+          "oklch(95.0% 0.077 269.4)"
+        ]
+      },
+      "chip-success": {
+        "role": "success",
+        "displayName": "Chip Success",
+        "canonical": "#DCEFE5",
+        "tonalRamp": [
+          "oklch(15.0% 0.024 163.1)",
+          "oklch(26.4% 0.024 163.1)",
+          "oklch(37.9% 0.024 163.1)",
+          "oklch(49.3% 0.024 163.1)",
+          "oklch(60.7% 0.024 163.1)",
+          "oklch(72.1% 0.024 163.1)",
+          "oklch(83.6% 0.024 163.1)",
+          "oklch(95.0% 0.024 163.1)"
+        ]
+      },
+      "chip-success-ink": {
+        "role": "success",
+        "displayName": "Chip Success Ink",
+        "canonical": "#1F5A40",
+        "tonalRamp": [
+          "oklch(15.0% 0.075 161.3)",
+          "oklch(26.4% 0.075 161.3)",
+          "oklch(37.9% 0.075 161.3)",
+          "oklch(49.3% 0.075 161.3)",
+          "oklch(60.7% 0.075 161.3)",
+          "oklch(72.1% 0.075 161.3)",
+          "oklch(83.6% 0.075 161.3)",
+          "oklch(95.0% 0.075 161.3)"
+        ]
+      },
+      "chip-warning": {
+        "role": "warning",
+        "displayName": "Chip Warning",
+        "canonical": "#FBEFCF",
+        "tonalRamp": [
+          "oklch(15.0% 0.044 89.9)",
+          "oklch(26.4% 0.044 89.9)",
+          "oklch(37.9% 0.044 89.9)",
+          "oklch(49.3% 0.044 89.9)",
+          "oklch(60.7% 0.044 89.9)",
+          "oklch(72.1% 0.044 89.9)",
+          "oklch(83.6% 0.044 89.9)",
+          "oklch(95.0% 0.044 89.9)"
+        ]
+      },
+      "chip-warning-ink": {
+        "role": "warning",
+        "displayName": "Chip Warning Ink",
+        "canonical": "#6E4C00",
+        "tonalRamp": [
+          "oklch(15.0% 0.092 79.1)",
+          "oklch(26.4% 0.092 79.1)",
+          "oklch(37.9% 0.092 79.1)",
+          "oklch(49.3% 0.092 79.1)",
+          "oklch(60.7% 0.092 79.1)",
+          "oklch(72.1% 0.092 79.1)",
+          "oklch(83.6% 0.092 79.1)",
+          "oklch(95.0% 0.092 79.1)"
+        ]
+      },
+      "chip-danger": {
+        "role": "danger",
+        "displayName": "Chip Danger",
+        "canonical": "#FBE1DE",
+        "tonalRamp": [
+          "oklch(15.0% 0.029 25.6)",
+          "oklch(26.4% 0.029 25.6)",
+          "oklch(37.9% 0.029 25.6)",
+          "oklch(49.3% 0.029 25.6)",
+          "oklch(60.7% 0.029 25.6)",
+          "oklch(72.1% 0.029 25.6)",
+          "oklch(83.6% 0.029 25.6)",
+          "oklch(95.0% 0.029 25.6)"
+        ]
+      },
+      "chip-danger-ink": {
+        "role": "danger",
+        "displayName": "Chip Danger Ink",
+        "canonical": "#9B1C12",
+        "tonalRamp": [
+          "oklch(15.0% 0.164 29.6)",
+          "oklch(26.4% 0.164 29.6)",
+          "oklch(37.9% 0.164 29.6)",
+          "oklch(49.3% 0.164 29.6)",
+          "oklch(60.7% 0.164 29.6)",
+          "oklch(72.1% 0.164 29.6)",
+          "oklch(83.6% 0.164 29.6)",
+          "oklch(95.0% 0.164 29.6)"
+        ]
+      },
+      "chip-school": {
+        "role": "school",
+        "displayName": "Chip School",
+        "canonical": "#EFE3EE",
+        "tonalRamp": [
+          "oklch(15.0% 0.020 328.3)",
+          "oklch(26.4% 0.020 328.3)",
+          "oklch(37.9% 0.020 328.3)",
+          "oklch(49.3% 0.020 328.3)",
+          "oklch(60.7% 0.020 328.3)",
+          "oklch(72.1% 0.020 328.3)",
+          "oklch(83.6% 0.020 328.3)",
+          "oklch(95.0% 0.020 328.3)"
+        ]
+      },
+      "chip-school-ink": {
+        "role": "school",
+        "displayName": "Chip School Ink",
+        "canonical": "#5A3358",
+        "tonalRamp": [
+          "oklch(15.0% 0.079 328.8)",
+          "oklch(26.4% 0.079 328.8)",
+          "oklch(37.9% 0.079 328.8)",
+          "oklch(49.3% 0.079 328.8)",
+          "oklch(60.7% 0.079 328.8)",
+          "oklch(72.1% 0.079 328.8)",
+          "oklch(83.6% 0.079 328.8)",
+          "oklch(95.0% 0.079 328.8)"
+        ]
+      },
+      "night": {
+        "role": "neutral",
+        "displayName": "Nocturnal Ground",
+        "canonical": "#0C1124",
+        "tonalRamp": [
+          "oklch(15.0% 0.040 271.0)",
+          "oklch(26.4% 0.040 271.0)",
+          "oklch(37.9% 0.040 271.0)",
+          "oklch(49.3% 0.040 271.0)",
+          "oklch(60.7% 0.040 271.0)",
+          "oklch(72.1% 0.040 271.0)",
+          "oklch(83.6% 0.040 271.0)",
+          "oklch(95.0% 0.040 271.0)"
+        ]
+      },
+      "night-card": {
+        "role": "neutral",
+        "displayName": "Nocturnal Card",
+        "canonical": "#131A31",
+        "tonalRamp": [
+          "oklch(15.0% 0.046 269.6)",
+          "oklch(26.4% 0.046 269.6)",
+          "oklch(37.9% 0.046 269.6)",
+          "oklch(49.3% 0.046 269.6)",
+          "oklch(60.7% 0.046 269.6)",
+          "oklch(72.1% 0.046 269.6)",
+          "oklch(83.6% 0.046 269.6)",
+          "oklch(95.0% 0.046 269.6)"
+        ]
+      },
+      "night-popover": {
+        "role": "neutral",
+        "displayName": "Nocturnal Popover",
+        "canonical": "#182039",
+        "tonalRamp": [
+          "oklch(15.0% 0.049 269.2)",
+          "oklch(26.4% 0.049 269.2)",
+          "oklch(37.9% 0.049 269.2)",
+          "oklch(49.3% 0.049 269.2)",
+          "oklch(60.7% 0.049 269.2)",
+          "oklch(72.1% 0.049 269.2)",
+          "oklch(83.6% 0.049 269.2)",
+          "oklch(95.0% 0.049 269.2)"
+        ]
+      },
+      "night-ink": {
+        "role": "neutral",
+        "displayName": "Nocturnal Ink",
+        "canonical": "#E6E9F2",
+        "tonalRamp": [
+          "oklch(15.0% 0.013 271.3)",
+          "oklch(26.4% 0.013 271.3)",
+          "oklch(37.9% 0.013 271.3)",
+          "oklch(49.3% 0.013 271.3)",
+          "oklch(60.7% 0.013 271.3)",
+          "oklch(72.1% 0.013 271.3)",
+          "oklch(83.6% 0.013 271.3)",
+          "oklch(95.0% 0.013 271.3)"
+        ]
+      },
+      "night-primary": {
+        "role": "primary",
+        "displayName": "Nocturnal Cobalt Text",
+        "canonical": "#8FA8F0",
+        "tonalRamp": [
+          "oklch(15.0% 0.108 269.0)",
+          "oklch(26.4% 0.108 269.0)",
+          "oklch(37.9% 0.108 269.0)",
+          "oklch(49.3% 0.108 269.0)",
+          "oklch(60.7% 0.108 269.0)",
+          "oklch(72.1% 0.108 269.0)",
+          "oklch(83.6% 0.108 269.0)",
+          "oklch(95.0% 0.108 269.0)"
+        ]
+      },
+      "night-muted": {
+        "role": "neutral",
+        "displayName": "Nocturnal Muted",
+        "canonical": "#1D2642",
+        "tonalRamp": [
+          "oklch(15.0% 0.054 269.2)",
+          "oklch(26.4% 0.054 269.2)",
+          "oklch(37.9% 0.054 269.2)",
+          "oklch(49.3% 0.054 269.2)",
+          "oklch(60.7% 0.054 269.2)",
+          "oklch(72.1% 0.054 269.2)",
+          "oklch(83.6% 0.054 269.2)",
+          "oklch(95.0% 0.054 269.2)"
+        ]
+      },
+      "night-muted-ink": {
+        "role": "neutral",
+        "displayName": "Nocturnal Muted Ink",
+        "canonical": "#9DA6BF",
+        "tonalRamp": [
+          "oklch(15.0% 0.038 269.8)",
+          "oklch(26.4% 0.038 269.8)",
+          "oklch(37.9% 0.038 269.8)",
+          "oklch(49.3% 0.038 269.8)",
+          "oklch(60.7% 0.038 269.8)",
+          "oklch(72.1% 0.038 269.8)",
+          "oklch(83.6% 0.038 269.8)",
+          "oklch(95.0% 0.038 269.8)"
+        ]
+      },
+      "night-muted-on-muted": {
+        "role": "neutral",
+        "displayName": "Nocturnal Ink On Muted",
+        "canonical": "#A9B1C8",
+        "tonalRamp": [
+          "oklch(15.0% 0.034 270.3)",
+          "oklch(26.4% 0.034 270.3)",
+          "oklch(37.9% 0.034 270.3)",
+          "oklch(49.3% 0.034 270.3)",
+          "oklch(60.7% 0.034 270.3)",
+          "oklch(72.1% 0.034 270.3)",
+          "oklch(83.6% 0.034 270.3)",
+          "oklch(95.0% 0.034 270.3)"
+        ]
+      },
+      "night-accent": {
+        "role": "neutral",
+        "displayName": "Nocturnal Accent",
+        "canonical": "#23305A",
+        "tonalRamp": [
+          "oklch(15.0% 0.077 268.8)",
+          "oklch(26.4% 0.077 268.8)",
+          "oklch(37.9% 0.077 268.8)",
+          "oklch(49.3% 0.077 268.8)",
+          "oklch(60.7% 0.077 268.8)",
+          "oklch(72.1% 0.077 268.8)",
+          "oklch(83.6% 0.077 268.8)",
+          "oklch(95.0% 0.077 268.8)"
+        ]
+      },
+      "night-critical": {
+        "role": "danger",
+        "displayName": "Nocturnal Critical",
+        "canonical": "#F0877C",
+        "tonalRamp": [
+          "oklch(15.0% 0.130 27.0)",
+          "oklch(26.4% 0.130 27.0)",
+          "oklch(37.9% 0.130 27.0)",
+          "oklch(49.3% 0.130 27.0)",
+          "oklch(60.7% 0.130 27.0)",
+          "oklch(72.1% 0.130 27.0)",
+          "oklch(83.6% 0.130 27.0)",
+          "oklch(95.0% 0.130 27.0)"
+        ]
+      },
+      "night-copper": {
+        "role": "success",
+        "displayName": "Nocturnal Copper",
+        "canonical": "#5CC195",
+        "tonalRamp": [
+          "oklch(15.0% 0.116 162.9)",
+          "oklch(26.4% 0.116 162.9)",
+          "oklch(37.9% 0.116 162.9)",
+          "oklch(49.3% 0.116 162.9)",
+          "oklch(60.7% 0.116 162.9)",
+          "oklch(72.1% 0.116 162.9)",
+          "oklch(83.6% 0.116 162.9)",
+          "oklch(95.0% 0.116 162.9)"
+        ]
+      },
+      "night-copper-ink": {
+        "role": "success",
+        "displayName": "Nocturnal Copper Ink",
+        "canonical": "#04140D",
+        "tonalRamp": [
+          "oklch(15.0% 0.028 164.6)",
+          "oklch(26.4% 0.028 164.6)",
+          "oklch(37.9% 0.028 164.6)",
+          "oklch(49.3% 0.028 164.6)",
+          "oklch(60.7% 0.028 164.6)",
+          "oklch(72.1% 0.028 164.6)",
+          "oklch(83.6% 0.028 164.6)",
+          "oklch(95.0% 0.028 164.6)"
+        ]
+      },
+      "night-ochre": {
+        "role": "warning",
+        "displayName": "Nocturnal Ochre",
+        "canonical": "#E7B53E",
+        "tonalRamp": [
+          "oklch(15.0% 0.143 85.0)",
+          "oklch(26.4% 0.143 85.0)",
+          "oklch(37.9% 0.143 85.0)",
+          "oklch(49.3% 0.143 85.0)",
+          "oklch(60.7% 0.143 85.0)",
+          "oklch(72.1% 0.143 85.0)",
+          "oklch(83.6% 0.143 85.0)",
+          "oklch(95.0% 0.143 85.0)"
+        ]
+      },
+      "night-ochre-ink": {
+        "role": "warning",
+        "displayName": "Nocturnal Ochre Ink",
+        "canonical": "#2A1D00",
+        "tonalRamp": [
+          "oklch(15.0% 0.049 84.9)",
+          "oklch(26.4% 0.049 84.9)",
+          "oklch(37.9% 0.049 84.9)",
+          "oklch(49.3% 0.049 84.9)",
+          "oklch(60.7% 0.049 84.9)",
+          "oklch(72.1% 0.049 84.9)",
+          "oklch(83.6% 0.049 84.9)",
+          "oklch(95.0% 0.049 84.9)"
+        ]
+      },
+      "night-manganese": {
+        "role": "school",
+        "displayName": "Nocturnal Manganese",
+        "canonical": "#C99BC6",
+        "tonalRamp": [
+          "oklch(15.0% 0.080 328.5)",
+          "oklch(26.4% 0.080 328.5)",
+          "oklch(37.9% 0.080 328.5)",
+          "oklch(49.3% 0.080 328.5)",
+          "oklch(60.7% 0.080 328.5)",
+          "oklch(72.1% 0.080 328.5)",
+          "oklch(83.6% 0.080 328.5)",
+          "oklch(95.0% 0.080 328.5)"
+        ]
+      },
+      "night-border": {
+        "role": "neutral",
+        "displayName": "Nocturnal Edge",
+        "canonical": "#262F4D",
+        "tonalRamp": [
+          "oklch(15.0% 0.055 270.3)",
+          "oklch(26.4% 0.055 270.3)",
+          "oklch(37.9% 0.055 270.3)",
+          "oklch(49.3% 0.055 270.3)",
+          "oklch(60.7% 0.055 270.3)",
+          "oklch(72.1% 0.055 270.3)",
+          "oklch(83.6% 0.055 270.3)",
+          "oklch(95.0% 0.055 270.3)"
+        ]
+      },
+      "night-input-border": {
+        "role": "neutral",
+        "displayName": "Nocturnal Field Edge",
+        "canonical": "#5F6A8A",
+        "tonalRamp": [
+          "oklch(15.0% 0.052 269.8)",
+          "oklch(26.4% 0.052 269.8)",
+          "oklch(37.9% 0.052 269.8)",
+          "oklch(49.3% 0.052 269.8)",
+          "oklch(60.7% 0.052 269.8)",
+          "oklch(72.1% 0.052 269.8)",
+          "oklch(83.6% 0.052 269.8)",
+          "oklch(95.0% 0.052 269.8)"
+        ]
+      },
+      "night-btn": {
+        "role": "primary",
+        "displayName": "Nocturnal Button Cobalt",
+        "canonical": "#3557C0",
+        "tonalRamp": [
+          "oklch(15.0% 0.169 266.6)",
+          "oklch(26.4% 0.169 266.6)",
+          "oklch(37.9% 0.169 266.6)",
+          "oklch(49.3% 0.169 266.6)",
+          "oklch(60.7% 0.169 266.6)",
+          "oklch(72.1% 0.169 266.6)",
+          "oklch(83.6% 0.169 266.6)",
+          "oklch(95.0% 0.169 266.6)"
+        ]
+      },
+      "night-btn-hover": {
+        "role": "primary",
+        "displayName": "Nocturnal Button Pressed",
+        "canonical": "#2D4AA8",
+        "tonalRamp": [
+          "oklch(15.0% 0.155 266.9)",
+          "oklch(26.4% 0.155 266.9)",
+          "oklch(37.9% 0.155 266.9)",
+          "oklch(49.3% 0.155 266.9)",
+          "oklch(60.7% 0.155 266.9)",
+          "oklch(72.1% 0.155 266.9)",
+          "oklch(83.6% 0.155 266.9)",
+          "oklch(95.0% 0.155 266.9)"
+        ]
+      },
+      "night-sidebar": {
+        "role": "neutral",
+        "displayName": "Nocturnal Rail",
+        "canonical": "#13225A",
+        "tonalRamp": [
+          "oklch(15.0% 0.103 267.7)",
+          "oklch(26.4% 0.103 267.7)",
+          "oklch(37.9% 0.103 267.7)",
+          "oklch(49.3% 0.103 267.7)",
+          "oklch(60.7% 0.103 267.7)",
+          "oklch(72.1% 0.103 267.7)",
+          "oklch(83.6% 0.103 267.7)",
+          "oklch(95.0% 0.103 267.7)"
+        ]
+      },
+      "night-sidebar-panel": {
+        "role": "neutral",
+        "displayName": "Nocturnal Band Panel",
+        "canonical": "#1B2D6E",
+        "tonalRamp": [
+          "oklch(15.0% 0.115 267.7)",
+          "oklch(26.4% 0.115 267.7)",
+          "oklch(37.9% 0.115 267.7)",
+          "oklch(49.3% 0.115 267.7)",
+          "oklch(60.7% 0.115 267.7)",
+          "oklch(72.1% 0.115 267.7)",
+          "oklch(83.6% 0.115 267.7)",
+          "oklch(95.0% 0.115 267.7)"
+        ]
+      },
+      "night-surface-alt": {
+        "role": "neutral",
+        "displayName": "Nocturnal Cooler Ground",
+        "canonical": "#10162B",
+        "tonalRamp": [
+          "oklch(15.0% 0.043 270.3)",
+          "oklch(26.4% 0.043 270.3)",
+          "oklch(37.9% 0.043 270.3)",
+          "oklch(49.3% 0.043 270.3)",
+          "oklch(60.7% 0.043 270.3)",
+          "oklch(72.1% 0.043 270.3)",
+          "oklch(83.6% 0.043 270.3)",
+          "oklch(95.0% 0.043 270.3)"
+        ]
+      },
+      "night-tile-rehearsal": {
+        "role": "primary",
+        "displayName": "Nocturnal Rehearsal Tile",
+        "canonical": "#2D4FA8",
+        "tonalRamp": [
+          "oklch(15.0% 0.149 265.2)",
+          "oklch(26.4% 0.149 265.2)",
+          "oklch(37.9% 0.149 265.2)",
+          "oklch(49.3% 0.149 265.2)",
+          "oklch(60.7% 0.149 265.2)",
+          "oklch(72.1% 0.149 265.2)",
+          "oklch(83.6% 0.149 265.2)",
+          "oklch(95.0% 0.149 265.2)"
+        ]
+      },
+      "night-tile-meeting": {
+        "role": "success",
+        "displayName": "Nocturnal Meeting Tile",
+        "canonical": "#2B7A57",
+        "tonalRamp": [
+          "oklch(15.0% 0.111 161.5)",
+          "oklch(26.4% 0.111 161.5)",
+          "oklch(37.9% 0.111 161.5)",
+          "oklch(49.3% 0.111 161.5)",
+          "oklch(60.7% 0.111 161.5)",
+          "oklch(72.1% 0.111 161.5)",
+          "oklch(83.6% 0.111 161.5)",
+          "oklch(95.0% 0.111 161.5)"
+        ]
+      },
+      "night-tile-school": {
+        "role": "school",
+        "displayName": "Nocturnal School Tile",
+        "canonical": "#8A5587",
+        "tonalRamp": [
+          "oklch(15.0% 0.099 328.9)",
+          "oklch(26.4% 0.099 328.9)",
+          "oklch(37.9% 0.099 328.9)",
+          "oklch(49.3% 0.099 328.9)",
+          "oklch(60.7% 0.099 328.9)",
+          "oklch(72.1% 0.099 328.9)",
+          "oklch(83.6% 0.099 328.9)",
+          "oklch(95.0% 0.099 328.9)"
+        ]
+      },
+      "night-tile-empty": {
+        "role": "neutral",
+        "displayName": "Nocturnal Empty Tile",
+        "canonical": "#1A223D",
+        "tonalRamp": [
+          "oklch(15.0% 0.052 270.0)",
+          "oklch(26.4% 0.052 270.0)",
+          "oklch(37.9% 0.052 270.0)",
+          "oklch(49.3% 0.052 270.0)",
+          "oklch(60.7% 0.052 270.0)",
+          "oklch(72.1% 0.052 270.0)",
+          "oklch(83.6% 0.052 270.0)",
+          "oklch(95.0% 0.052 270.0)"
+        ]
+      },
+      "night-chart": {
+        "role": "neutral",
+        "displayName": "Nocturnal Chart Grout",
+        "canonical": "#3A4466",
+        "tonalRamp": [
+          "oklch(15.0% 0.059 271.0)",
+          "oklch(26.4% 0.059 271.0)",
+          "oklch(37.9% 0.059 271.0)",
+          "oklch(49.3% 0.059 271.0)",
+          "oklch(60.7% 0.059 271.0)",
+          "oklch(72.1% 0.059 271.0)",
+          "oklch(83.6% 0.059 271.0)",
+          "oklch(95.0% 0.059 271.0)"
+        ]
+      },
+      "night-chip-info": {
+        "role": "primary",
+        "displayName": "Nocturnal Info Chip",
+        "canonical": "#1E2A52",
+        "tonalRamp": [
+          "oklch(15.0% 0.074 269.0)",
+          "oklch(26.4% 0.074 269.0)",
+          "oklch(37.9% 0.074 269.0)",
+          "oklch(49.3% 0.074 269.0)",
+          "oklch(60.7% 0.074 269.0)",
+          "oklch(72.1% 0.074 269.0)",
+          "oklch(83.6% 0.074 269.0)",
+          "oklch(95.0% 0.074 269.0)"
+        ]
+      },
+      "night-chip-info-ink": {
+        "role": "primary",
+        "displayName": "Nocturnal Info Ink",
+        "canonical": "#B8C7F5",
+        "tonalRamp": [
+          "oklch(15.0% 0.067 270.8)",
+          "oklch(26.4% 0.067 270.8)",
+          "oklch(37.9% 0.067 270.8)",
+          "oklch(49.3% 0.067 270.8)",
+          "oklch(60.7% 0.067 270.8)",
+          "oklch(72.1% 0.067 270.8)",
+          "oklch(83.6% 0.067 270.8)",
+          "oklch(95.0% 0.067 270.8)"
+        ]
+      },
+      "night-chip-success": {
+        "role": "success",
+        "displayName": "Nocturnal Success Chip",
+        "canonical": "#11301F",
+        "tonalRamp": [
+          "oklch(15.0% 0.049 157.1)",
+          "oklch(26.4% 0.049 157.1)",
+          "oklch(37.9% 0.049 157.1)",
+          "oklch(49.3% 0.049 157.1)",
+          "oklch(60.7% 0.049 157.1)",
+          "oklch(72.1% 0.049 157.1)",
+          "oklch(83.6% 0.049 157.1)",
+          "oklch(95.0% 0.049 157.1)"
+        ]
+      },
+      "night-chip-success-ink": {
+        "role": "success",
+        "displayName": "Nocturnal Success Ink",
+        "canonical": "#7FD6AE",
+        "tonalRamp": [
+          "oklch(15.0% 0.103 163.1)",
+          "oklch(26.4% 0.103 163.1)",
+          "oklch(37.9% 0.103 163.1)",
+          "oklch(49.3% 0.103 163.1)",
+          "oklch(60.7% 0.103 163.1)",
+          "oklch(72.1% 0.103 163.1)",
+          "oklch(83.6% 0.103 163.1)",
+          "oklch(95.0% 0.103 163.1)"
+        ]
+      },
+      "night-chip-warning": {
+        "role": "warning",
+        "displayName": "Nocturnal Warning Chip",
+        "canonical": "#33270A",
+        "tonalRamp": [
+          "oklch(15.0% 0.047 86.2)",
+          "oklch(26.4% 0.047 86.2)",
+          "oklch(37.9% 0.047 86.2)",
+          "oklch(49.3% 0.047 86.2)",
+          "oklch(60.7% 0.047 86.2)",
+          "oklch(72.1% 0.047 86.2)",
+          "oklch(83.6% 0.047 86.2)",
+          "oklch(95.0% 0.047 86.2)"
+        ]
+      },
+      "night-chip-warning-ink": {
+        "role": "warning",
+        "displayName": "Nocturnal Warning Ink",
+        "canonical": "#F0C866",
+        "tonalRamp": [
+          "oklch(15.0% 0.125 87.3)",
+          "oklch(26.4% 0.125 87.3)",
+          "oklch(37.9% 0.125 87.3)",
+          "oklch(49.3% 0.125 87.3)",
+          "oklch(60.7% 0.125 87.3)",
+          "oklch(72.1% 0.125 87.3)",
+          "oklch(83.6% 0.125 87.3)",
+          "oklch(95.0% 0.125 87.3)"
+        ]
+      },
+      "night-chip-danger": {
+        "role": "danger",
+        "displayName": "Nocturnal Danger Chip",
+        "canonical": "#3A1714",
+        "tonalRamp": [
+          "oklch(15.0% 0.056 26.7)",
+          "oklch(26.4% 0.056 26.7)",
+          "oklch(37.9% 0.056 26.7)",
+          "oklch(49.3% 0.056 26.7)",
+          "oklch(60.7% 0.056 26.7)",
+          "oklch(72.1% 0.056 26.7)",
+          "oklch(83.6% 0.056 26.7)",
+          "oklch(95.0% 0.056 26.7)"
+        ]
+      },
+      "night-chip-danger-ink": {
+        "role": "danger",
+        "displayName": "Nocturnal Danger Ink",
+        "canonical": "#F5A29A",
+        "tonalRamp": [
+          "oklch(15.0% 0.100 25.6)",
+          "oklch(26.4% 0.100 25.6)",
+          "oklch(37.9% 0.100 25.6)",
+          "oklch(49.3% 0.100 25.6)",
+          "oklch(60.7% 0.100 25.6)",
+          "oklch(72.1% 0.100 25.6)",
+          "oklch(83.6% 0.100 25.6)",
+          "oklch(95.0% 0.100 25.6)"
+        ]
+      },
+      "night-chip-school": {
+        "role": "school",
+        "displayName": "Nocturnal School Chip",
+        "canonical": "#2E1D2D",
+        "tonalRamp": [
+          "oklch(15.0% 0.038 328.6)",
+          "oklch(26.4% 0.038 328.6)",
+          "oklch(37.9% 0.038 328.6)",
+          "oklch(49.3% 0.038 328.6)",
+          "oklch(60.7% 0.038 328.6)",
+          "oklch(72.1% 0.038 328.6)",
+          "oklch(83.6% 0.038 328.6)",
+          "oklch(95.0% 0.038 328.6)"
+        ]
+      },
+      "night-chip-school-ink": {
+        "role": "school",
+        "displayName": "Nocturnal School Ink",
+        "canonical": "#DDB6DA",
+        "tonalRamp": [
+          "oklch(15.0% 0.066 328.6)",
+          "oklch(26.4% 0.066 328.6)",
+          "oklch(37.9% 0.066 328.6)",
+          "oklch(49.3% 0.066 328.6)",
+          "oklch(60.7% 0.066 328.6)",
+          "oklch(72.1% 0.066 328.6)",
+          "oklch(83.6% 0.066 328.6)",
+          "oklch(95.0% 0.066 328.6)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles in the page header. 32px, weight 800, Archivo width 87.5%."
+      },
+      "plaque": {
+        "displayName": "Plaque",
+        "purpose": "Plaque titles at 80% width. The sign-in headline uses this same width at a larger size."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Bare first-level headings outside the page header. 24px, weight 800, width 87.5%."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Second-level headings at 20px, weight 700, width 87.5%."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface text at 14px, line-height 1.5, normal width."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase 11px labels for rail groups, table headers, and date-mark months."
+      }
+    },
+    "shadows": [
+      {
+        "name": "lift",
+        "value": "0 1px 2px 0 rgb(14 26 66 / 0.06)",
+        "purpose": "The selected segment in a segmented control."
+      },
+      {
+        "name": "raised",
+        "value": "0 4px 10px -2px rgb(14 26 66 / 0.12)",
+        "purpose": "Defined for an optional hover lift. No screen uses it."
+      },
+      {
+        "name": "float",
+        "value": "0 16px 32px -8px rgb(14 26 66 / 0.22), 0 2px 6px rgb(14 26 66 / 0.08)",
+        "purpose": "Menus, dialogs, toasts, the command palette, and the mobile drawer."
+      },
+      {
+        "name": "float-dark",
+        "value": "0 16px 32px -8px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3)",
+        "purpose": "The float shadow in dark theme. Lift and raised stay cobalt-tinted."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.2, 0, 0, 1)",
+        "purpose": "Default easing for color and navigation transitions."
+      },
+      {
+        "name": "duration-short",
+        "value": "150ms",
+        "purpose": "Hover and color transitions."
+      },
+      {
+        "name": "duration-medium",
+        "value": "200ms",
+        "purpose": "Panel open, page fade, and section disclosure."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "week",
+        "value": "479px"
+      },
+      {
+        "name": "dialog",
+        "value": "640px"
+      },
+      {
+        "name": "table",
+        "value": "720px"
+      },
+      {
+        "name": "tablet",
+        "value": "768px"
+      },
+      {
+        "name": "auth",
+        "value": "960px"
+      },
+      {
+        "name": "rail",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The cobalt action. One primary button on a view.",
+      "html": "<button class=\"ds-btn-primary\">Ver convocatoria</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:Archivo,system-ui,sans-serif;font-size:14px;font-weight:700;line-height:1.5;border-radius:var(--radius-md,6px);padding:8px 16px;min-height:38px;cursor:pointer;transition:background-color var(--duration-short,150ms) var(--ease-standard,cubic-bezier(0.2, 0, 0, 1)),transform .1s ease-out;border:1px solid transparent;background:var(--btn-bg,#23408E);color:var(--btn-text,#FFFFFF);}.ds-btn-primary:hover{background:var(--btn-hover,#1C3577);color:var(--btn-text,#FFFFFF);}.ds-btn-primary:focus-visible{outline:2px solid var(--focus,#23408E);outline-offset:2px;}.ds-btn-primary:active{transform:scale(0.98);}"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "The secondary action beside a plaque or a primary button.",
+      "html": "<button class=\"ds-btn-ghost\">Nuevo ensayo</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:Archivo,system-ui,sans-serif;font-size:14px;font-weight:700;line-height:1.5;border-radius:var(--radius-md,6px);padding:8px 16px;min-height:38px;cursor:pointer;transition:background-color var(--duration-short,150ms) var(--ease-standard,cubic-bezier(0.2, 0, 0, 1)),transform .1s ease-out;border:1px solid var(--input-border,#7D869B);background:var(--card,#FFFFFF);color:var(--text-strong,#141A2E);}.ds-btn-ghost:hover{background:var(--muted,#ECEEF3);color:var(--foreground,#141A2E);}.ds-btn-ghost:focus-visible{outline:2px solid var(--focus,#23408E);outline-offset:2px;}.ds-btn-ghost:active{transform:scale(0.98);}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Destructive confirmation. Red text on the glaze field.",
+      "html": "<button class=\"ds-btn-danger\">Eliminar</button>",
+      "css": ".ds-btn-danger{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:Archivo,system-ui,sans-serif;font-size:14px;font-weight:700;line-height:1.5;border-radius:var(--radius-md,6px);padding:8px 16px;min-height:38px;cursor:pointer;transition:background-color var(--duration-short,150ms) var(--ease-standard,cubic-bezier(0.2, 0, 0, 1)),transform .1s ease-out;border:1px solid color-mix(in srgb,var(--destructive,#B42318) 30%,var(--border-color,#DCDFE6));background:var(--background,#F3F5F8);color:var(--destructive,#B42318);}.ds-btn-danger:hover{background:color-mix(in srgb,var(--destructive,#B42318) 6%,var(--background,#F3F5F8));color:var(--destructive,#B42318);}.ds-btn-danger:focus-visible{outline:2px solid var(--focus,#23408E);outline-offset:2px;}.ds-btn-danger:active{transform:scale(0.98);}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Default field. Field Edge border, cobalt focus ring drawn inside.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Nombre, email, instrumento…\" />",
+      "css": ".ds-input{font-family:Archivo,system-ui,sans-serif;font-size:14px;line-height:20px;color:var(--text-strong,#141A2E);background:var(--input-bg,#FFFFFF);border:1px solid var(--input-border,#7D869B);border-radius:var(--radius-md,6px);padding:0 12px;height:38px;width:100%;transition:border-color var(--duration-short,150ms) var(--ease-standard,cubic-bezier(0.2, 0, 0, 1));}.ds-input::placeholder{color:var(--muted-foreground,#545D73);}.ds-input:hover{border-color:var(--muted-foreground,#545D73);}.ds-input:focus-visible{outline:2px solid var(--ring,#23408E);outline-offset:-1px;border-color:var(--ring,#23408E);}"
+    },
+    {
+      "name": "Rail",
+      "kind": "nav",
+      "refersTo": "nav-active",
+      "description": "Cobalt rail. The active item is a glaze plaque. The count is ochre.",
+      "html": "<nav class=\"ds-rail\"><a class=\"ds-nav ds-nav-active\" href=\"#\" aria-current=\"page\">Inicio</a><a class=\"ds-nav\" href=\"#\">Agenda<span class=\"ds-count\">3</span></a></nav>",
+      "css": ".ds-rail{display:flex;flex-direction:column;gap:2px;width:248px;padding:8px;background:var(--sidebar-bg,#16275E);border-radius:10px;}.ds-nav{display:flex;align-items:center;gap:12px;min-height:36px;padding:7px 8px;border-radius:var(--radius-md,6px);color:var(--sidebar-text,#C9D3F0);font-family:Archivo,system-ui,sans-serif;font-size:14px;font-weight:500;text-decoration:none;transition:background-color var(--duration-short,150ms) var(--ease-standard,cubic-bezier(0.2, 0, 0, 1)),color var(--duration-short,150ms) var(--ease-standard,cubic-bezier(0.2, 0, 0, 1));}.ds-nav:hover{background:var(--sidebar-hover,rgb(255 255 255 / .08));color:var(--sidebar-text-strong,#FFFFFF);}.ds-nav:focus-visible{outline:2px solid var(--ochre,#D9A21B);outline-offset:2px;}.ds-nav-active{background:var(--sidebar-active,#F3F5F8);color:var(--sidebar-text-active,#16275E);font-weight:700;}.ds-count{margin-left:auto;display:inline-flex;align-items:center;justify-content:center;height:20px;min-width:20px;padding:0 6px;border-radius:9999px;background:var(--ochre,#D9A21B);color:var(--tile-performance-text,#241900);font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;}"
+    },
+    {
+      "name": "Warning Chip",
+      "kind": "chip",
+      "refersTo": "chip-warning",
+      "description": "Pending work. Soft ochre field, darker ochre ink, square pip.",
+      "html": "<span class=\"ds-chip\">Cobro</span>",
+      "css": ".ds-chip{display:inline-flex;align-items:center;gap:6px;border-radius:9999px;padding:2px 8px;font-family:Archivo,system-ui,sans-serif;font-size:12px;font-weight:600;line-height:1.5;background:var(--chip-warning,#FBEFCF);color:var(--chip-warning-text,#6E4C00);}.ds-chip::before{content:'';width:6px;height:6px;border-radius:2px;background:currentColor;}"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat white surface with a 1px edge. The resting container.",
+      "html": "<article class=\"ds-card\"><h2 class=\"ds-card__title\">Pendiente</h2><p class=\"ds-card__body\">Nada pendiente por ahora.</p></article>",
+      "css": ".ds-card{background:var(--card,#FFFFFF);color:var(--card-foreground,#141A2E);border:1px solid var(--border-color,#DCDFE6);border-radius:var(--radius-lg,10px);padding:20px;font-family:Archivo,system-ui,sans-serif;}.ds-card__title{margin:0 0 16px;font-size:15px;font-weight:800;font-stretch:87.5%;letter-spacing:0;}.ds-card__body{margin:0;font-size:14px;line-height:1.5;color:var(--text-muted,#545D73);}"
+    },
+    {
+      "name": "Plaque",
+      "kind": "custom",
+      "refersTo": "plaque",
+      "description": "The primary fact. Cobalt field, 80% width title, inner fillet, glaze button.",
+      "html": "<section class=\"ds-plaque\"><div><h2 class=\"ds-plaque__title\">Ensayo general 1</h2><p class=\"ds-plaque__detail\">Ensayo · martes, 27 de octubre, 19:30 · Local social</p></div><button class=\"ds-plaque__btn\">Ver convocatoria</button></section>",
+      "css": ".ds-plaque{display:grid;grid-template-columns:1fr auto;gap:12px 24px;align-items:end;padding:24px 32px;border-radius:var(--radius-lg,10px);background:var(--plaque-bg,#23408E);color:var(--plaque-text,#FFFFFF);outline:1.5px solid var(--plaque-rule,#F3F5F8);outline-offset:-6px;font-family:Archivo,system-ui,sans-serif;}.ds-plaque__title{margin:0;font-size:clamp(1.5rem,2.4vw,2rem);font-weight:800;font-stretch:80%;line-height:1.05;color:inherit;}.ds-plaque__detail{margin:8px 0 0;color:var(--plaque-text-muted,#C9D4F2);font-size:14px;line-height:1.5;}.ds-plaque__btn{font-family:inherit;font-size:14px;font-weight:700;border:0;border-radius:var(--radius-md,6px);padding:8px 16px;min-height:38px;background:var(--glaze,#F3F5F8);color:var(--cobalt-900,#16275E);cursor:pointer;}.ds-plaque__btn:hover{background:#fff;color:var(--cobalt-900,#16275E);}.ds-plaque :focus-visible{outline:2px solid var(--ochre,#D9A21B);outline-offset:2px;}"
+    },
+    {
+      "name": "Week Tiles",
+      "kind": "custom",
+      "refersTo": "week-tile-rehearsal",
+      "description": "The week as glazed squares. One enamel per event type, plus the empty tile.",
+      "html": "<div class=\"ds-week\"><ol class=\"ds-week__row\"><li class=\"ds-tile\"><span>sáb</span><span class=\"ds-tile__day\">24</span></li><li class=\"ds-tile ds-tile-rehearsal ds-tile-today\"><span>mar</span><span class=\"ds-tile__day\">27</span><strong>Ensayo</strong></li><li class=\"ds-tile ds-tile-performance\"><span>vie</span><span class=\"ds-tile__day\">30</span><strong>Actuación</strong></li><li class=\"ds-tile ds-tile-meeting\"><span>lun</span><span class=\"ds-tile__day\">2</span><strong>Reunión</strong></li><li class=\"ds-tile ds-tile-school\"><span>mié</span><span class=\"ds-tile__day\">4</span><strong>Escuela</strong></li></ol><p class=\"ds-week__legend\"><span class=\"ds-swatch ds-swatch-rehearsal\">Ensayo</span><span class=\"ds-swatch ds-swatch-performance\">Actuación</span><span class=\"ds-swatch ds-swatch-meeting\">Reunión</span><span class=\"ds-swatch ds-swatch-school\">Escuela</span></p></div>",
+      "css": ".ds-week{font-family:Archivo,system-ui,sans-serif;max-width:520px;}.ds-week__row{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;}.ds-tile{aspect-ratio:1;display:flex;flex-direction:column;justify-content:space-between;padding:8px;border-radius:var(--radius-md,6px);background:var(--tile-empty,#ECEEF3);color:var(--text-muted,#545D73);font-size:12px;line-height:1.2;}.ds-tile span{font-weight:600;}.ds-tile strong{font-size:14px;font-weight:800;font-stretch:87.5%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}.ds-tile__day{font-size:22px;font-weight:800;font-stretch:87.5%;font-variant-numeric:tabular-nums;color:var(--text-strong,#141A2E);}.ds-tile-rehearsal{background:var(--tile-rehearsal,#23408E);color:#fff;}.ds-tile-performance{background:var(--tile-performance,#D9A21B);color:var(--tile-performance-text,#241900);}.ds-tile-meeting{background:var(--tile-meeting,#2F7D5B);color:#fff;}.ds-tile-school{background:var(--tile-school,#6B3F69);color:#fff;}.ds-tile-rehearsal .ds-tile__day,.ds-tile-performance .ds-tile__day,.ds-tile-meeting .ds-tile__day,.ds-tile-school .ds-tile__day{color:inherit;}.ds-tile-today{box-shadow:inset 0 0 0 2px var(--text-strong,#141A2E);}.ds-week__legend{display:flex;flex-wrap:wrap;gap:16px;margin:12px 0 0;font-size:12px;color:var(--text-muted,#545D73);}.ds-swatch::before{content:'';display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px;}.ds-swatch-rehearsal::before{background:var(--tile-rehearsal,#23408E);}.ds-swatch-performance::before{background:var(--tile-performance,#D9A21B);}.ds-swatch-meeting::before{background:var(--tile-meeting,#2F7D5B);}.ds-swatch-school::before{background:var(--tile-school,#6B3F69);}"
+    },
+    {
+      "name": "Stat",
+      "kind": "card",
+      "refersTo": "stat",
+      "description": "A tabular figure on a flat card. Warning hints use ochre strong text and an ochre square.",
+      "html": "<article class=\"ds-stat\"><p class=\"ds-stat__label\">Cuotas pendientes</p><p class=\"ds-stat__value\">900,00 €</p><p class=\"ds-stat__hint\">15 recibos por cobrar</p></article>",
+      "css": ".ds-stat{background:var(--card,#FFFFFF);color:var(--card-foreground,#141A2E);border:1px solid var(--border-color,#DCDFE6);border-radius:var(--radius-lg,10px);padding:16px 20px;font-family:Archivo,system-ui,sans-serif;}.ds-stat__label{margin:0;font-size:12px;font-weight:600;color:var(--text-muted,#545D73);}.ds-stat__value{margin:8px 0 0;font-size:32px;font-weight:700;font-stretch:87.5%;letter-spacing:-.01em;line-height:1.1;font-variant-numeric:tabular-nums;}.ds-stat__hint{margin:4px 0 0;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--warning-strong,#8F6300);}.ds-stat__hint::before{content:'';width:8px;height:8px;border-radius:2px;background:var(--warning,#D9A21B);}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Azulejo y placa esmaltada",
+    "overview": "Solfeamos is the seat of a Spanish community wind band, rendered as glazed tile and enamel plaque. The page is cold white glaze. The rail is deep cobalt. White cards sit on that glaze with a 1px edge. When a screen has one fact the board or the musician must read first, that fact is a cobalt plaque with a light inner fillet. Inicio is the reference composition: a page title, the next-call plaque (\"Ver convocatoria\"), a row of figures, the week as seven tiles, and a \"Pendiente\" card.\n\nThe interface is dense enough for a volunteer board at a desk and direct enough for a musician on a phone. Color is flat enamel. Each enamel has one semantic job, and the agenda reuses those same enamels for event types. Archivo is the only text family; a width axis tightens titles and plaques, and figures that scan (money, dates, counts) are tabular. Confirmed rejections: the generic grey SaaS panel with a single blue accent, and musical-notation folklore (staff lines, clefs) as chrome.\n\nTwo facts stay open. The exact Solfeamos brand palette is not documented in this repo; the enamels below are the shipped interface, and they are not a logo specification. The platform logo is uploaded from the global panel and served from the brand API; until a logo is set, the mark is an S on a small plaque. Per-band colour templates are a confirmed requirement and are not built. No tenant palette ships. The planned seam, when that work is done, is the sidebar and plaque tokens only (`--sidebar-bg`, `--sidebar-active`, `--sidebar-panel`, `--sidebar-text`, `--plaque-bg`, `--plaque-text`, `--plaque-rule`, and the wordmark fillet).",
+    "keyCharacteristics": [
+      "Cobalt rail and cobalt plaque on a cold glaze ground",
+      "One enamel, one job, reused as the agenda tile color",
+      "Archivo width axis: 87.5% for titles, 80% for plaques, 100% for UI text",
+      "Tabular figures for money, dates, counts, and day numbers",
+      "Flat color, 1px edges, inner fillet on plaques",
+      "8px module with 4px half-steps",
+      "Light and dark themes that keep the same enamel jobs",
+      "WCAG 2.2 AA as the target: visible focus, keyboard path, reduced motion, 44px primary targets on narrow screens"
+    ],
+    "rules": [
+      {
+        "name": "The Enamel Legend Rule",
+        "body": "Cobalt navigates and is the primary action. Ochre asks for attention and marks what is pending. Copper green means confirmed or paid. Manganese is school. Red is critical. Agenda tiles reuse those enamels for rehearsal, performance, meeting, and school. They do not introduce a new hue.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ochre Field Rule",
+        "body": "Ochre is a field, never small text. Ochre on white is about 2.3:1. Text on solid ochre uses Ochre Field Ink. New attention UI uses the warning role so dark theme can retint it. The rail count still paints the unthemed `--ochre` primitive; that split is drift, and new counts should follow the warning role.",
+        "section": "colors"
+      },
+      {
+        "name": "The Dark Button Rule",
+        "body": "In dark, links and primary text use Nocturnal Cobalt Text. Primary buttons stay a saturated cobalt field with white text. A light-blue button on the night ground is the wrong cobalt.",
+        "section": "colors"
+      },
+      {
+        "name": "The Width Axis Rule",
+        "body": "Page titles, second-level headings, card titles, stat values, and the wordmark use Archivo at 87.5% width. Plaque titles and the sign-in headline use 80%. Body, labels, fields, and buttons stay at 100%.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Money, dates, counts, day numbers, rail counts, and numeric table columns use `tabular-nums`. A changing figure keeps its place.",
+        "section": "typography"
+      },
+      {
+        "name": "The Eight-Pixel Module Rule",
+        "body": "New structural space uses the module: 4, 8, 12, 16, 20, 24, 32, 40, 48. A few dense controls already use 6px, 7px, or 10px. Those local adjustments are not a second rhythm.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Enamel Rule",
+        "body": "Cards, the page, and the plaque rest flat. A drop shadow means the layer is floating (menu, dialog, toast, command palette, mobile drawer) or it is the selected segment's hairline lift. Gradients do not ship.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Inner Fillet Rule",
+        "body": "A plaque, a module mark, and the wordmark S carry a 1.5px inner fillet. That fillet is an outline with a negative offset, in glaze (light) or Plaque Mist (dark). A second border around the plaque is a different object.",
+        "section": "shapes"
+      }
+    ],
+    "dos": [
+      "**Do** give cobalt the navigation, the primary button, the link, the rehearsal tile, and the plaque.",
+      "**Do** use ochre for pending and warning, copper green for confirmed and paid, manganese for school, and red for destructive and overdue.",
+      "**Do** set Archivo to 87.5% width on titles and 80% on plaques, and keep UI text at 100%.",
+      "**Do** set tabular figures on money, dates, counts, day numbers, and numeric columns.",
+      "**Do** keep resting cards flat, with a 1px edge and a 10px corner.",
+      "**Do** draw the plaque fillet at 1.5px, inside the edge.",
+      "**Do** show a 2px focus ring: cobalt on light surfaces, ochre on the rail and the plaque.",
+      "**Do** grow primary buttons, fields, and segmented controls to 44px below 768px, and honor `prefers-reduced-motion` by dropping transitions, the press scale, and entrance motion.",
+      "**Do** write interface copy in Spanish of Spain, in the band's own vocabulary (socios, convocatoria, junta, ensayo).",
+      "**Do** treat sidebar and plaque tokens as the future per-band seam. They are not a theming API today."
+    ],
+    "donts": [
+      "**Don't** set ochre, copper, manganese, or red as a second primary, and don't set ochre as small text on white.",
+      "**Don't** put a status chip on the plaque. The plaque resets chips to white at 14%, and the enamel is lost.",
+      "**Don't** add gradients, glass, staff lines, or clefs. The material is flat enamel.",
+      "**Don't** put a drop shadow on a resting card, plaque, or page. Shadow is for floating layers and the selected segment.",
+      "**Don't** introduce an 8px or 12px corner. The corners in use are 4, 6, and 10px, plus the full pill. `--radius` (0.5rem) and `--radius-xl` (12px) are declared and unused.",
+      "**Don't** add 13px to the type scale. Small buttons already use it; the scale is 11, 12, 14, 15, 18, 20, 24, and 32px.",
+      "**Don't** treat this palette as the official Solfeamos logo colors. Those values are not in the repo.",
+      "**Don't** recolor the rail or the plaque per band until the template work exists. Inventing a tenant theme now skips the planned seam.",
+      "**Don't** paint dark primary buttons with Nocturnal Cobalt Text. That hex is for text and links. Buttons use Nocturnal Button Cobalt and white.",
+      "**Don't** lighten the dark meeting tile above `#2B7A57`: white labels on it hold about 5.2:1, and lighter greens drop below 4.5:1."
+    ]
+  }
+}

@@ -15,7 +15,6 @@ export function AuthLayout({ title, lead, children }: { title: string; lead?: st
           <BrandMark />
         </Link>
         <div className="auth__copy">
-          <p className="auth__kicker">Para bandas de música</p>
           <p className="auth__headline">Toda tu banda, en un solo panel.</p>
           <p className="auth__lead">Archivo, ensayos, socios, tesorería y escuela. Cada banda trabaja con sus datos, separados del resto.</p>
           <ul className="auth__points">
@@ -24,20 +23,22 @@ export function AuthLayout({ title, lead, children }: { title: string; lead?: st
             <li>La marca de tu banda en la aplicación y en los documentos</li>
           </ul>
         </div>
-        <div className="auth__preview" aria-hidden="true">
-          <div>
-            <strong>42</strong>
-            <span>Socios activos</span>
-          </div>
-          <div>
-            <strong>91 %</strong>
-            <span>Asistencia</span>
-          </div>
-          <div>
-            <strong>186</strong>
-            <span>Obras</span>
-          </div>
-        </div>
+        <ol className="auth__preview week-tiles" aria-hidden="true">
+          {[
+            ['Lun', ''],
+            ['Mar', 'Ensayo'],
+            ['Mié', 'Escuela'],
+            ['Jue', 'Ensayo'],
+            ['Vie', ''],
+            ['Sáb', 'Pasacalle'],
+            ['Dom', 'Procesión'],
+          ].map(([day, what]) => (
+            <li key={day} className={`week-tile${what === 'Ensayo' ? ' week-tile--REHEARSAL' : what === 'Escuela' ? ' week-tile--SCHOOL' : what ? ' week-tile--PERFORMANCE' : ''}`}>
+              <span>{day}</span>
+              <strong>{what}</strong>
+            </li>
+          ))}
+        </ol>
       </aside>
       <main id="main" className="auth__panel">
         <div className="auth__card card">

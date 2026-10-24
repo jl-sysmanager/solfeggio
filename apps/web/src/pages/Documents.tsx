@@ -58,7 +58,7 @@ export default function DocumentsPage() {
     <Page
       header={
         <PageHeader
-          eyebrow="Secretaría"
+          eyebrow="Gestión"
           title="Documentos"
           description="Actas, estatutos, contratos y documentación de la banda. Almacenamiento privado y cifrado."
           actions={can('documents:write') && <Button onClick={() => setOpen(true)}>Subir documento</Button>}

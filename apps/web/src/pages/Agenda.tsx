@@ -51,7 +51,7 @@ export default function AgendaPage() {
             <ul className="list-plain list-divided">
               {groupByDay(q.data).map(([day, items]) => (
                 <li key={day} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap' }}>
-                  <div className="calendar-day" aria-hidden="true">
+                  <div className={`calendar-day calendar-day--${items.some((i) => i.kind === 'event') ? 'REHEARSAL' : items.some((i) => i.kind === 'fee_due') ? 'DUE' : 'OTHER'}`} aria-hidden="true">
                     <strong>{new Date(items[0].startsAt).getDate()}</strong>
                     <span>{new Date(items[0].startsAt).toLocaleDateString('es-ES', { weekday: 'short' })}</span>
                   </div>

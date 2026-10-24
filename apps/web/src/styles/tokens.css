@@ -1,46 +1,65 @@
-/* Tema inspirado en Breeze (github.com/lanternops/breeze, apps/web/src/styles/globals.css):
-   tokens estilo shadcn con superficies cálidas (no blanco puro), primario azul pizarra,
-   neutros con tinte cálido, semánticos de tonos distintos y radio de 0.5rem.
-   Valores HSL tomados de su :root y .dark. Tipografía: Plus Jakarta Sans. */
+/* Identidad de Solfeamos: azulejo vidriado y placa esmaltada de la sede de una sociedad musical.
+   Raíl en cobalto, fondo de esmalte blanco frío y una leyenda de esmaltes con un único trabajo cada uno:
+   cobalto navega y es la acción principal, ocre pide atención, verde confirma, manganeso es escuela y
+   rojo es crítico. Color plano, módulo de 8px. Tipografía: Archivo (eje de anchura para títulos y placas). */
 :root {
-  /* ── Paleta Breeze (claro) ─────────────────────────────── */
-  --background: hsl(220 20% 98%);
-  --foreground: hsl(224 28% 14%);
-  --card: hsl(220 20% 99%);
-  --card-foreground: hsl(224 28% 14%);
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(224 28% 14%);
-  --primary: hsl(225 62% 48%);
-  --primary-foreground: hsl(0 0% 100%);
-  --secondary: hsl(220 16% 94%);
-  --secondary-foreground: hsl(224 20% 18%);
-  --muted: hsl(220 16% 94%);
-  --muted-foreground: hsl(220 10% 46%);
-  --accent: hsl(220 20% 92%);
-  --accent-foreground: hsl(224 20% 18%);
-  --destructive: hsl(4 76% 44%);
-  --destructive-foreground: hsl(0 0% 100%);
-  --success: hsl(152 56% 37%);
-  --success-foreground: hsl(0 0% 100%);
-  --warning: hsl(36 88% 50%);
-  --warning-foreground: hsl(28 60% 16%);
-  --warning-strong: hsl(30 85% 38%);
-  --info: hsl(205 85% 38%);
-  --info-foreground: hsl(0 0% 100%);
-  --chart-neutral: hsl(220 12% 72%);
-  --border-color: hsl(220 16% 90%);
-  --input-color: hsl(220 16% 90%);
-  --ring: hsl(225 62% 48%);
-  --radius: 0.5rem;
-  /* Ajustes AA sobre Breeze: borde de campo ≥ 3:1 (WCAG 1.4.11; el de Breeze da 1.2:1) y
-     texto atenuado sobre fondo muted ≥ 4.5:1 (muted-foreground sobre muted da 4.2:1). */
-  --input-border-strong: hsl(220 10% 58%);
-  --muted-on-muted: hsl(220 12% 40%);
+  /* ── Esmaltes (claro) ─────────────────────────────────── */
+  --cobalt-950: #0E1A42;
+  --cobalt-900: #16275E;
+  --cobalt-800: #1C3577;
+  --cobalt-700: #23408E;
+  --cobalt-100: #E3E8F6;
+  --glaze: #F3F5F8;
+  --ochre: #D9A21B;
+  --ochre-ink: #5A3E00;
+  --copper: #2F7D5B;
+  --manganese: #6B3F69;
 
-  /* Tipografía (Breeze: Plus Jakarta Sans en toda la UI) */
-  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --background: var(--glaze);
+  --foreground: #141A2E;
+  --card: #FFFFFF;
+  --card-foreground: #141A2E;
+  --popover: #FFFFFF;
+  --popover-foreground: #141A2E;
+  --primary: var(--cobalt-700);
+  --primary-foreground: #FFFFFF;
+  --secondary: #ECEEF3;
+  --secondary-foreground: #1D2438;
+  --muted: #ECEEF3;
+  --muted-foreground: #545D73;
+  --accent: var(--cobalt-100);
+  --accent-foreground: var(--cobalt-900);
+  --destructive: #B42318;
+  --destructive-foreground: #FFFFFF;
+  --success: var(--copper);
+  --success-foreground: #FFFFFF;
+  --warning: var(--ochre);
+  --warning-foreground: var(--ochre-ink);
+  --warning-strong: #8F6300;
+  --info: var(--cobalt-700);
+  --info-foreground: #FFFFFF;
+  --school: var(--manganese);
+  --chart-neutral: #B9BFCC;
+  --border-color: #DCDFE6;
+  --input-color: #DCDFE6;
+  --ring: var(--cobalt-700);
+  --radius: 0.5rem;
+  /* Borde de campo ≥ 3:1 (WCAG 1.4.11) y texto atenuado sobre muted ≥ 4.5:1. */
+  --input-border-strong: #7D869B;
+  --muted-on-muted: #4A5268;
+
+  /* Placa esmaltada: campo cobalto con filete blanco interior */
+  --plaque-bg: var(--cobalt-700);
+  --plaque-text: #FFFFFF;
+  --plaque-text-muted: #C9D4F2;
+  --plaque-rule: var(--glaze);
+
+  /* Tipografía */
+  --font-sans: 'Archivo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-display: var(--font-sans);
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  --stretch-display: 87.5%;
+  --stretch-plaque: 80%;
   --text-2xs: 11px;
   --text-xs: 12px;
   --text-sm: 14px;
@@ -48,14 +67,15 @@
   --text-lg: 18px;
   --text-xl: 20px;
   --text-2xl: 24px;
-  --text-3xl: 24px;
+  --text-3xl: 32px;
   --leading-body: 1.5;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
   --weight-bold: 700;
+  --weight-heavy: 800;
 
-  /* Espaciado (escala Tailwind) */
+  /* Espaciado (módulo de azulejo de 8px, con medios pasos de 4px) */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -66,35 +86,35 @@
   --space-10: 40px;
   --space-12: 48px;
 
-  /* Layout (Breeze: sidebar w-64, header h-16, main p-6) */
-  --sidebar-width: 256px;
+  /* Layout */
+  --sidebar-width: 248px;
   --topbar-height: 64px;
   --page-max-width: 1440px;
   --section-gap: var(--space-6);
-  --card-padding: var(--space-6);
+  --card-padding: var(--space-5);
   --element-gap: var(--space-4);
 
-  /* Radios: lg = --radius, md = -2px, sm = -4px */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: var(--radius);
+  /* Radios */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
   --radius-full: 9999px;
 
-  /* Sombras (Tailwind: shadow-sm / shadow-lg) */
-  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  /* Sombras: sólo superficies flotantes (menús, diálogos, avisos) */
+  --shadow-sm: 0 1px 2px 0 rgb(14 26 66 / 0.06);
+  --shadow-md: 0 4px 10px -2px rgb(14 26 66 / 0.12);
+  --shadow-lg: 0 16px 32px -8px rgb(14 26 66 / 0.22), 0 2px 6px rgb(14 26 66 / 0.08);
 
   /* Movimiento */
-  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
   --duration-short: 150ms;
   --duration-medium: 200ms;
 
   /* ── Roles de la aplicación (los consumen los componentes) ── */
   --bg: var(--background);
   --surface: var(--card);
-  --surface-alt: color-mix(in srgb, var(--muted) 30%, var(--card));
+  --surface-alt: #F8F9FB;
   --surface-hover: color-mix(in srgb, var(--muted) 60%, transparent);
   --text: var(--foreground);
   --text-strong: var(--foreground);
@@ -107,52 +127,65 @@
   --focus: var(--ring);
   --btn-bg: var(--primary);
   --btn-text: var(--primary-foreground);
-  --btn-hover: color-mix(in srgb, var(--primary) 90%, black);
+  --btn-hover: var(--cobalt-800);
   --pill-active-bg: var(--primary);
   --pill-active-text: var(--primary-foreground);
   --danger: var(--destructive);
   --chart-bar: var(--primary);
   --chart-bar-alt: var(--chart-neutral);
+  --selection: color-mix(in srgb, var(--ochre) 35%, transparent);
 
-  /* Barra lateral (Breeze: bg-card + border-r, activo = bg-primary) */
-  --sidebar-bg: var(--card);
-  --sidebar-text: var(--muted-foreground);
-  --sidebar-text-active: var(--primary-foreground);
-  --sidebar-hover: var(--muted);
-  --sidebar-active: var(--primary);
-  --sidebar-label: var(--muted-foreground);
-  --sidebar-border: var(--border-color);
+  /* Raíl de navegación: cobalto vidriado en ambos temas */
+  --sidebar-bg: var(--cobalt-900);
+  --sidebar-text: #C9D3F0;
+  --sidebar-text-strong: #FFFFFF;
+  --sidebar-text-active: var(--cobalt-900);
+  --sidebar-hover: rgb(255 255 255 / 0.08);
+  --sidebar-active: var(--glaze);
+  --sidebar-label: #93A5D8;
+  --sidebar-border: rgb(255 255 255 / 0.1);
+  --sidebar-panel: var(--cobalt-800);
 
-  /* Estados (insignias tintadas: tono/10 de fondo + texto del tono) */
+  /* Estados (insignias tintadas: tono suave de fondo + texto del tono) */
   --tint-blue: color-mix(in srgb, var(--primary) 6%, var(--card));
-  --tint-green: color-mix(in srgb, var(--success) 6%, var(--card));
-  --tint-amber: color-mix(in srgb, var(--warning) 8%, var(--card));
-  --chip-neutral: color-mix(in srgb, var(--muted) 50%, transparent);
-  --chip-neutral-text: var(--muted-foreground);
-  --chip-info: color-mix(in srgb, var(--info) 10%, transparent);
-  --chip-info-text: var(--info);
-  --chip-success: color-mix(in srgb, var(--success) 10%, transparent);
-  --chip-success-text: color-mix(in srgb, var(--success) 75%, black);
-  --chip-warning: color-mix(in srgb, var(--warning) 15%, transparent);
-  --chip-warning-text: var(--warning-foreground);
-  --chip-danger: color-mix(in srgb, var(--destructive) 10%, transparent);
-  --chip-danger-text: var(--destructive);
+  --tint-green: color-mix(in srgb, var(--success) 7%, var(--card));
+  --tint-amber: color-mix(in srgb, var(--warning) 10%, var(--card));
+  --chip-neutral: var(--muted);
+  --chip-neutral-text: var(--muted-on-muted);
+  --chip-info: var(--cobalt-100);
+  --chip-info-text: var(--cobalt-800);
+  --chip-success: #DCEFE5;
+  --chip-success-text: #1F5A40;
+  --chip-warning: #FBEFCF;
+  --chip-warning-text: #6E4C00;
+  --chip-danger: #FBE1DE;
+  --chip-danger-text: #9B1C12;
+  --chip-school: #EFE3EE;
+  --chip-school-text: #5A3358;
   --delta-up-bg: var(--chip-success);
   --delta-up-text: var(--chip-success-text);
   --delta-down-bg: var(--chip-danger);
   --delta-down-text: var(--chip-danger-text);
 
-  /* Recuadros de icono (Breeze PageHeader: bg-muted text-muted-foreground) */
-  --icon-blue-bg: color-mix(in srgb, var(--primary) 10%, transparent);
-  --icon-blue: var(--primary);
-  --icon-green-bg: color-mix(in srgb, var(--success) 10%, transparent);
+  /* Recuadros de icono */
+  --icon-blue-bg: var(--cobalt-100);
+  --icon-blue: var(--cobalt-700);
+  --icon-green-bg: var(--chip-success);
   --icon-green: var(--chip-success-text);
-  --icon-amber-bg: color-mix(in srgb, var(--warning) 15%, transparent);
+  --icon-amber-bg: var(--chip-warning);
   --icon-amber: var(--warning-strong);
-  --icon-red-bg: color-mix(in srgb, var(--destructive) 10%, transparent);
+  --icon-red-bg: var(--chip-danger);
   --icon-red: var(--destructive);
   --icon-slate-bg: var(--muted);
   --icon-slate: var(--muted-foreground);
+
+  /* Azulejos de la agenda (un esmalte por tipo de evento) */
+  --tile-rehearsal: var(--cobalt-700);
+  --tile-performance: var(--ochre);
+  --tile-performance-text: #241900;
+  --tile-meeting: var(--copper);
+  --tile-school: var(--manganese);
+  --tile-empty: #ECEEF3;
 
   /* Compatibilidad con estilos en línea existentes */
   --blue-600: var(--primary);
@@ -160,77 +193,129 @@
   color-scheme: light;
 }
 
-/* Tema oscuro de Breeze (.dark) */
+/* Tema oscuro: esmalte nocturno, mismo raíl cobalto más profundo */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --background: hsl(224 28% 7%);
-    --foreground: hsl(220 15% 92%);
-    --card: hsl(224 24% 10%);
-    --card-foreground: hsl(220 15% 92%);
-    --popover: hsl(224 24% 10%);
-    --popover-foreground: hsl(220 15% 92%);
-    --primary: hsl(225 70% 62%);
-    --primary-foreground: hsl(224 28% 7%);
-    --secondary: hsl(224 18% 16%);
-    --secondary-foreground: hsl(220 15% 92%);
-    --muted: hsl(224 18% 16%);
-    --muted-foreground: hsl(220 12% 58%);
-    --accent: hsl(224 18% 18%);
-    --accent-foreground: hsl(220 15% 92%);
-    --destructive: hsl(4 80% 64%);
-    --destructive-foreground: hsl(224 28% 7%);
-    --success: hsl(152 52% 44%);
-    --success-foreground: hsl(152 50% 8%);
-    --warning: hsl(40 90% 52%);
-    --warning-foreground: hsl(28 60% 10%);
-    --warning-strong: hsl(40 90% 52%);
-    --info: hsl(205 80% 62%);
-    --info-foreground: hsl(210 60% 10%);
-    --chart-neutral: hsl(224 14% 34%);
-    --border-color: hsl(224 18% 18%);
-    --input-color: hsl(224 18% 18%);
-    --ring: hsl(225 70% 62%);
-    --input-border-strong: hsl(224 12% 40%);
-    --muted-on-muted: hsl(220 12% 58%);
-    --btn-hover: color-mix(in srgb, var(--primary) 88%, white);
-    --chip-success-text: var(--success);
-    --chip-warning-text: var(--warning);
+    --background: #0C1124;
+    --foreground: #E6E9F2;
+    --card: #131A31;
+    --card-foreground: #E6E9F2;
+    --popover: #182039;
+    --popover-foreground: #E6E9F2;
+    --primary: #8FA8F0;
+    --primary-foreground: #0C1124;
+    --secondary: #1D2642;
+    --secondary-foreground: #E6E9F2;
+    --muted: #1D2642;
+    --muted-foreground: #9DA6BF;
+    --accent: #23305A;
+    --accent-foreground: #E6E9F2;
+    --destructive: #F0877C;
+    --destructive-foreground: #0C1124;
+    --success: #5CC195;
+    --success-foreground: #04140D;
+    --warning: #E7B53E;
+    --warning-foreground: #2A1D00;
+    --warning-strong: #E7B53E;
+    --info: #8FA8F0;
+    --info-foreground: #0C1124;
+    --school: #C99BC6;
+    --chart-neutral: #3A4466;
+    --border-color: #262F4D;
+    --input-color: #262F4D;
+    --ring: #8FA8F0;
+    --input-border-strong: #5F6A8A;
+    --muted-on-muted: #A9B1C8;
+    --plaque-bg: #23408E;
+    --plaque-rule: #C9D4F2;
+    --surface-alt: #10162B;
+    --btn-bg: #3557C0;
+    --btn-text: #FFFFFF;
+    --btn-hover: #2D4AA8;
+    --sidebar-bg: #13225A;
+    --sidebar-active: #23408E;
+    --sidebar-text-active: #FFFFFF;
+    --sidebar-panel: #1B2D6E;
+    --chip-info: #1E2A52;
+    --chip-info-text: #B8C7F5;
+    --chip-success: #11301F;
+    --chip-success-text: #7FD6AE;
+    --chip-warning: #33270A;
+    --chip-warning-text: #F0C866;
+    --chip-danger: #3A1714;
+    --chip-danger-text: #F5A29A;
+    --chip-school: #2E1D2D;
+    --chip-school-text: #DDB6DA;
+    --icon-blue-bg: #1E2A52;
+    --icon-blue: #B8C7F5;
+    --tile-rehearsal: #2D4FA8;
+    --tile-performance: #E7B53E;
+    --tile-meeting: #2B7A57;
+    --tile-school: #8A5587;
+    --tile-empty: #1A223D;
+    --shadow-lg: 0 16px 32px -8px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
     color-scheme: dark;
   }
 }
 
 :root[data-theme='dark'] {
-  --background: hsl(224 28% 7%);
-  --foreground: hsl(220 15% 92%);
-  --card: hsl(224 24% 10%);
-  --card-foreground: hsl(220 15% 92%);
-  --popover: hsl(224 24% 10%);
-  --popover-foreground: hsl(220 15% 92%);
-  --primary: hsl(225 70% 62%);
-  --primary-foreground: hsl(224 28% 7%);
-  --secondary: hsl(224 18% 16%);
-  --secondary-foreground: hsl(220 15% 92%);
-  --muted: hsl(224 18% 16%);
-  --muted-foreground: hsl(220 12% 58%);
-  --accent: hsl(224 18% 18%);
-  --accent-foreground: hsl(220 15% 92%);
-  --destructive: hsl(4 80% 64%);
-  --destructive-foreground: hsl(224 28% 7%);
-  --success: hsl(152 52% 44%);
-  --success-foreground: hsl(152 50% 8%);
-  --warning: hsl(40 90% 52%);
-  --warning-foreground: hsl(28 60% 10%);
-  --warning-strong: hsl(40 90% 52%);
-  --info: hsl(205 80% 62%);
-  --info-foreground: hsl(210 60% 10%);
-  --chart-neutral: hsl(224 14% 34%);
-  --border-color: hsl(224 18% 18%);
-  --input-color: hsl(224 18% 18%);
-  --ring: hsl(225 70% 62%);
-  --input-border-strong: hsl(224 12% 40%);
-  --muted-on-muted: hsl(220 12% 58%);
-  --btn-hover: color-mix(in srgb, var(--primary) 88%, white);
-  --chip-success-text: var(--success);
-  --chip-warning-text: var(--warning);
+  --background: #0C1124;
+  --foreground: #E6E9F2;
+  --card: #131A31;
+  --card-foreground: #E6E9F2;
+  --popover: #182039;
+  --popover-foreground: #E6E9F2;
+  --primary: #8FA8F0;
+  --primary-foreground: #0C1124;
+  --secondary: #1D2642;
+  --secondary-foreground: #E6E9F2;
+  --muted: #1D2642;
+  --muted-foreground: #9DA6BF;
+  --accent: #23305A;
+  --accent-foreground: #E6E9F2;
+  --destructive: #F0877C;
+  --destructive-foreground: #0C1124;
+  --success: #5CC195;
+  --success-foreground: #04140D;
+  --warning: #E7B53E;
+  --warning-foreground: #2A1D00;
+  --warning-strong: #E7B53E;
+  --info: #8FA8F0;
+  --info-foreground: #0C1124;
+  --school: #C99BC6;
+  --chart-neutral: #3A4466;
+  --border-color: #262F4D;
+  --input-color: #262F4D;
+  --ring: #8FA8F0;
+  --input-border-strong: #5F6A8A;
+  --muted-on-muted: #A9B1C8;
+  --plaque-bg: #23408E;
+  --plaque-rule: #C9D4F2;
+  --surface-alt: #10162B;
+  --btn-bg: #3557C0;
+  --btn-text: #FFFFFF;
+  --btn-hover: #2D4AA8;
+  --sidebar-bg: #13225A;
+  --sidebar-active: #23408E;
+  --sidebar-text-active: #FFFFFF;
+  --sidebar-panel: #1B2D6E;
+  --chip-info: #1E2A52;
+  --chip-info-text: #B8C7F5;
+  --chip-success: #11301F;
+  --chip-success-text: #7FD6AE;
+  --chip-warning: #33270A;
+  --chip-warning-text: #F0C866;
+  --chip-danger: #3A1714;
+  --chip-danger-text: #F5A29A;
+  --chip-school: #2E1D2D;
+  --chip-school-text: #DDB6DA;
+  --icon-blue-bg: #1E2A52;
+  --icon-blue: #B8C7F5;
+  --tile-rehearsal: #2D4FA8;
+  --tile-performance: #E7B53E;
+  --tile-meeting: #2B7A57;
+  --tile-school: #8A5587;
+  --tile-empty: #1A223D;
+  --shadow-lg: 0 16px 32px -8px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.3);
   color-scheme: dark;
 }

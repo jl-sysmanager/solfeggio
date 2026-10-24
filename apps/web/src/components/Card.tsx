@@ -37,10 +37,13 @@ export function StatCard({
   meter,
   icon,
   iconColor = 'blue',
+  hintTone,
 }: {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
+  /** Color de leyenda del texto de apoyo: ocre pide atención, verde confirma. */
+  hintTone?: 'warning' | 'success';
   tone?: CardProps['tone'];
   meter?: number;
   /** Icono en círculo de color, alineado a la derecha (metric card de DESIGN.md). */
@@ -63,7 +66,7 @@ export function StatCard({
           <div className="meter__fill" style={{ width: `${Math.min(100, Math.max(0, meter * 100))}%` }} />
         </div>
       )}
-      {hint && <p className="stat__hint">{hint}</p>}
+      {hint && <p className={hintTone ? `stat__hint stat__hint--${hintTone}` : 'stat__hint'}>{hint}</p>}
     </div>
   );
 }
