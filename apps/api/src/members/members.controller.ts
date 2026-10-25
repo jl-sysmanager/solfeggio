@@ -1,6 +1,7 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, Patch, Post, Put, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Member, Prisma } from '@prisma/client';
+import type { Request } from 'express';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, RequireFeature } from '../auth/decorators';
@@ -11,6 +12,8 @@ import { idParam, isoDate, optionalText, toDate } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
 import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
+import { logoFileName, readLogo } from '../platform/logo';
+import { Storage } from '../storage/storage.service';
 import { LimitsService } from '../tenancy/limits.service';
 
 const memberFields = z.object({
@@ -42,22 +45,49 @@ const listQuery = pageQuery.extend({
   q: z.string().trim().max(100).optional(),
   status: z.enum(['ACTIVE', 'INACTIVE', 'LEFT']).optional(),
   sectionId: z.string().uuid().optional(),
+  /** all = todos los socios; users = con acceso a la app; members_only = ficha sin usuario. */
+  access: z.enum(['all', 'users', 'members_only']).default('all'),
 });
 const leaveSchema = z.object({ date: isoDate, reason: z.string().trim().max(500).optional() });
 const sizesSchema = z.array(z.object({ garment: z.string().trim().min(1).max(60), size: z.string().trim().min(1).max(20) })).max(30);
 const sectionSchema = z.object({ name: z.string().trim().min(1).max(60), position: z.number().int().min(0).max(999).optional() });
 
-type MemberWithSection = Member & { section?: { id: string; name: string } | null };
+const membershipAccessSelect = {
+  id: true,
+  status: true,
+  role: { select: { id: true, key: true, name: true } },
+  user: { select: { id: true, name: true, email: true, mfaEnabled: true } },
+} as const;
 
-/** Nunca devolvemos las columnas cifradas; los datos sensibles sólo con permiso explícito. */
+type MemberWithSection = Member & {
+  section?: { id: string; name: string } | null;
+  membership?: {
+    id: string;
+    status: string;
+    role: { id: string; key: string; name: string };
+    user: { id: string; name: string; email: string; mfaEnabled: boolean };
+  } | null;
+};
+
+/** Nunca devolvemos las columnas cifradas ni las claves S3; los datos sensibles sólo con permiso explícito. */
 export function serializeMember(m: MemberWithSection, ctx: RequestContext) {
-  const { nationalIdEnc, ...rest } = m;
+  const { nationalIdEnc, photoKey, photoMime: _mime, membership, ...rest } = m;
   const sensitive = ctx.permissions.has('members:sensitive');
   return {
     ...rest,
     nationalId: sensitive ? decrypt(nationalIdEnc) : undefined,
     hasNationalId: !!nationalIdEnc,
+    hasPhoto: !!photoKey,
+    access: membership
+      ? { kind: 'user' as const, membershipId: membership.id, status: membership.status, role: membership.role, user: membership.user }
+      : { kind: 'member_only' as const },
+    _photoKey: photoKey,
   };
+}
+
+async function withPhotoUrl<T extends { _photoKey?: string | null; hasPhoto: boolean }>(row: T, storage: Storage) {
+  const { _photoKey, ...rest } = row;
+  return { ...rest, photoUrl: _photoKey ? await storage.viewUrl(_photoKey) : null };
 }
 
 function toData(body: z.infer<typeof memberPatch>): Prisma.MemberUncheckedUpdateInput {
@@ -84,6 +114,7 @@ export class MembersController {
     private readonly db: Db,
     private readonly audit: Audit,
     private readonly limits: LimitsService,
+    private readonly storage: Storage,
   ) {}
 
   @Perm('members:read')
@@ -91,6 +122,8 @@ export class MembersController {
   list(@Ctx() ctx: RequestContext, @Query(zod(listQuery)) q: z.infer<typeof listQuery>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const where: Prisma.MemberWhereInput = { status: q.status, sectionId: q.sectionId };
+      if (q.access === 'users') where.membership = { isNot: null };
+      if (q.access === 'members_only') where.membership = { is: null };
       if (q.q) {
         // Búsqueda sin distinguir tildes ni mayúsculas («garcia» encuentra «García»).
         const like = `%${q.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
@@ -100,11 +133,13 @@ export class MembersController {
              OR "memberNumber"::text = ${q.q}`;
         where.id = { in: rows.map((r) => r.id) };
       }
+      const include = { section: { select: { id: true, name: true } }, membership: { select: membershipAccessSelect } };
       const [data, total] = await Promise.all([
-        tx.member.findMany({ where, include: { section: { select: { id: true, name: true } } }, orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }], ...skipTake(q) }),
+        tx.member.findMany({ where, include, orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }], ...skipTake(q) }),
         tx.member.count({ where }),
       ]);
-      return page(data.map((m) => serializeMember(m, ctx)), total, q);
+      const rows = await Promise.all(data.map((m) => withPhotoUrl(serializeMember(m, ctx), this.storage)));
+      return page(rows, total, q);
     });
   }
 
@@ -119,7 +154,7 @@ export class MembersController {
         include: { section: { select: { id: true, name: true } } },
       });
       await this.audit.log(tx, ctx, 'member.created', 'member', member.id, changedFields(body));
-      return serializeMember(member, ctx);
+      return withPhotoUrl(serializeMember(member, ctx), this.storage);
     });
   }
 
@@ -132,6 +167,7 @@ export class MembersController {
           where: { id },
           include: {
             section: { select: { id: true, name: true } },
+            membership: { select: membershipAccessSelect },
             sizes: true,
             uniformLoans: { where: { returnedAt: null }, include: { item: true } },
             instrumentLoans: { where: { endAt: null }, include: { instrument: true } },
@@ -140,7 +176,18 @@ export class MembersController {
         'Socio',
       );
       const attendance = await tx.attendance.groupBy({ by: ['status'], where: { memberId: id }, _count: true });
-      return { ...serializeMember(m, ctx), attendanceSummary: Object.fromEntries(attendance.map((a) => [a.status, a._count])) };
+      const pendingInvite = m.membership
+        ? null
+        : await tx.invitation.findFirst({
+            where: { memberId: id, acceptedAt: null, expiresAt: { gt: new Date() } },
+            select: { id: true, email: true, roleId: true, expiresAt: true, createdAt: true },
+            orderBy: { createdAt: 'desc' },
+          });
+      return {
+        ...(await withPhotoUrl(serializeMember(m, ctx), this.storage)),
+        attendanceSummary: Object.fromEntries(attendance.map((a) => [a.status, a._count])),
+        pendingInvite,
+      };
     });
   }
 
@@ -153,9 +200,13 @@ export class MembersController {
       if (body.nationalId !== undefined && !ctx.permissions.has('members:sensitive')) {
         throw new BadRequestException({ message: 'No puedes modificar datos sensibles', code: 'FORBIDDEN' });
       }
-      const updated = await tx.member.update({ where: { id }, data: toData(body), include: { section: { select: { id: true, name: true } } } });
+      const updated = await tx.member.update({
+        where: { id },
+        data: toData(body),
+        include: { section: { select: { id: true, name: true } }, membership: { select: membershipAccessSelect } },
+      });
       await this.audit.log(tx, ctx, 'member.updated', 'member', id, changedFields(body));
-      return serializeMember(updated, ctx);
+      return withPhotoUrl(serializeMember(updated, ctx), this.storage);
     });
   }
 
@@ -164,9 +215,13 @@ export class MembersController {
   leave(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(leaveSchema)) body: z.infer<typeof leaveSchema>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       found(await tx.member.findUnique({ where: { id } }), 'Socio');
-      const m = await tx.member.update({ where: { id }, data: { status: 'LEFT', leftAt: toDate(body.date), leaveReason: body.reason } });
+      const m = await tx.member.update({
+        where: { id },
+        data: { status: 'LEFT', leftAt: toDate(body.date), leaveReason: body.reason },
+        include: { membership: { select: membershipAccessSelect } },
+      });
       await this.audit.log(tx, ctx, 'member.left', 'member', id, { date: body.date });
-      return serializeMember(m, ctx);
+      return withPhotoUrl(serializeMember(m, ctx), this.storage);
     });
   }
 
@@ -177,10 +232,52 @@ export class MembersController {
       const existing = found(await tx.member.findUnique({ where: { id } }), 'Socio');
       if (existing.anonymizedAt) throw new BadRequestException({ message: 'El socio está anonimizado', code: 'ANONYMIZED' });
       await this.limits.assertCanAddMember(tx, ctx.tenantId);
-      const m = await tx.member.update({ where: { id }, data: { status: 'ACTIVE', leftAt: null, leaveReason: null, joinedAt: new Date() } });
+      const m = await tx.member.update({
+        where: { id },
+        data: { status: 'ACTIVE', leftAt: null, leaveReason: null, joinedAt: new Date() },
+        include: { membership: { select: membershipAccessSelect } },
+      });
       await this.audit.log(tx, ctx, 'member.rejoined', 'member', id);
-      return serializeMember(m, ctx);
+      return withPhotoUrl(serializeMember(m, ctx), this.storage);
     });
+  }
+
+  /** Foto de perfil: quien gestiona socios o el propio usuario vinculado. */
+  @Post('members/:id/photo')
+  async photoSave(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Req() req: Request) {
+    this.assertCanEditPhoto(ctx, id);
+    const { buf, mime } = await readLogo(req);
+    const fileKey = this.storage.newKey(ctx.tenantId, 'members/photos', logoFileName(mime));
+    await this.storage.putObject(fileKey, buf, mime);
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const prev = found(await tx.member.findUnique({ where: { id }, select: { id: true, photoKey: true, anonymizedAt: true } }), 'Socio');
+      if (prev.anonymizedAt) throw new BadRequestException({ message: 'El socio está anonimizado', code: 'ANONYMIZED' });
+      const updated = await tx.member.update({
+        where: { id },
+        data: { photoKey: fileKey, photoMime: mime },
+        include: { section: { select: { id: true, name: true } }, membership: { select: membershipAccessSelect } },
+      });
+      await this.audit.log(tx, ctx, 'member.photo', 'member', id);
+      if (prev.photoKey && prev.photoKey !== fileKey) await this.storage.remove(prev.photoKey);
+      return withPhotoUrl(serializeMember(updated, ctx), this.storage);
+    });
+  }
+
+  @HttpCode(204)
+  @Delete('members/:id/photo')
+  async photoRemove(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    this.assertCanEditPhoto(ctx, id);
+    await this.db.tenant(ctx.tenantId, async (tx) => {
+      const prev = found(await tx.member.findUnique({ where: { id }, select: { id: true, photoKey: true } }), 'Socio');
+      await tx.member.update({ where: { id }, data: { photoKey: null, photoMime: null } });
+      await this.audit.log(tx, ctx, 'member.photo_removed', 'member', id);
+      if (prev.photoKey) await this.storage.remove(prev.photoKey);
+    });
+  }
+
+  private assertCanEditPhoto(ctx: RequestContext, memberId: string) {
+    if (ctx.permissions.has('members:write') || ctx.memberId === memberId) return;
+    throw new ForbiddenException({ message: 'No puedes cambiar esta foto', code: 'FORBIDDEN' });
   }
 
   @Perm('members:write')
@@ -227,16 +324,18 @@ export class MembersController {
       const m = found(await tx.member.findUnique({ where: { id } }), 'Socio');
       await tx.memberSize.deleteMany({ where: { memberId: id } });
       await tx.membership.updateMany({ where: { memberId: id }, data: { memberId: null } });
+      const prevPhoto = m.photoKey;
       const updated = await tx.member.update({
         where: { id },
         data: {
           firstName: 'Socio', lastName: `anonimizado #${m.memberNumber}`, email: null, phone: null, birthDate: null,
           nationalIdEnc: null, address: null, notes: null, leaveReason: null, consentDataAt: null,
-          consentImages: false, status: 'LEFT', leftAt: m.leftAt ?? new Date(), anonymizedAt: new Date(),
+          consentImages: false, photoKey: null, photoMime: null, status: 'LEFT', leftAt: m.leftAt ?? new Date(), anonymizedAt: new Date(),
         },
       });
       await this.audit.log(tx, ctx, 'member.anonymized', 'member', id);
-      return serializeMember(updated, ctx);
+      if (prevPhoto) await this.storage.remove(prevPhoto);
+      return withPhotoUrl(serializeMember(updated, ctx), this.storage);
     });
   }
 

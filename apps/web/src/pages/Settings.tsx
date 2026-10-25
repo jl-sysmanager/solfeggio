@@ -1,24 +1,22 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { del, patch, post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { AuditEntry, Invitation, Paginated, PermissionDef, Role, Section, Tenant, TenantUser } from '../api/types';
+import type { AuditEntry, Paginated, PermissionDef, Role, Section, Tenant } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Person } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { Chip } from '../components/Chip';
+import { StatusChip } from '../components/Chip';
 import { DataTable, Pagination } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
-import { FormError, SelectField, TextField, formValues } from '../components/Field';
-import { Menu } from '../components/Menu';
+import { SelectField, TextField, formValues } from '../components/Field';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
 import { Tabs, type TabDef } from '../components/Tabs';
-import { date, dateTime } from '../lib/format';
-import { tenantStatus } from '../lib/labels';
-import { StatusChip } from '../components/Chip';
-import { REGIONS } from '../components/admin/support/shared';
 import { LogoEditor } from '../components/LogoEditor';
+import { REGIONS } from '../components/admin/support/shared';
+import { dateTime } from '../lib/format';
+import { tenantStatus } from '../lib/labels';
 
 function TenantTab() {
   const { reload, can } = useAuth();
@@ -222,138 +220,6 @@ function RolesTab() {
   );
 }
 
-function UsersTab() {
-  const { session } = useAuth();
-  const users = useApi<TenantUser[] | Paginated<TenantUser>>('/users');
-  // Sólo los roles que quien gestiona usuarios puede asignar (dentro de sus propios permisos).
-  const roles = useApi<Pick<Role, 'id' | 'key' | 'name'>[]>('/roles/assignable');
-  const invites = useApi<Invitation[]>('/invitations');
-  const [inviting, setInviting] = useState(false);
-  const [removing, setRemoving] = useState<TenantUser | null>(null);
-  const rows = Array.isArray(users.data) ? users.data : users.data?.data ?? [];
-  const roleOptions = (roles.data ?? []).map((r) => ({ value: r.id, label: r.name }));
-
-  const update = useApiMutation((v: { id: string; body: unknown }) => patch(`/users/${v.id}`, v.body), { success: 'Usuario actualizado', invalidate: ['/users'] });
-  const remove = useApiMutation((id: string) => del(`/users/${id}`), { success: 'Acceso retirado', invalidate: ['/users', '/dashboard'], onSuccess: () => setRemoving(null) });
-  const invite = useApiMutation((body: unknown) => post('/invitations', body), { success: 'Invitación enviada', invalidate: ['/invitations'], onSuccess: () => setInviting(false) });
-
-  return (
-    <div className="stack" style={{ gap: 24 }}>
-      <div className="row between">
-        <p className="small">El número de miembros depende del plan.</p>
-        <Button onClick={() => setInviting(true)}>Invitar miembro</Button>
-      </div>
-      {users.isLoading && <Loading />}
-      {users.error && <ErrorNote error={users.error} />}
-      {users.data && (
-        <Card>
-          <DataTable
-            caption="Miembros de la banda"
-            rows={rows}
-            rowKey={(u) => u.id}
-            columns={[
-              { key: 'n', header: 'Miembro', render: (u) => <Person name={u.user.name} detail={u.user.email} /> },
-              {
-                key: 'r',
-                header: 'Rol',
-                render: (u) =>
-                  u.role.key === 'owner' || u.user.id === session?.user.id ? (
-                    u.role.name
-                  ) : (
-                    <select
-                      className="select"
-                      aria-label={`Rol de ${u.user.name}`}
-                      value={u.role.id}
-                      onChange={(e) => update.mutate({ id: u.id, body: { roleId: e.target.value } })}
-                    >
-                      {!roleOptions.some((o) => o.value === u.role.id) && <option value={u.role.id}>{u.role.name}</option>}
-                      {roleOptions.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  ),
-              },
-              { key: 'm', header: 'MFA', render: (u) => (u.user.mfaEnabled ? <Chip tone="success">Activa</Chip> : <Chip>No</Chip>) },
-              { key: 's', header: 'Estado', render: (u) => <Chip tone={u.status === 'ACTIVE' ? 'success' : 'warning'}>{u.status === 'ACTIVE' ? 'Activo' : 'Suspendido'}</Chip> },
-              {
-                key: 'a',
-                header: 'Acciones',
-                render: (u) =>
-                  u.role.key === 'owner' || u.user.id === session?.user.id ? null : (
-                    <Menu
-                      label={`Acciones de ${u.user.name}`}
-                      items={[
-                        {
-                          label: u.status === 'ACTIVE' ? 'Suspender acceso' : 'Reactivar acceso',
-                          onSelect: () => update.mutate({ id: u.id, body: { status: u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' } }),
-                        },
-                        { label: 'Quitar de la banda', onSelect: () => setRemoving(u), danger: true },
-                      ]}
-                    />
-                  ),
-              },
-            ]}
-          />
-        </Card>
-      )}
-      {invites.data && invites.data.length > 0 && (
-        <Card title="Invitaciones" tone="cream">
-          <DataTable
-            caption="Invitaciones"
-            rows={invites.data}
-            rowKey={(i) => i.id}
-            columns={[
-              { key: 'e', header: 'Email', render: (i) => i.email },
-              { key: 'r', header: 'Rol', render: (i) => roleOptions.find((r) => r.value === i.roleId)?.label ?? '—' },
-              { key: 'd', header: 'Enviada', render: (i) => date(i.createdAt), nowrap: true },
-              {
-                key: 's',
-                header: 'Estado',
-                render: (i) =>
-                  i.acceptedAt ? <Chip tone="success">Aceptada</Chip> : new Date(i.expiresAt) < new Date() ? <Chip tone="danger">Caducada</Chip> : <Chip tone="warning">Pendiente</Chip>,
-              },
-            ]}
-          />
-        </Card>
-      )}
-      <Modal open={inviting} onClose={() => setInviting(false)} title="Invitar miembro">
-        <form
-          className="form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const v = formValues(e.currentTarget);
-            invite.mutate({ email: v.email, roleId: v.roleId });
-          }}
-        >
-          <TextField label="Email" name="email" type="email" required />
-          <SelectField label="Rol" name="roleId" required options={roleOptions.filter((r) => (roles.data ?? []).find((x) => x.id === r.value)?.key !== 'owner')} />
-          <p className="small muted">Recibirá un enlace válido 7 días para unirse.</p>
-          <FormError error={invite.error} />
-          <div className="modal__footer">
-            <Button variant="ghost" onClick={() => setInviting(false)}>
-              Cancelar
-            </Button>
-            <Button type="submit" loading={invite.isPending}>
-              Enviar invitación
-            </Button>
-          </div>
-        </form>
-      </Modal>
-      <ConfirmModal
-        open={!!removing}
-        title="Retirar acceso"
-        message={`${removing?.user.name} dejará de tener acceso a la banda. Su ficha de socio, si la tiene, se conserva.`}
-        confirmLabel="Retirar acceso"
-        loading={remove.isPending}
-        onConfirm={() => removing && remove.mutate(removing.id)}
-        onClose={() => setRemoving(null)}
-      />
-    </div>
-  );
-}
-
 function SectionsTab() {
   const q = useApi<Section[]>('/sections');
   const create = useApiMutation((body: unknown) => post('/sections', body), { success: 'Sección creada', invalidate: ['/sections'] });
@@ -422,15 +288,6 @@ function AuditTab() {
         </Card>
       )}
     </div>
-  );
-}
-
-/** Personas con cuenta en la banda. Vive en Gestión, no en Ajustes. */
-export function BandMembersPage() {
-  return (
-    <Page header={<PageHeader eyebrow="Gestión" title="Miembros" description="Personas con acceso a la banda: invitación, rol y suspensión." />}>
-      <UsersTab />
-    </Page>
   );
 }
 

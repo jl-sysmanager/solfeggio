@@ -23,7 +23,6 @@ const Market = lazy(() => import('./pages/Market'));
 const Communications = lazy(() => import('./pages/Communications'));
 const Documents = lazy(() => import('./pages/Documents'));
 const Settings = lazy(() => import('./pages/Settings'));
-const BandMembers = lazy(() => import('./pages/Settings').then((m) => ({ default: m.BandMembersPage })));
 const Billing = lazy(() => import('./pages/Billing'));
 const Notifications = lazy(() => import('./pages/Notifications'));
 const Incidents = lazy(() => import('./pages/Incidents'));
@@ -78,7 +77,7 @@ export function App() {
       <Route path="/security" element={<Shell tenant={false}><Security /></Shell>} />
 
       <Route path="/members" element={<Mod perm={['members:read']} feature="members" title="Socios"><Members /></Mod>} />
-      <Route path="/access" element={<Shell><Guard perm={['users:manage']}><BandMembers /></Guard></Shell>} />
+      <Route path="/access" element={<Navigate to="/members?access=users" replace />} />
       <Route path="/members/:id" element={<Mod perm={['members:read']} feature="members" title="Socio"><MemberDetail /></Mod>} />
       <Route path="/communications" element={<Mod perm={['communications:send']} feature="communications" title="Comunicaciones"><Communications /></Mod>} />
       <Route path="/documents" element={<Mod perm={['documents:read']} feature="members" title="Documentos"><Documents /></Mod>} />

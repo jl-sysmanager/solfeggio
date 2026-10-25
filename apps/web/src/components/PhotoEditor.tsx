@@ -1,0 +1,81 @@
+import { useState, type FormEvent } from 'react';
+import { ApiError, api, del } from '../api/client';
+import { Button } from './Button';
+import { FormError } from './Field';
+
+const ACCEPT = 'image/png,image/jpeg,image/webp';
+const MAX_BYTES = 1_048_576;
+
+/** Subida de foto de perfil (mismo contrato que el logotipo: POST cuerpo binario). */
+export function PhotoEditor({
+  previewUrl,
+  confirmPath,
+  deletePath,
+  onChanged,
+}: {
+  previewUrl: string | null;
+  confirmPath: string;
+  deletePath: string;
+  onChanged: () => void;
+}) {
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function submit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const file = (e.currentTarget.elements.namedItem('photo') as HTMLInputElement).files?.[0];
+    if (!file) return;
+    if (file.size > MAX_BYTES) {
+      setError(new ApiError(400, 'La foto no puede superar 1 MB'));
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await api(confirmPath, { method: 'POST', rawBody: file, contentType: file.type || 'application/octet-stream' });
+      e.currentTarget.reset();
+      onChanged();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function remove() {
+    setLoading(true);
+    setError(null);
+    try {
+      await del(deletePath);
+      onChanged();
+    } catch (err) {
+      setError(err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form className="form" onSubmit={submit}>
+      {previewUrl && (
+        <img src={previewUrl} alt="Foto actual" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: '50%', background: 'var(--surface-alt)' }} />
+      )}
+      <div className="field">
+        <label htmlFor="photo-file">Foto</label>
+        <input id="photo-file" className="input" name="photo" type="file" accept={ACCEPT} required />
+        <span className="field__hint">PNG, JPEG o WebP. Máximo 1 MB. Se muestra en el listado y en la ficha.</span>
+      </div>
+      <FormError error={error} />
+      <div className="row">
+        <Button type="submit" loading={loading}>
+          Guardar foto
+        </Button>
+        {previewUrl && (
+          <Button type="button" variant="ghost" disabled={loading} onClick={remove}>
+            Quitar
+          </Button>
+        )}
+      </div>
+    </form>
+  );
+}

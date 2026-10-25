@@ -313,6 +313,7 @@ model Membership {
   roleId        String           @db.Uuid
   role          Role             @relation(fields: [roleId], references: [id])
   memberId      String?          @unique @db.Uuid
+  member        Member?          @relation(fields: [memberId], references: [id], onDelete: SetNull)
   /// Tutor de la escuela vinculado (portal de familias).
   guardianId    String?          @unique @db.Uuid
   status        MembershipStatus @default(ACTIVE)
@@ -416,10 +417,14 @@ model Member {
   consentDataAt DateTime?
   consentImages Boolean      @default(false)
   notes         String?
+  /// Foto de perfil (área `members/photos` en el bucket).
+  photoKey      String?
+  photoMime     String?
   anonymizedAt  DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
+  membership         Membership?
   sizes              MemberSize[]
   calls              EventCall[]
   attendance         Attendance[]

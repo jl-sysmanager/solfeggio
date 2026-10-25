@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { post } from '../api/client';
-import { useApiMutation } from '../api/hooks';
+import { useApi, useApiMutation } from '../api/hooks';
+import type { Member } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { passwordIssue } from './Auth';
 import { Button } from '../components/Button';
@@ -8,9 +9,11 @@ import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { FormError, TextField, formValues } from '../components/Field';
 import { Page, PageHeader } from '../components/PageHeader';
+import { PhotoEditor } from '../components/PhotoEditor';
 
 export default function SecurityPage() {
   const { session, reload } = useAuth();
+  const meMember = useApi<Member>(session?.memberId ? `/members/${session.memberId}` : null);
   const [setup, setSetup] = useState<{ otpauthUrl: string; qrDataUrl: string } | null>(null);
   const start = useApiMutation(() => post<{ otpauthUrl: string; qrDataUrl: string }>('/auth/mfa/setup'), { onSuccess: setSetup });
   const enable = useApiMutation((code: string) => post('/auth/mfa/enable', { code }), {
@@ -129,6 +132,19 @@ export default function SecurityPage() {
           </div>
         )}
       </Card>
+      {session?.memberId && (
+        <Card title="Foto de perfil">
+          <p className="small muted" style={{ marginBottom: 12 }}>
+            Se muestra en tu ficha de socio y en los listados de la banda.
+          </p>
+          <PhotoEditor
+            previewUrl={meMember.data?.photoUrl ?? null}
+            confirmPath={`/members/${session.memberId}/photo`}
+            deletePath={`/members/${session.memberId}/photo`}
+            onChanged={() => meMember.refetch()}
+          />
+        </Card>
+      )}
       <Card title="Privacidad" tone="cream">
         <p className="small">
           Tus datos se tratan conforme al RGPD. Puedes solicitar el acceso, rectificación, portabilidad o supresión de tus datos a la secretaría de tu banda o a través de una incidencia de soporte.

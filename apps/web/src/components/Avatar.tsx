@@ -13,7 +13,10 @@ function tone(name: string) {
   return TONES[h % TONES.length];
 }
 
-export function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
+export function Avatar({ name, size = 'md', photoUrl }: { name: string; size?: 'sm' | 'md'; photoUrl?: string | null }) {
+  if (photoUrl) {
+    return <img className={`avatar avatar--${size} avatar--photo`} src={photoUrl} alt="" aria-hidden="true" />;
+  }
   return (
     <span className={`avatar avatar--${size} avatar--${tone(name)}`} aria-hidden="true">
       {initials(name)}
@@ -22,10 +25,10 @@ export function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md'
 }
 
 /** Nombre con avatar delante (celdas de tabla, listas). */
-export function Person({ name, detail, children }: { name: string; detail?: string; children?: React.ReactNode }) {
+export function Person({ name, detail, photoUrl, children }: { name: string; detail?: string; photoUrl?: string | null; children?: React.ReactNode }) {
   return (
     <span className="person">
-      <Avatar name={name} size="sm" />
+      <Avatar name={name} size="sm" photoUrl={photoUrl} />
       <span className="person__text">
         {children ?? <span className="person__name">{name}</span>}
         {detail && <span className="person__detail">{detail}</span>}

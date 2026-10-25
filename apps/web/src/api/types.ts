@@ -73,6 +73,15 @@ export interface Section {
 }
 
 export type MemberStatus = 'ACTIVE' | 'INACTIVE' | 'LEFT';
+export type MemberAccess =
+  | { kind: 'member_only' }
+  | {
+      kind: 'user';
+      membershipId: string;
+      status: 'ACTIVE' | 'SUSPENDED';
+      role: { id: string; key: string; name: string };
+      user: { id: string; name: string; email: string; mfaEnabled?: boolean };
+    };
 export interface Member {
   id: string;
   memberNumber: number;
@@ -93,6 +102,10 @@ export interface Member {
   consentDataAt?: string | null;
   consentImages: boolean;
   notes?: string | null;
+  hasPhoto?: boolean;
+  photoUrl?: string | null;
+  access?: MemberAccess;
+  pendingInvite?: { id: string; email: string; roleId: string; expiresAt: string; createdAt: string } | null;
   sizes?: { garment: string; size: string }[];
 }
 
@@ -374,6 +387,7 @@ export interface Invitation {
   id: string;
   email: string;
   roleId: string;
+  memberId?: string | null;
   expiresAt: string;
   acceptedAt?: string | null;
   createdAt: string;

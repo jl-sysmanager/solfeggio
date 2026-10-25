@@ -9,12 +9,15 @@ export function Modal({
   onClose,
   children,
   footer,
+  size = 'md',
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  /** `lg` para previsualizar documentos. */
+  size?: 'md' | 'lg';
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -67,7 +70,7 @@ export function Modal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div ref={ref} className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+      <div ref={ref} className={`modal${size === 'lg' ? ' modal--lg' : ''}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <div className="modal__header">
           <h2 id={titleId}>{title}</h2>
           <button type="button" className="btn btn--ghost btn--icon" onClick={onClose} aria-label="Cerrar">

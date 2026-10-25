@@ -20,6 +20,7 @@ export function configureApp(app: INestApplication) {
   const logoBody = express.raw({ type: ['image/png', 'image/jpeg', 'image/webp', 'application/octet-stream'], limit: '1mb' });
   app.use('/api/v1/admin/brand/logo', logoBody);
   app.use('/api/v1/tenant/logo', logoBody);
+  app.use('/api/v1/members/:id/photo', logoBody);
   app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } }, crossOriginResourcePolicy: { policy: 'same-site' } }));
   app.use(cookieParser());
   app.use(metricsMiddleware);

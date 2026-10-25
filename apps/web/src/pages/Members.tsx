@@ -1,21 +1,31 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { patch, post } from '../api/client';
+import { del, patch, post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { Member, Paginated, Section } from '../api/types';
+import type { Invitation, Member, Paginated, Role, Section, TenantUser } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Person } from '../components/Avatar';
 import { ArrowLink, Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { StatusChip } from '../components/Chip';
+import { Chip, StatusChip } from '../components/Chip';
 import { DataTable, Pagination } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { Checkbox, FormError, SelectField, TextAreaField, TextField, formValues } from '../components/Field';
 import { Menu } from '../components/Menu';
-import { Modal } from '../components/Modal';
+import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
 import { date, today } from '../lib/format';
 import { memberStatus } from '../lib/labels';
+
+type AccessFilter = 'all' | 'users' | 'members_only';
+
+function accessLabel(m: Member) {
+  if (m.access?.kind === 'user') {
+    const suspended = m.access.status === 'SUSPENDED';
+    return <Chip tone={suspended ? 'warning' : 'success'}>{suspended ? 'Usuario suspendido' : `Usuario · ${m.access.role.name}`}</Chip>;
+  }
+  return <Chip>Solo socio</Chip>;
+}
 
 export function useSections() {
   return useApi<Section[]>('/sections');
@@ -136,6 +146,73 @@ export function LeaveModal({ member, onClose }: { member: Member | null; onClose
   );
 }
 
+function OrphanUsersCard() {
+  const { session } = useAuth();
+  const users = useApi<TenantUser[] | Paginated<TenantUser>>('/users');
+  const invites = useApi<Invitation[]>('/invitations');
+  const roles = useApi<Pick<Role, 'id' | 'key' | 'name'>[]>('/roles/assignable');
+  const [removing, setRemoving] = useState<TenantUser | null>(null);
+  const rows = (Array.isArray(users.data) ? users.data : users.data?.data ?? []).filter((u) => !u.memberId);
+  const pending = (invites.data ?? []).filter((i) => !i.memberId && !i.acceptedAt);
+  const update = useApiMutation((v: { id: string; body: unknown }) => patch(`/users/${v.id}`, v.body), { success: 'Usuario actualizado', invalidate: ['/users', '/members'] });
+  const remove = useApiMutation((id: string) => del(`/users/${id}`), { success: 'Acceso retirado', invalidate: ['/users', '/members', '/dashboard'], onSuccess: () => setRemoving(null) });
+  if (!rows.length && !pending.length) return null;
+  return (
+    <Card title="Accesos sin ficha de socio" tone="cream">
+      <p className="small muted" style={{ marginBottom: 12 }}>
+        Cuentas con acceso a la app que no están vinculadas a un socio (p. ej. familias o personal externo). Cuentan como usuarios del plan.
+      </p>
+      {rows.length > 0 && (
+        <DataTable
+          caption="Usuarios sin socio"
+          rows={rows}
+          rowKey={(u) => u.id}
+          columns={[
+            { key: 'n', header: 'Persona', render: (u) => <Person name={u.user.name} detail={u.user.email} /> },
+            { key: 'r', header: 'Rol', render: (u) => u.role.name },
+            { key: 's', header: 'Estado', render: (u) => <Chip tone={u.status === 'ACTIVE' ? 'success' : 'warning'}>{u.status === 'ACTIVE' ? 'Activo' : 'Suspendido'}</Chip> },
+            {
+              key: 'a',
+              header: 'Acciones',
+              render: (u) =>
+                u.role.key === 'owner' || u.user.id === session?.user.id ? null : (
+                  <Menu
+                    label={`Acciones de ${u.user.name}`}
+                    items={[
+                      {
+                        label: u.status === 'ACTIVE' ? 'Suspender acceso' : 'Reactivar acceso',
+                        onSelect: () => update.mutate({ id: u.id, body: { status: u.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' } }),
+                      },
+                      { label: 'Quitar de la banda', onSelect: () => setRemoving(u), danger: true },
+                    ]}
+                  />
+                ),
+            },
+          ]}
+        />
+      )}
+      {pending.length > 0 && (
+        <ul className="list-plain" style={{ marginTop: 12 }}>
+          {pending.map((i) => (
+            <li key={i.id} className="small">
+              Invitación pendiente: {i.email} · {roles.data?.find((r) => r.id === i.roleId)?.name ?? '—'}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ConfirmModal
+        open={!!removing}
+        title="Retirar acceso"
+        message={`${removing?.user.name} dejará de tener acceso a la banda.`}
+        confirmLabel="Retirar acceso"
+        loading={remove.isPending}
+        onConfirm={() => removing && remove.mutate(removing.id)}
+        onClose={() => setRemoving(null)}
+      />
+    </Card>
+  );
+}
+
 export default function MembersPage() {
   const { can } = useAuth();
   const [params, setParams] = useSearchParams();
@@ -143,12 +220,17 @@ export default function MembersPage() {
   const [q, setQ] = useState(params.get('q') ?? '');
   const status = params.get('status') ?? 'ACTIVE';
   const sectionId = params.get('sectionId') ?? '';
+  const access = (params.get('access') as AccessFilter) || 'all';
   const page = Number(params.get('page') ?? 1);
   const [editing, setEditing] = useState<Member | null>(null);
   const [creating, setCreating] = useState(params.get('new') === '1');
   const [leaving, setLeaving] = useState<Member | null>(null);
   const sections = useSections();
-  const list = useApi<Paginated<Member>>('/members', { q: params.get('q'), status: status === 'ALL' ? undefined : status, sectionId, page, pageSize: 25 });
+  const canReadMembers = can('members:read');
+  const list = useApi<Paginated<Member>>(
+    canReadMembers ? '/members' : null,
+    { q: params.get('q'), status: status === 'ALL' ? undefined : status, sectionId, access, page, pageSize: 25 },
+  );
 
   const set = (k: string, v: string) => {
     const next = new URLSearchParams(params);
@@ -165,49 +247,64 @@ export default function MembersPage() {
         <PageHeader
           eyebrow="Gestión"
           title="Socios"
-          description="Altas, bajas, datos personales y consentimientos."
+          description="Fichas de la banda y, si se invita, acceso a la app con un rol. Un usuario vinculado cuenta como socio y como usuario del plan."
           actions={can('members:write') && <Button onClick={() => setCreating(true)}>Alta de socio</Button>}
         />
       }
     >
-      <Card>
-        <form
-          className="toolbar"
-          role="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            set('q', q);
-          }}
-        >
-          <TextField label="Buscar" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, email, instrumento…" />
-          <SelectField
-            label="Estado"
-            value={status}
-            onChange={(e) => set('status', e.target.value)}
-            options={[
-              { value: 'ACTIVE', label: 'Activos' },
-              { value: 'INACTIVE', label: 'Inactivos' },
-              { value: 'LEFT', label: 'Bajas' },
-              { value: 'ALL', label: 'Todos' },
-            ]}
-          />
-          <SelectField
-            label="Sección"
-            value={sectionId}
-            onChange={(e) => set('sectionId', e.target.value)}
-            placeholder="Todas"
-            options={(sections.data ?? []).map((s) => ({ value: s.id, label: s.name }))}
-          />
-          <Button type="submit" variant="ghost">
-            Buscar
-          </Button>
-        </form>
-      </Card>
+      <div className="chips" role="group" aria-label="Filtrar por tipo">
+        {(
+          [
+            ['all', 'Todos'],
+            ['members_only', 'Solo socios'],
+            ['users', 'Usuarios'],
+          ] as const
+        ).map(([value, label]) => (
+          <button key={value} type="button" className="chip chip--plain chip--outline" aria-pressed={access === value} onClick={() => set('access', value === 'all' ? '' : value)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      {canReadMembers && (
+        <Card>
+          <form
+            className="toolbar"
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              set('q', q);
+            }}
+          >
+            <TextField label="Buscar" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nombre, email, instrumento…" />
+            <SelectField
+              label="Estado"
+              value={status}
+              onChange={(e) => set('status', e.target.value)}
+              options={[
+                { value: 'ACTIVE', label: 'Activos' },
+                { value: 'INACTIVE', label: 'Inactivos' },
+                { value: 'LEFT', label: 'Bajas' },
+                { value: 'ALL', label: 'Todos' },
+              ]}
+            />
+            <SelectField
+              label="Sección"
+              value={sectionId}
+              onChange={(e) => set('sectionId', e.target.value)}
+              placeholder="Todas"
+              options={(sections.data ?? []).map((s) => ({ value: s.id, label: s.name }))}
+            />
+            <Button type="submit" variant="ghost">
+              Buscar
+            </Button>
+          </form>
+        </Card>
+      )}
 
-      {list.isLoading && <Loading />}
-      {list.error && <ErrorNote error={list.error} />}
-      {list.data && (
-        <Card title={`${list.data.total} socios`}>
+      {canReadMembers && list.isLoading && <Loading />}
+      {canReadMembers && list.error && <ErrorNote error={list.error} />}
+      {canReadMembers && list.data && (
+        <Card title={`${list.data.total} ${access === 'users' ? 'usuarios' : access === 'members_only' ? 'socios sin acceso' : 'personas'}`}>
           <DataTable
             caption="Listado de socios"
             rows={list.data.data}
@@ -218,16 +315,17 @@ export default function MembersPage() {
                 key: 'name',
                 header: 'Nombre',
                 render: (m) => (
-                  <Person name={`${m.firstName} ${m.lastName}`} detail={m.email ?? undefined}>
+                  <Person name={`${m.firstName} ${m.lastName}`} detail={m.email ?? undefined} photoUrl={m.photoUrl}>
                     <ArrowLink to={`/members/${m.id}`}>{`${m.lastName}, ${m.firstName}`}</ArrowLink>
                   </Person>
                 ),
               },
+              { key: 'access', header: 'Acceso', render: (m) => accessLabel(m), nowrap: true },
               { key: 'inst', header: 'Instrumento', render: (m) => m.instrument ?? '—' },
               { key: 'sec', header: 'Sección', render: (m) => m.section?.name ?? '—' },
               { key: 'joined', header: 'Alta', render: (m) => date(m.joinedAt), nowrap: true },
               { key: 'status', header: 'Estado', render: (m) => <StatusChip value={m.status} map={memberStatus} /> },
-              ...(can('members:write')
+              ...(can('members:write') || can('users:manage')
                 ? [
                     {
                       key: 'act',
@@ -237,8 +335,12 @@ export default function MembersPage() {
                           label={`Acciones de ${m.firstName} ${m.lastName}`}
                           items={[
                             { label: 'Ver ficha', onSelect: () => navigate(`/members/${m.id}`) },
-                            { label: 'Editar', onSelect: () => setEditing(m) },
-                            ...(m.status !== 'LEFT' ? [{ label: 'Dar de baja', onSelect: () => setLeaving(m), danger: true }] : []),
+                            ...(can('members:write')
+                              ? [
+                                  { label: 'Editar', onSelect: () => setEditing(m) },
+                                  ...(m.status !== 'LEFT' ? [{ label: 'Dar de baja', onSelect: () => setLeaving(m), danger: true }] : []),
+                                ]
+                              : []),
                           ]}
                         />
                       ),
@@ -250,6 +352,8 @@ export default function MembersPage() {
           <Pagination page={list.data.page} pageSize={list.data.pageSize} total={list.data.total} onPage={(p) => set('page', String(p))} />
         </Card>
       )}
+
+      {can('users:manage') && <OrphanUsersCard />}
 
       <MemberFormModal open={creating || !!editing} member={editing} onClose={() => { setCreating(false); setEditing(null); }} />
       <LeaveModal member={leaving} onClose={() => setLeaving(null)} />

@@ -70,7 +70,7 @@ describe('menú lateral con secciones plegables', () => {
   it('la sección activa se calcula por el prefijo más largo', () => {
     expect(activeGroupLabel(NAV, '/')).toBe('General');
     expect(activeGroupLabel(NAV, '/members/42')).toBe('Gestión');
-    expect(activeGroupLabel(NAV, '/access')).toBe('Gestión');
+    expect(activeGroupLabel(NAV, '/members')).toBe('Gestión');
     expect(activeGroupLabel(NAV, '/membersx')).toBeUndefined();
   });
 });

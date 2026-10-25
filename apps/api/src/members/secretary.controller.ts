@@ -115,10 +115,15 @@ export class SecretaryController {
 
   @Perm('documents:read')
   @Get('documents/:id/download')
-  download(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+  download(
+    @Ctx() ctx: RequestContext,
+    @Param('id', zod(idParam)) id: string,
+    @Query('inline') inline?: string,
+  ) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const doc = found(await tx.document.findUnique({ where: { id } }), 'Documento');
-      return { url: await this.storage.downloadUrl(doc.fileKey, doc.fileName) };
+      const asInline = inline === '1' || inline === 'true';
+      return { url: await this.storage.downloadUrl(doc.fileKey, doc.fileName, asInline), mimeType: doc.mimeType, fileName: doc.fileName };
     });
   }
 
