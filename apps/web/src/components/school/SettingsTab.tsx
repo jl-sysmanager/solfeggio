@@ -301,6 +301,7 @@ function DiscountsForm({ settings, write }: { settings: SchoolSettings; write: b
           const pct = (x?: string) => Math.min(100, Math.max(0, Number(x ?? 0) || 0));
           save.mutate({
             feeMode: mode,
+            familyDiscountCents: centsOrNull(v.family) ?? 0,
             ...(mode === 'PERCENT'
               ? { siblingDiscountPct: pct(v.sibling), memberDiscountPct: pct(v.member), multiSubjectDiscountPct: pct(v.multi) }
               : {}),
@@ -322,8 +323,9 @@ function DiscountsForm({ settings, write }: { settings: SchoolSettings; write: b
             <TextField label="Varias asignaturas (%)" name="multi" type="number" min={0} max={100} defaultValue={settings.multiSubjectDiscountPct} hint="Con 2 o más matrículas." disabled={!write} />
           </div>
         )}
-        {mode === 'PERCENT' && <p className="small muted">Los descuentos se suman y nunca superan el 100 %.</p>}
-        {mode === 'FIXED' && <p className="small muted">Cada alumno paga la tarifa de su ficha. Sin tarifa, se cobra la suma de las asignaturas, sin descuentos.</p>}
+        <TextField label="Familia (€)" name="family" inputMode="decimal" defaultValue={euros(settings.familyDiscountCents)} hint="El 2.º alumno resta el importe, el 3.º el doble y así sucesivamente. También con tarifa fija." disabled={!write} />
+        {mode === 'PERCENT' && <p className="small muted">Los porcentajes se suman y no superan el 100 %. El descuento de familia se resta después y el cargo no baja de cero.</p>}
+        {mode === 'FIXED' && <p className="small muted">Cada alumno paga la tarifa de su ficha. Sin tarifa, se cobra la suma de las asignaturas. El descuento de familia se resta igual.</p>}
         <TextAreaField label="Presentación del formulario público" name="publicIntro" rows={4} defaultValue={settings.publicIntro ?? ''} disabled={!write} />
         <FormError error={save.error} />
         {write && (

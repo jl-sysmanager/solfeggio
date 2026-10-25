@@ -245,9 +245,49 @@ describe('Escuela de música', () => {
       // Lucía no tiene tarifa: paga la asignatura (3000), sin el descuento de hermana ni de socio.
       expect(byStudent(lucia.id)).toMatchObject({ baseCents: 3000, discountCents: 0, amountCents: 3000, detail: { tariffMissing: true } });
 
-      await put('/school/settings', { feeMode: 'PERCENT' }).expect(200);
+      // El descuento fijo de familia también se resta de la tarifa. Álvaro es el mayor y no lo lleva.
+      await put('/school/settings', { feeMode: 'FIXED', familyDiscountCents: 500 }).expect(200);
+      await patch(`/school/students/${lucia.id}`, { tuitionTariffId: reduced.id }).expect(200);
+      await post('/school/tuition/issue', { yearId: year.id, period: '2027-02', dueDate: '2027-02-05' }).expect(201);
+      const fixedFamily = await get('/school/tuition/charges?period=2027-02').expect(200);
+      const fixedRow = (id: string) => fixedFamily.body.data.find((c: { studentId: string }) => c.studentId === id);
+      expect(fixedRow(alvaro.id)).toMatchObject({ baseCents: 4000, discountCents: 0, amountCents: 4000 });
+      expect(fixedRow(lucia.id)).toMatchObject({ baseCents: 4000, discountCents: 500, amountCents: 3500 });
+      expect(fixedRow(lucia.id).detail.tariff).toMatchObject({ name: 'Reducida', cents: 4000 });
+      expect(fixedRow(lucia.id).detail.discounts).toContainEqual({ kind: 'FAMILY', pct: 0, cents: 500 });
+
+      await put('/school/settings', { feeMode: 'PERCENT', familyDiscountCents: 500 }).expect(200);
       await patch(`/school/students/${alvaro.id}`, { tuitionTariffId: null }).expect(200);
-      await ctx.db.system.tuitionCharge.deleteMany({ where: { period: '2026-11', studentId: { in: [alvaro.id, lucia.id] } } });
+      await patch(`/school/students/${lucia.id}`, { tuitionTariffId: null }).expect(200);
+      await post('/school/tuition/issue', { yearId: year.id, period: '2026-12', dueDate: '2026-12-05' }).expect(201);
+      const percent = await get('/school/tuition/charges?period=2026-12').expect(200);
+      const row = (id: string) => percent.body.data.find((c: { studentId: string }) => c.studentId === id);
+      // Álvaro es el mayor: no lleva descuento de familia. 25 % de 7500.
+      expect(row(alvaro.id)).toMatchObject({ discountCents: 1875, amountCents: 5625 });
+      // Lucía es la adicional: 15 % de 3000 (450) más 5 € de familia.
+      expect(row(lucia.id)).toMatchObject({ baseCents: 3000, discountCents: 950, amountCents: 2050 });
+      expect(row(lucia.id).detail.discounts).toContainEqual({ kind: 'FAMILY', pct: 0, cents: 500 });
+      // El importe fijo no deja el cargo en negativo.
+      await put('/school/settings', { familyDiscountCents: 100000 }).expect(200);
+      await post('/school/tuition/issue', { yearId: year.id, period: '2027-01', dueDate: '2027-01-05' }).expect(201);
+      const capped = await get('/school/tuition/charges?period=2027-01').expect(200);
+      const luciaCapped = capped.body.data.find((c: { studentId: string }) => c.studentId === lucia.id);
+      expect(luciaCapped).toMatchObject({ discountCents: 3000, amountCents: 0 });
+
+      // El 2.º resta una vez el importe y el 3.º el doble, sobre el total de cada alumno.
+      await put('/school/settings', { familyDiscountCents: 500 }).expect(200);
+      const nerea = (await post('/school/students', { familyId: family.id, firstName: 'Nerea', lastName: 'Pérez', birthDate: '2019-01-01' }).expect(201)).body;
+      await post('/school/enrollments', { studentId: nerea.id, groupId: gTheory.id }).expect(201);
+      await post('/school/tuition/issue', { yearId: year.id, period: '2027-03', dueDate: '2027-03-05' }).expect(201);
+      const three = await get('/school/tuition/charges?period=2027-03').expect(200);
+      const byRank = (id: string) => three.body.data.find((c: { studentId: string }) => c.studentId === id);
+      expect(byRank(lucia.id).detail.discounts).toContainEqual({ kind: 'FAMILY', pct: 0, cents: 500 });
+      expect(byRank(nerea.id)).toMatchObject({ baseCents: 3000, discountCents: 1450, amountCents: 1550 });
+      expect(byRank(nerea.id).detail.discounts).toContainEqual({ kind: 'FAMILY', pct: 0, cents: 1000 });
+      await patch(`/school/students/${nerea.id}`, { status: 'LEFT' }).expect(200);
+
+      await put('/school/settings', { familyDiscountCents: 0 }).expect(200);
+      await ctx.db.system.tuitionCharge.deleteMany({ where: { period: { in: ['2026-11', '2026-12', '2027-01', '2027-02', '2027-03'] }, studentId: { in: [alvaro.id, lucia.id, nerea.id] } } });
     });
   });
 

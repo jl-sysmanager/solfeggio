@@ -16,6 +16,7 @@ export interface SchoolSettings {
   siblingDiscountPct: number;
   memberDiscountPct: number;
   multiSubjectDiscountPct: number;
+  familyDiscountCents: number;
   publicIntro: string | null;
   slug?: string;
 }
@@ -216,7 +217,7 @@ export interface ScheduleConflict {
 
 export interface TuitionDetail {
   lines: { groupId: string; label: string; cents: number }[];
-  discounts: { kind: 'SIBLING' | 'MEMBER' | 'MULTI_SUBJECT'; pct: number }[];
+  discounts: { kind: 'SIBLING' | 'MEMBER' | 'MULTI_SUBJECT' | 'FAMILY'; pct: number; cents?: number }[];
   pct: number;
   tariff?: { id: string; name: string; cents: number };
   tariffMissing?: boolean;

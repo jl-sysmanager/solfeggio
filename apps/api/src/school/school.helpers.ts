@@ -160,7 +160,7 @@ export interface TuitionLine {
 }
 export interface TuitionDetail {
   lines: TuitionLine[];
-  discounts: { kind: 'SIBLING' | 'MEMBER' | 'MULTI_SUBJECT'; pct: number }[];
+  discounts: { kind: 'SIBLING' | 'MEMBER' | 'MULTI_SUBJECT' | 'FAMILY'; pct: number; cents?: number }[];
   pct: number;
   /** Tarifa fija aplicada. Ausente en el modo de descuentos por porcentaje. */
   tariff?: { id: string; name: string; cents: number };
@@ -180,11 +180,20 @@ type StudentForTuition = Prisma.StudentGetPayload<{
  * Calcula las mensualidades de un periodo.
  * PERCENT: descuentos en % sumados (máximo 100) por hermanos (del 2º en adelante),
  * socio (el alumno o algún tutor es socio) y varias asignaturas (2 o más matrículas).
+ * El descuento fijo de familia se resta del total de cada alumno según su puesto:
+ * el 2.º resta el importe, el 3.º el doble y así sucesivamente. El cargo no baja de cero.
  * FIXED: el alumno paga la tarifa asignada. Sin tarifa, paga la suma de asignaturas.
+ * El descuento de familia se resta también en este modo.
  */
 export function computeTuition(
   students: StudentForTuition[],
-  settings: { feeMode?: 'PERCENT' | 'FIXED'; siblingDiscountPct: number; memberDiscountPct: number; multiSubjectDiscountPct: number },
+  settings: {
+    feeMode?: 'PERCENT' | 'FIXED';
+    siblingDiscountPct: number;
+    memberDiscountPct: number;
+    multiSubjectDiscountPct: number;
+    familyDiscountCents?: number;
+  },
 ) {
   const byFamily = new Map<string, StudentForTuition[]>();
   for (const s of students) {
@@ -192,9 +201,14 @@ export function computeTuition(
     byFamily.set(s.familyId, [...(byFamily.get(s.familyId) ?? []), s]);
   }
   const siblings = new Set<string>();
+  // Puesto en la familia (0 = el mayor). El descuento de familia es puesto × importe.
+  const familyRank = new Map<string, number>();
   for (const list of byFamily.values()) {
     const sorted = [...list].sort((a, b) => (a.birthDate?.getTime() ?? Infinity) - (b.birthDate?.getTime() ?? Infinity) || a.createdAt.getTime() - b.createdAt.getTime());
-    sorted.slice(1).forEach((s) => siblings.add(s.id));
+    sorted.forEach((s, index) => {
+      familyRank.set(s.id, index);
+      if (index > 0) siblings.add(s.id);
+    });
   }
   return students
     .filter((s) => s.enrollments.length)
@@ -205,24 +219,29 @@ export function computeTuition(
         cents: e.group.monthlyFeeCents ?? e.group.subject.monthlyFeeCents,
       }));
       const subjectCents = lines.reduce((sum, l) => sum + l.cents, 0);
-      if (settings.feeMode === 'FIXED') {
-        const tariff = s.tuitionTariff;
-        if (tariff) {
-          const detail: TuitionDetail = { lines, discounts: [], pct: 0, tariff: { id: tariff.id, name: tariff.name, cents: tariff.monthlyCents } };
-          return { studentId: s.id, familyId: s.familyId, baseCents: tariff.monthlyCents, discountCents: 0, amountCents: tariff.monthlyCents, detail };
-        }
-        const detail: TuitionDetail = { lines, discounts: [], pct: 0, tariffMissing: true };
-        return { studentId: s.id, familyId: s.familyId, baseCents: subjectCents, discountCents: 0, amountCents: subjectCents, detail };
-      }
-      const baseCents = subjectCents;
       const discounts: TuitionDetail['discounts'] = [];
-      if (siblings.has(s.id) && settings.siblingDiscountPct) discounts.push({ kind: 'SIBLING', pct: settings.siblingDiscountPct });
-      const isMember = !!s.memberId || !!s.family?.guardians.some((g) => g.memberId);
-      if (isMember && settings.memberDiscountPct) discounts.push({ kind: 'MEMBER', pct: settings.memberDiscountPct });
-      if (s.enrollments.length >= 2 && settings.multiSubjectDiscountPct) discounts.push({ kind: 'MULTI_SUBJECT', pct: settings.multiSubjectDiscountPct });
-      const pct = Math.min(100, discounts.reduce((sum, d) => sum + d.pct, 0));
-      const discountCents = Math.round((baseCents * pct) / 100);
-      const detail: TuitionDetail = { lines, discounts, pct };
+      let baseCents = subjectCents;
+      let pct = 0;
+      const tariff = settings.feeMode === 'FIXED' ? s.tuitionTariff : null;
+      if (tariff) baseCents = tariff.monthlyCents;
+      else if (settings.feeMode !== 'FIXED') {
+        if (siblings.has(s.id) && settings.siblingDiscountPct) discounts.push({ kind: 'SIBLING', pct: settings.siblingDiscountPct });
+        const isMember = !!s.memberId || !!s.family?.guardians.some((g) => g.memberId);
+        if (isMember && settings.memberDiscountPct) discounts.push({ kind: 'MEMBER', pct: settings.memberDiscountPct });
+        if (s.enrollments.length >= 2 && settings.multiSubjectDiscountPct) discounts.push({ kind: 'MULTI_SUBJECT', pct: settings.multiSubjectDiscountPct });
+        pct = Math.min(100, discounts.reduce((sum, d) => sum + d.pct, 0));
+      }
+      let discountCents = Math.round((baseCents * pct) / 100);
+      const familyCents = Math.min((familyRank.get(s.id) ?? 0) * (settings.familyDiscountCents ?? 0), baseCents - discountCents);
+      if (familyCents > 0) discounts.push({ kind: 'FAMILY', pct: 0, cents: familyCents });
+      discountCents += familyCents;
+      const detail: TuitionDetail = {
+        lines,
+        discounts,
+        pct,
+        ...(tariff && { tariff: { id: tariff.id, name: tariff.name, cents: tariff.monthlyCents } }),
+        ...(settings.feeMode === 'FIXED' && !tariff && { tariffMissing: true }),
+      };
       return { studentId: s.id, familyId: s.familyId, baseCents, discountCents, amountCents: baseCents - discountCents, detail };
     });
 }

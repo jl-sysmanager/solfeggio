@@ -53,7 +53,7 @@ export class TuitionController {
           },
         }),
       ]);
-      const rows = computeTuition(students, settings ?? { siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0 }).filter((r) => r.baseCents > 0);
+      const rows = computeTuition(students, settings ?? { siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, familyDiscountCents: 0 }).filter((r) => r.baseCents > 0);
       const { count } = rows.length
         ? await tx.tuitionCharge.createMany({
             data: rows.map((r) => ({

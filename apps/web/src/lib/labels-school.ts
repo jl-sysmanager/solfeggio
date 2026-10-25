@@ -51,6 +51,7 @@ export const discountKind: Record<string, string> = {
   SIBLING: 'Hermanos',
   MEMBER: 'Socio de la banda',
   MULTI_SUBJECT: 'Varias asignaturas',
+  FAMILY: 'Familia',
 };
 
 export const conflictReason: Record<string, string> = {

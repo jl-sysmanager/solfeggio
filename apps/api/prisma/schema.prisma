@@ -1062,6 +1062,8 @@ model SchoolSettings {
   siblingDiscountPct      Int      @default(0)
   memberDiscountPct       Int      @default(0)
   multiSubjectDiscountPct Int      @default(0)
+  /// Importe fijo que se resta a cada alumno adicional de la misma familia.
+  familyDiscountCents     Int      @default(0)
   /// Texto de presentación del formulario público de matrícula.
   publicIntro             String?
   updatedAt               DateTime @updatedAt

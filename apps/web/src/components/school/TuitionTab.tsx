@@ -94,14 +94,15 @@ export function TuitionTab() {
               {
                 key: 'd',
                 header: 'Descuentos',
-                render: (c) =>
-                  c.detail.tariff
-                    ? c.detail.tariff.name
-                    : c.detail.tariffMissing
-                      ? 'Sin tarifa'
-                      : c.detail.discounts.length
-                        ? `${c.detail.discounts.map((d) => `${discountKind[d.kind]} ${d.pct} %`).join(', ')} (−${money(c.discountCents)})`
-                        : '—',
+                render: (c) => {
+                  const parts = [
+                    c.detail.tariff?.name,
+                    c.detail.tariffMissing ? 'Sin tarifa' : null,
+                    ...c.detail.discounts.map((d) => (d.kind === 'FAMILY' ? `${discountKind.FAMILY} ${money(d.cents)}` : `${discountKind[d.kind]} ${d.pct} %`)),
+                  ].filter(Boolean);
+                  if (!parts.length) return '—';
+                  return `${parts.join(', ')}${c.discountCents ? ` (−${money(c.discountCents)})` : ''}`;
+                },
               },
               { key: 'a', header: 'Importe', render: (c) => <strong>{money(c.amountCents)}</strong>, numeric: true, nowrap: true },
               { key: 'v', header: 'Vence', render: (c) => date(c.dueDate), nowrap: true },

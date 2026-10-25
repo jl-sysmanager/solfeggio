@@ -30,6 +30,7 @@ const settingsSchema = z.object({
   siblingDiscountPct: pct.optional(),
   memberDiscountPct: pct.optional(),
   multiSubjectDiscountPct: pct.optional(),
+  familyDiscountCents: cents.optional(),
   publicIntro: optionalText(4000),
 });
 const tariffFields = z.object({ name: name80, monthlyCents: cents, active: z.boolean().optional() });
@@ -178,7 +179,7 @@ export class SchoolController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const s = await tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId } });
       const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { slug: true } });
-      return { feeMode: 'PERCENT' as const, siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, publicIntro: null, ...s, slug: tenant?.slug };
+      return { feeMode: 'PERCENT' as const, siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, familyDiscountCents: 0, publicIntro: null, ...s, slug: tenant?.slug };
     });
   }
 
