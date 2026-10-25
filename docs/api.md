@@ -74,7 +74,7 @@ Cada ruta exige un permiso, indicado entre corchetes; algunas exigen además una
 - `GET /tenant` · `PATCH /tenant` [tenant:manage]
 - `GET /dashboard` → `{ members: { active, total }, nextEvents: Event[], pendingCharges: { count, amountCents }, attendanceRate30d (fracción 0–1), storage: { usedBytes, limitBytes }, users: { used, limit } }`
 - `GET /permissions` → catálogo `{ key, group, label }[]`
-- `GET|POST /roles`, `PATCH|DELETE /roles/:id` [roles:manage] (los roles de sistema no se pueden borrar)
+- `GET|POST /roles`, `PATCH|DELETE /roles/:id` [roles:manage] (los roles de sistema no se pueden borrar; `POST` acepta `{ name, permissions, key? }` — si falta `key` se genera del nombre; la lista incluye `membershipCount`)
 - `GET /users`, `PATCH /users/:membershipId { roleId?, status? }`, `DELETE /users/:membershipId` [users:manage]
 - `GET|POST /invitations { email, roleId, memberId?, createMember?: { firstName, lastName } }` · `DELETE /invitations/:id` [users:manage] (`createMember` exige también `members:write`). El email lleva el enlace `${APP_URL}/invite/<token>`, válido 7 días; las invitaciones pendientes cuentan para el límite de usuarios.
 - `GET /audit-logs?entity&actorId&page` [audit:read]

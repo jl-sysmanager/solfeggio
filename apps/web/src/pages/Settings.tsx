@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { del, patch, post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
 import type { AuditEntry, InstrumentCatalogItem, Paginated, PermissionDef, Role, Section, Tenant } from '../api/types';
@@ -6,10 +6,10 @@ import { useAuth } from '../auth/AuthProvider';
 import { Person } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { StatusChip } from '../components/Chip';
+import { Chip, StatusChip } from '../components/Chip';
 import { DataTable, Pagination } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
-import { FormError, SelectField, TextField, formValues } from '../components/Field';
+import { Checkbox, FormError, SelectField, TextField, formValues } from '../components/Field';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
 import { Tabs, type TabDef } from '../components/Tabs';
@@ -17,6 +17,12 @@ import { LogoEditor } from '../components/LogoEditor';
 import { REGIONS } from '../components/admin/support/shared';
 import { dateTime } from '../lib/format';
 import { tenantStatus } from '../lib/labels';
+
+function roleSummary(perms: string[], catalog: PermissionDef[]) {
+  const set = new Set(perms);
+  const areas = new Set(catalog.filter((p) => set.has(p.key)).map((p) => p.group));
+  return { areas: areas.size, count: perms.length };
+}
 
 function TenantTab() {
   const { reload, can } = useAuth();
@@ -79,110 +85,208 @@ function RolesTab() {
   const { can } = useAuth();
   const perms = useApi<PermissionDef[]>('/permissions');
   const roles = useApi<Role[]>('/roles');
-  const [draft, setDraft] = useState<Record<string, string[]>>({});
+  const catalog = perms.data ?? [];
+  const list = roles.data ?? [];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
   const [removing, setRemoving] = useState<Role | null>(null);
 
+  const selected = list.find((r) => r.id === selectedId) ?? list[0] ?? null;
+
   useEffect(() => {
-    if (roles.data) setDraft(Object.fromEntries(roles.data.map((r) => [r.id, r.permissions])));
-  }, [roles.data]);
+    if (!list.length) {
+      setSelectedId(null);
+      return;
+    }
+    if (!selectedId || !list.some((r) => r.id === selectedId)) setSelectedId(list[0].id);
+  }, [list, selectedId]);
+
+  useEffect(() => {
+    if (selected) setDraft([...selected.permissions]);
+  }, [selected?.id, selected?.permissions]);
 
   const groups = useMemo(() => {
     const map = new Map<string, PermissionDef[]>();
-    for (const p of perms.data ?? []) map.set(p.group, [...(map.get(p.group) ?? []), p]);
+    for (const p of catalog) map.set(p.group, [...(map.get(p.group) ?? []), p]);
     return Array.from(map.entries());
-  }, [perms.data]);
+  }, [catalog]);
 
-  const save = useApiMutation((r: Role) => patch(`/roles/${r.id}`, { permissions: draft[r.id] }), { success: 'Permisos guardados', invalidate: ['/roles'] });
-  const create = useApiMutation((body: unknown) => post('/roles', body), { success: 'Rol creado', invalidate: ['/roles'], onSuccess: () => setCreating(false) });
-  const remove = useApiMutation((id: string) => del(`/roles/${id}`), { success: 'Rol eliminado', invalidate: ['/roles'], onSuccess: () => setRemoving(null) });
+  const save = useApiMutation((body: { id: string; permissions: string[] }) => patch(`/roles/${body.id}`, { permissions: body.permissions }), {
+    success: 'Permisos guardados',
+    invalidate: ['/roles'],
+  });
+  const create = useApiMutation((body: unknown) => post<Role>('/roles', body), {
+    success: 'Rol creado',
+    invalidate: ['/roles'],
+    onSuccess: (role) => {
+      setCreating(false);
+      setSelectedId(role.id);
+    },
+  });
+  const remove = useApiMutation((id: string) => del(`/roles/${id}`), {
+    success: 'Rol eliminado',
+    invalidate: ['/roles'],
+    onSuccess: () => setRemoving(null),
+  });
 
   if (perms.isLoading || roles.isLoading) return <Loading />;
   if (roles.error) return <ErrorNote error={roles.error} />;
-  const list = roles.data ?? [];
-  const toggle = (rid: string, key: string) =>
-    setDraft((d) => ({ ...d, [rid]: d[rid]?.includes(key) ? d[rid].filter((k) => k !== key) : [...(d[rid] ?? []), key] }));
-  const dirty = (r: Role) => JSON.stringify([...(draft[r.id] ?? [])].sort()) !== JSON.stringify([...r.permissions].sort());
+
+  const isOwner = selected?.key === 'owner';
+  const dirty =
+    !!selected &&
+    !isOwner &&
+    JSON.stringify([...draft].sort()) !== JSON.stringify([...selected.permissions].sort());
+  const draftSet = new Set(draft);
+
+  const toggle = (key: string) => {
+    setDraft((d) => (d.includes(key) ? d.filter((k) => k !== key) : [...d, key]));
+  };
+  const setGroup = (items: PermissionDef[], on: boolean) => {
+    const keys = items.map((p) => p.key);
+    setDraft((d) => {
+      const without = d.filter((k) => !keys.includes(k));
+      if (!on) return without;
+      const add = keys.filter((k) => can(k) || d.includes(k));
+      return [...new Set([...without, ...add])];
+    });
+  };
+  const discard = () => selected && setDraft([...selected.permissions]);
 
   return (
-    <div className="stack" style={{ gap: 24 }}>
-      <div className="row between">
-        <p className="small">Marca qué puede hacer cada rol. El rol de propietario siempre tiene todos los permisos.</p>
+    <div className="stack" style={{ gap: 16 }}>
+      <div className="row between" style={{ alignItems: 'flex-start', gap: 12 }}>
+        <p className="small muted" style={{ margin: 0, maxWidth: '42rem' }}>
+          Los roles definen qué puede hacer cada persona en la banda. Elige un rol y marca las acciones permitidas por área.
+        </p>
         <Button onClick={() => setCreating(true)}>Nuevo rol</Button>
       </div>
-      <Card>
-        <div className="table-wrap">
-          <table className="table matrix">
-            <caption className="sr-only">Matriz de permisos por rol</caption>
-            <thead>
-              <tr>
-                <th scope="col">Permiso</th>
-                {list.map((r) => (
-                  <th key={r.id} scope="col" style={{ textAlign: 'center' }}>
-                    {r.name}
-                    {!r.isSystem && <span className="sr-only"> (personalizado)</span>}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {groups.map(([group, items]) => (
-                <Fragment key={group}>
-                  <tr>
-                    <th colSpan={list.length + 1} scope="colgroup" style={{ background: 'var(--surface-alt)' }}>
-                      {group}
-                    </th>
-                  </tr>
-                  {items.map((p) => (
-                    <tr key={p.key}>
-                      <th scope="row">
-                        {p.label}
-                        <span className="small muted" style={{ display: 'block' }}>
-                          {p.key}
-                        </span>
-                      </th>
-                      {list.map((r) => (
-                        <td key={r.id}>
-                          <input
-                            type="checkbox"
-                            aria-label={`${p.label} para ${r.name}`}
-                            checked={r.key === 'owner' || (draft[r.id] ?? []).includes(p.key)}
-                            disabled={r.key === 'owner' || (!(draft[r.id] ?? []).includes(p.key) && !can(p.key))}
-                            title={!can(p.key) ? 'No puedes conceder un permiso que no tienes' : undefined}
-                            onChange={() => toggle(r.id, p.key)}
-                            style={{ width: 18, height: 18, accentColor: 'var(--blue-600)' }}
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </Fragment>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td />
-                {list.map((r) => (
-                  <td key={r.id} style={{ textAlign: 'center' }}>
-                    <div className="stack" style={{ alignItems: 'center', gap: 6 }}>
-                      {r.key !== 'owner' && (
-                        <Button size="sm" disabled={!dirty(r)} onClick={() => save.mutate(r)}>
-                          Guardar
+
+      <div className="roles-layout">
+        <Card className="roles-layout__list" title="Roles">
+          <ul className="roles-nav" role="listbox" aria-label="Roles de la banda">
+            {list.map((r) => {
+              const summary = roleSummary(r.key === 'owner' ? catalog.map((p) => p.key) : r.permissions, catalog);
+              const active = selected?.id === r.id;
+              const people = r.membershipCount ?? 0;
+              return (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className={['roles-nav__item', active ? 'is-active' : ''].filter(Boolean).join(' ')}
+                    onClick={() => setSelectedId(r.id)}
+                  >
+                    <span className="roles-nav__name">{r.name}</span>
+                    <span className="roles-nav__meta">
+                      <Chip tone={r.isSystem ? 'info' : 'neutral'} plain>
+                        {r.isSystem ? 'De sistema' : 'Personalizado'}
+                      </Chip>
+                      <span className="small muted">
+                        {summary.areas} {summary.areas === 1 ? 'área' : 'áreas'}
+                        {people > 0 ? ` · ${people} ${people === 1 ? 'persona' : 'personas'}` : ''}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+
+        <Card
+          className="roles-layout__editor"
+          title={selected ? selected.name : 'Permisos'}
+          actions={
+            selected && !selected.isSystem ? (
+              <Button
+                size="sm"
+                variant="danger"
+                disabled={(selected.membershipCount ?? 0) > 0}
+                title={(selected.membershipCount ?? 0) > 0 ? 'Reasigna a las personas a otro rol antes de eliminarlo' : undefined}
+                onClick={() => setRemoving(selected)}
+              >
+                Eliminar
+              </Button>
+            ) : undefined
+          }
+        >
+          {!selected ? (
+            <p className="small muted">Crea un rol para empezar.</p>
+          ) : isOwner ? (
+            <p className="small">
+              El propietario tiene acceso total a la banda. Este rol no se puede modificar ni eliminar.
+            </p>
+          ) : (
+            <div className="stack" style={{ gap: 16 }}>
+              <p className="small muted" style={{ margin: 0 }}>
+                {roleSummary(draft, catalog).count} permisos en {roleSummary(draft, catalog).areas} áreas
+                {(selected.membershipCount ?? 0) > 0
+                  ? ` · ${selected.membershipCount} ${(selected.membershipCount ?? 0) === 1 ? 'persona' : 'personas'} con este rol`
+                  : ''}
+              </p>
+              {groups.map(([group, items]) => {
+                const enabled = items.filter((p) => draftSet.has(p.key)).length;
+                const allOn = enabled === items.length;
+                const someOn = enabled > 0 && !allOn;
+                return (
+                  <section key={group} className="perm-area">
+                    <header className="perm-area__head">
+                      <div>
+                        <h3 className="perm-area__title">{group}</h3>
+                        <p className="small muted" style={{ margin: 0 }}>
+                          {enabled} de {items.length}
+                        </p>
+                      </div>
+                      <div className="row" style={{ gap: 8 }}>
+                        <Button size="sm" variant="ghost" onClick={() => setGroup(items, true)} disabled={allOn}>
+                          Marcar área
                         </Button>
-                      )}
-                      {!r.isSystem && (
-                        <Button size="sm" variant="danger" onClick={() => setRemoving(r)}>
-                          Eliminar
+                        <Button size="sm" variant="ghost" onClick={() => setGroup(items, false)} disabled={!someOn && !allOn}>
+                          Quitar área
                         </Button>
-                      )}
-                    </div>
-                  </td>
-                ))}
-              </tr>
-            </tfoot>
-          </table>
-        </div>
-      </Card>
+                      </div>
+                    </header>
+                    <ul className="perm-area__list">
+                      {items.map((p) => {
+                        const checked = draftSet.has(p.key);
+                        const locked = !checked && !can(p.key);
+                        return (
+                          <li key={p.key}>
+                            <Checkbox
+                              label={p.label}
+                              checked={checked}
+                              disabled={locked}
+                              title={locked ? 'No puedes conceder un permiso que tú no tienes' : undefined}
+                              onChange={() => toggle(p.key)}
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </section>
+                );
+              })}
+              {dirty && (
+                <div className="roles-savebar">
+                  <FormError error={save.error} />
+                  <div className="row" style={{ gap: 8, justifyContent: 'flex-end' }}>
+                    <Button variant="ghost" onClick={discard} disabled={save.isPending}>
+                      Descartar
+                    </Button>
+                    <Button loading={save.isPending} onClick={() => selected && save.mutate({ id: selected.id, permissions: draft })}>
+                      Guardar cambios
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+
       <Modal open={creating} onClose={() => setCreating(false)} title="Nuevo rol">
         <form
           className="form"
@@ -190,12 +294,17 @@ function RolesTab() {
             e.preventDefault();
             const v = formValues(e.currentTarget);
             const base = list.find((r) => r.id === v.baseRoleId);
-            create.mutate({ name: v.name, key: v.key, permissions: base?.permissions ?? [] });
+            create.mutate({ name: v.name, permissions: base?.permissions ?? [] });
           }}
         >
-          <TextField label="Nombre" name="name" required placeholder="Archivero" />
-          <TextField label="Clave" name="key" required pattern="[a-z][a-z0-9_]*" placeholder="archivist" hint="Minúsculas y guiones bajos." />
-          <SelectField label="Copiar permisos de" name="baseRoleId" placeholder="Ninguno" options={list.map((r) => ({ value: r.id, label: r.name }))} />
+          <TextField label="Nombre" name="name" required placeholder="Archivero" hint="Cómo lo veréis al asignar el rol a una persona." />
+          <SelectField
+            label="Empezar copiando de"
+            name="baseRoleId"
+            placeholder="Ninguno (sin permisos)"
+            options={list.filter((r) => r.key !== 'owner').map((r) => ({ value: r.id, label: r.name }))}
+            hint="Luego podrás ajustar las áreas en el panel."
+          />
           <FormError error={create.error} />
           <div className="modal__footer">
             <Button variant="ghost" onClick={() => setCreating(false)}>
@@ -210,7 +319,7 @@ function RolesTab() {
       <ConfirmModal
         open={!!removing}
         title="Eliminar rol"
-        message={`¿Eliminar el rol «${removing?.name}»? Los usuarios con este rol deben reasignarse antes.`}
+        message={`¿Eliminar el rol «${removing?.name}»? Esta acción no se puede deshacer.`}
         confirmLabel="Eliminar"
         loading={remove.isPending}
         onConfirm={() => removing && remove.mutate(removing.id)}

@@ -378,6 +378,8 @@ export interface Role {
   name: string;
   permissions: string[];
   isSystem: boolean;
+  /** Personas con este rol (respuesta de GET /roles). */
+  membershipCount?: number;
 }
 export interface PermissionDef {
   key: string;

@@ -16,12 +16,42 @@ import { LimitsService } from '../tenancy/limits.service';
 import { ALL_PERMISSIONS, PERMISSIONS } from './permissions';
 
 const permList = z.array(z.enum(ALL_PERMISSIONS as [string, ...string[]])).max(ALL_PERMISSIONS.length);
+const roleKeySchema = z.string().regex(/^[a-z][a-z0-9_]{1,31}$/);
 const roleCreate = z.object({
-  key: z.string().regex(/^[a-z][a-z0-9_]{1,31}$/),
+  /** Opcional: si falta, se genera a partir del nombre (UI no técnica). */
+  key: roleKeySchema.optional(),
   name: z.string().trim().min(2).max(60),
-  permissions: permList,
+  permissions: permList.default([]),
 });
 const rolePatch = z.object({ name: z.string().trim().min(2).max(60).optional(), permissions: permList.optional() });
+
+/** Clave interna de rol a partir del nombre visible (sin acentos, máx. 32). */
+function roleKeyFromName(name: string): string {
+  const base = name
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 28);
+  if (!base) return 'rol';
+  return (base.match(/^[a-z]/) ? base : `r_${base}`).slice(0, 32);
+}
+
+async function uniqueRoleKey(tx: Tx, tenantId: string, preferred: string): Promise<string> {
+  let key = preferred.slice(0, 32);
+  let n = 2;
+  while (await tx.role.findUnique({ where: { tenantId_key: { tenantId, key } } })) {
+    const suffix = `_${n++}`;
+    key = `${preferred.slice(0, Math.max(1, 32 - suffix.length))}${suffix}`;
+  }
+  return key;
+}
+
+function presentRole<T extends { _count?: { memberships: number } }>(role: T) {
+  const { _count, ...rest } = role;
+  return { ...rest, membershipCount: _count?.memberships ?? 0 };
+}
 const userPatch = z.object({ roleId: z.string().uuid().optional(), status: z.enum(['ACTIVE', 'SUSPENDED']).optional() });
 const inviteSchema = z
   .object({
@@ -84,10 +114,11 @@ export class IamController {
 
   @Perm('roles:manage')
   @Get('roles')
-  roles(@Ctx() ctx: RequestContext) {
-    return this.db.tenant(ctx.tenantId, (tx) =>
+  async roles(@Ctx() ctx: RequestContext) {
+    const rows = await this.db.tenant(ctx.tenantId, (tx) =>
       tx.role.findMany({ orderBy: [{ isSystem: 'desc' }, { name: 'asc' }], include: { _count: { select: { memberships: true } } } }),
     );
+    return rows.map(presentRole);
   }
 
   @Perm('roles:manage')
@@ -95,9 +126,14 @@ export class IamController {
   createRole(@Ctx() ctx: RequestContext, @Body(zod(roleCreate)) body: z.infer<typeof roleCreate>) {
     this.assertCeiling(ctx, body.permissions);
     return this.db.tenant(ctx.tenantId, async (tx) => {
-      const role = await tx.role.create({ data: { ...body, tenantId: ctx.tenantId } });
-      await this.audit.log(tx, ctx, 'role.created', 'role', role.id, body);
-      return role;
+      const preferred = body.key ?? roleKeyFromName(body.name);
+      const key = await uniqueRoleKey(tx, ctx.tenantId, preferred);
+      const role = await tx.role.create({
+        data: { key, name: body.name, permissions: body.permissions, tenantId: ctx.tenantId },
+        include: { _count: { select: { memberships: true } } },
+      });
+      await this.audit.log(tx, ctx, 'role.created', 'role', role.id, { key, name: body.name, permissions: body.permissions });
+      return presentRole(role);
     });
   }
 
