@@ -219,9 +219,10 @@ model User {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
-  memberships    Membership[]
-  refreshTokens  RefreshToken[]
-  passwordResets PasswordResetToken[]
+  memberships      Membership[]
+  refreshTokens    RefreshToken[]
+  passwordResets   PasswordResetToken[]
+  emailVerifications EmailVerificationToken[]
 
   @@map("users")
 }
@@ -238,6 +239,20 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/// Enlace de un solo uso para confirmar que el email del propietario es suyo.
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@map("email_verification_tokens")
 }
 
 /// Programación editable del catálogo cerrado de tareas globales.

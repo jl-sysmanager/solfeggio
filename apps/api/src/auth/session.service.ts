@@ -6,7 +6,7 @@ import { effectiveLimits } from '../tenancy/effective-limits';
 import { withGuardianPortalAccess } from './effective-permissions';
 
 export interface Session {
-  user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean };
+  user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean; emailVerified: boolean };
   tenant: { id: string; name: string; slug: string; status: string; timezone: string; hasLogo: boolean; logoVersion: string | null } | null;
   role: { id: string; key: string; name: string } | null;
   permissions: string[];
@@ -48,6 +48,7 @@ export class SessionService {
         name: user.name,
         mfaEnabled: user.mfaEnabled,
         isPlatformAdmin: user.isPlatformAdmin,
+        emailVerified: !!user.emailVerifiedAt,
       },
       tenant: active
         ? {
@@ -90,7 +91,7 @@ export class SessionService {
       this.db.system.tenant.findUniqueOrThrow({ where: { id: imp.tenantId }, include: tenantEntitlement }),
     ]);
     return {
-      user: { id: user.id, email: user.email, name: user.name, mfaEnabled: user.mfaEnabled, isPlatformAdmin: user.isPlatformAdmin },
+      user: { id: user.id, email: user.email, name: user.name, mfaEnabled: user.mfaEnabled, isPlatformAdmin: user.isPlatformAdmin, emailVerified: !!user.emailVerifiedAt },
       tenant: {
         id: tenant.id, name: tenant.name, slug: tenant.slug, status: tenant.status, timezone: tenant.timezone,
         hasLogo: !!tenant.logoKey, logoVersion: tenant.logoKey ? tenant.updatedAt.toISOString() : null,

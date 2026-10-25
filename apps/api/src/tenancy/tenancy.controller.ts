@@ -162,12 +162,16 @@ export class TenancyController {
     if (ctx.impersonationId) throw new ForbiddenException({ message: 'No disponible en modo «ver como»', code: 'IMPERSONATION_READ_ONLY' });
     if (ctx.roleKey !== 'owner') throw new ForbiddenException({ message: 'Sólo el propietario puede eliminar la banda', code: 'OWNER_ONLY' });
     if (!ctx.tenantId) throw new BadRequestException({ message: 'Selecciona una banda', code: 'TENANT_REQUIRED' });
-    const { accessToken, refresh, session } = await this.onboarding.deleteBandAsOwner(ctx.userId, ctx.tenantId, body.password);
-    res.cookie('sf_rt', refresh, {
+    const issued = await this.onboarding.deleteBandAsOwner(ctx.userId, ctx.tenantId, body.password);
+    if (!issued) {
+      res.clearCookie('sf_rt', { path: '/api/v1/auth' });
+      return { accessToken: null, session: null, accountDeleted: true };
+    }
+    res.cookie('sf_rt', issued.refresh, {
       httpOnly: true, secure: env().NODE_ENV === 'production', sameSite: 'strict', path: '/api/v1/auth',
       maxAge: env().JWT_REFRESH_TTL_DAYS * 86_400_000,
     });
-    return { accessToken, session };
+    return { accessToken: issued.accessToken, session: issued.session, accountDeleted: false };
   }
 
   @Get('dashboard')

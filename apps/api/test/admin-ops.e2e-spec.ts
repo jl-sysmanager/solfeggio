@@ -182,7 +182,7 @@ describe('Salud técnica del panel global', () => {
     ctx.storage.remove = async (k: string) => void removed.push(k);
 
     const scan = await ctx.app.get(OpsService).scanOrphans();
-    expect(scan).toEqual({ count: 1, bytes: 700, scanned: 3 });
+    expect(scan).toMatchObject({ count: 1, bytes: 700, scanned: 3, accounts: 0 });
     const st = (await http().get(`${O}/storage`).set(auth(admin.token)).expect(200)).body;
     expect(st.totalBytes).toBe(5000);
     expect(st.topTenants[0]).toMatchObject({ id: band.tenantId, usedBytes: 5000 });

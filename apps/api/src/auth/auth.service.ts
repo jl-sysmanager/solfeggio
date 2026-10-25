@@ -14,6 +14,7 @@ import { TokensService } from './tokens.service';
 const MAX_FAILED = 5;
 const LOCK_MINUTES = 15;
 const RESET_TTL_MS = 60 * 60 * 1000;
+const VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
 // Hash ficticio para igualar tiempos cuando el email no existe.
 let dummyHash: Promise<string> | undefined;
 
@@ -39,6 +40,7 @@ export class AuthService {
     const user = await this.db.system.user.create({
       data: { email: normalized, name: name.trim(), passwordHash: await hashPassword(password) },
     });
+    await this.sendEmailVerification(user.id, user.email);
     return { id: user.id, email: user.email, name: user.name };
   }
 
@@ -181,6 +183,49 @@ export class AuthService {
       await this.audit.log(tx, { tenantId: inv.tenantId, userId }, 'invitation.accepted', 'membership', membership.id);
     });
     return this.issue(userId, inv.tenantId);
+  }
+
+  /**
+   * Envía un enlace de un solo uso. Si el email ya está confirmado no manda nada.
+   * La creación de una banda exige `emailVerifiedAt`.
+   */
+  async sendEmailVerification(userId: string, email?: string) {
+    const user = await this.db.system.user.findUnique({ where: { id: userId }, select: { id: true, email: true, emailVerifiedAt: true, blockedAt: true } });
+    if (!user || user.blockedAt) return { verified: false, sent: false };
+    if (user.emailVerifiedAt) return { verified: true, sent: false };
+    await this.db.system.emailVerificationToken.updateMany({ where: { userId, usedAt: null }, data: { usedAt: new Date() } });
+    const token = randomToken(32);
+    await this.db.system.emailVerificationToken.create({
+      data: { userId, tokenHash: sha256(token), expiresAt: new Date(Date.now() + VERIFY_TTL_MS) },
+    });
+    await this.jobs.add('email.send', {
+      to: email ?? user.email,
+      subject: 'Confirma tu email de Solfeamos',
+      text:
+        `Para crear tu banda necesitamos comprobar que este email es tuyo.\n\n` +
+        `Confírmalo aquí (el enlace caduca en 24 horas y sólo puede usarse una vez):\n${appUrl(`/verify-email/${token}`)}\n\n` +
+        `Si no has creado una cuenta, ignora este mensaje.`,
+    });
+    return { verified: false, sent: true };
+  }
+
+  /** Marca el email como confirmado. El enlace no revela si la cuenta existe cuando es inválido. */
+  async verifyEmail(token: string) {
+    const row = await this.db.system.emailVerificationToken.findUnique({ where: { tokenHash: sha256(token) } });
+    if (!row || row.usedAt || row.expiresAt < new Date()) {
+      throw new BadRequestException({ message: 'El enlace no es válido o ha caducado', code: 'EMAIL_VERIFY_INVALID' });
+    }
+    const user = await this.db.system.user.findUnique({ where: { id: row.userId }, select: { blockedAt: true, emailVerifiedAt: true } });
+    if (user?.blockedAt) throw new ForbiddenException({ message: 'Cuenta bloqueada', code: 'ACCOUNT_BLOCKED' });
+    await this.db.system.$transaction(async (tx) => {
+      const claimed = await tx.emailVerificationToken.updateMany({
+        where: { id: row.id, usedAt: null, expiresAt: { gt: new Date() } },
+        data: { usedAt: new Date() },
+      });
+      if (claimed.count !== 1) throw new BadRequestException({ message: 'El enlace no es válido o ha caducado', code: 'EMAIL_VERIFY_INVALID' });
+      if (!user?.emailVerifiedAt) await tx.user.update({ where: { id: row.userId }, data: { emailVerifiedAt: new Date() } });
+    });
+    return { verified: true };
   }
 
   /** Cambia la contraseña de la sesión actual y cierra el resto de sesiones. */

@@ -13,6 +13,7 @@ const URL_LINE = /^https?:\/\/[^\s<>"']+$/i;
 const URL_IN_TEXT = /https?:\/\/[^\s<>"']+/gi;
 
 const ACTION_LABELS: Array<[RegExp, string]> = [
+  [/^\/verify-email(?:\/|$)/, 'Confirmar el email'],
   [/^\/reset-password(?:\/|$)/, 'Elegir una contraseña'],
   [/^\/invite(?:\/|$)/, 'Aceptar la invitación'],
   [/^\/reinforcements(?:\/|$)/, 'Ver la bolsa de refuerzos'],

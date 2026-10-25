@@ -243,7 +243,8 @@ export function RegisterPage() {
         <TextField label="Contraseña" name="password" type="password" autoComplete="new-password" minLength={12} required hint="Mínimo 12 caracteres." />
         <TextField label="Repite la contraseña" name="password2" type="password" autoComplete="new-password" required />
         <p className="small muted">
-          Al crear la cuenta aceptas las condiciones del servicio y la política de privacidad. Tratamos tus datos conforme al RGPD.
+          Te enviaremos un enlace para confirmar el email antes de crear la banda. Al crear la cuenta aceptas las condiciones del servicio y la
+          política de privacidad.
         </p>
         <FormError error={error} />
         <Button type="submit" loading={loading}>
@@ -305,6 +306,53 @@ export function ForgotPasswordPage() {
             <Link to="/login">Volver a entrar</Link>
           </p>
         </form>
+      )}
+    </AuthLayout>
+  );
+}
+
+export function VerifyEmailPage() {
+  const { token } = useParams();
+  const { session, reload } = useAuth();
+  const navigate = useNavigate();
+  const [error, setError] = useState<unknown>(null);
+  const [loading, setLoading] = useState(false);
+  const [done, setDone] = useState(false);
+
+  async function confirm() {
+    setError(null);
+    setLoading(true);
+    try {
+      await api('/auth/email/verify', { method: 'POST', body: { token }, noRefresh: true });
+      if (session) await reload();
+      setDone(true);
+    } catch (err) {
+      setError(err instanceof ApiError && err.code === 'EMAIL_VERIFY_INVALID' ? new Error('El enlace no es válido o ha caducado. Pide otro desde el alta de la banda.') : err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <AuthLayout title="Confirmar email" lead="Este enlace comprueba que el email del propietario es suyo.">
+      {done ? (
+        <div className="stack">
+          <p>Email confirmado. Ya puedes crear la banda.</p>
+          {session ? (
+            <Button onClick={() => navigate('/onboarding', { replace: true })}>Crear la banda</Button>
+          ) : (
+            <p className="small">
+              <Link to="/login">Entra para continuar</Link>
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="stack">
+          <FormError error={error} />
+          <Button onClick={confirm} loading={loading} disabled={!token}>
+            Confirmar email
+          </Button>
+        </div>
       )}
     </AuthLayout>
   );

@@ -56,6 +56,12 @@ export class FakeStorage extends Storage {
     this.objects.delete(key);
     this.bodies.delete(key);
   }
+
+  async list(prefix: string) {
+    return [...this.objects.entries()]
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, size]) => ({ key, size, lastModified: null as Date | null }));
+  }
 }
 
 export class FakeStripe {
@@ -219,6 +225,7 @@ export { auth };
 export async function signupBand(ctx: TestCtx, slug: string, plan: PlanCode = 'PRO'): Promise<Band> {
   const email = `${slug}@test.local`;
   await ctx.http().post('/api/v1/auth/register').send({ email, password: PASSWORD, name: `Owner ${slug}` }).expect(201);
+  await ctx.db.system.user.update({ where: { email }, data: { emailVerifiedAt: new Date() } });
   const login = await ctx.http().post('/api/v1/auth/login').send({ email, password: PASSWORD }).expect(200);
   const onboard = await ctx.http().post('/api/v1/onboarding').set(auth(login.body.accessToken)).send({ bandName: `Banda ${slug}`, slug }).expect(201);
   const tenantId = onboard.body.session.tenant.id;

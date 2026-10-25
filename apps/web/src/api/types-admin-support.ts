@@ -103,7 +103,17 @@ export interface OpsEmail {
 export interface OpsStorage {
   totalBytes: number;
   topTenants: { id: string; name: string; usedBytes: number; quotaBytes: number | null }[];
-  orphans: null | { lastRunAt: string; detail: { scanned: number; count: number; bytes: number; sample: { key: string; size: number }[]; deleted?: { count: number; bytes: number } } };
+  orphans: null | {
+    lastRunAt: string;
+    detail: {
+      scanned: number;
+      count: number;
+      bytes: number;
+      sample: { key: string; size: number }[];
+      deleted?: { count: number; bytes: number };
+      accounts?: { count: number; sample: { id: string; email: string; name: string; createdAt: string }[]; deleted?: { count: number } };
+    };
+  };
 }
 
 export interface OpsSchedule {

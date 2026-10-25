@@ -18,13 +18,52 @@ export function slugify(s: string) {
 }
 
 export function OnboardingPage() {
-  const { applyTokenSession } = useAuth();
+  const { applyTokenSession, session, reload } = useAuth();
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  if (session && !session.user.emailVerified) {
+    return (
+      <AuthLayout title="Confirma tu email" lead={`Te hemos enviado un enlace a ${session.user.email}.`}>
+        <div className="stack">
+          <p>Ábrelo para comprobar que el email es tuyo. Hasta entonces no se puede crear la banda. El enlace caduca en 24 horas y sólo puede usarse una vez.</p>
+          <Button
+            loading={loading}
+            onClick={async () => {
+              setLoading(true);
+              setError(null);
+              try {
+                await post('/auth/email/send');
+                setNotice('Enlace reenviado.');
+              } catch (err) {
+                setError(err);
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            Reenviar enlace
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={async () => {
+              setError(null);
+              await reload();
+            }}
+          >
+            Ya lo he confirmado
+          </Button>
+          {notice && <p className="small">{notice}</p>}
+          <FormError error={error} />
+        </div>
+      </AuthLayout>
+    );
+  }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

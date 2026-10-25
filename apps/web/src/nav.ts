@@ -122,7 +122,7 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: 'Plataforma',
     items: [
-      { to: '/admin/users', icon: 'user', label: 'Usuarios' },
+      { to: '/admin/users', icon: 'user', label: 'Equipo' },
       { to: '/admin/ops', icon: 'storage', label: 'Sistema' },
       { to: '/admin/plans', icon: 'euro', label: 'Planes' },
       { to: '/admin/integrations', icon: 'settings', label: 'Integraciones' },

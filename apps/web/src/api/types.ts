@@ -19,7 +19,7 @@ export interface Membership {
 }
 
 export interface Session {
-  user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean };
+  user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean; emailVerified?: boolean };
   tenant: { id: string; name: string; slug: string; status: TenantStatus; timezone: string; hasLogo?: boolean; logoVersion?: string | null } | null;
   role: { id: string; key: string; name: string } | null;
   permissions: string[];

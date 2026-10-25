@@ -10,6 +10,12 @@ const SAMPLE = 50;
 
 export const ORPHANS = 'storage.orphans';
 
+/** Cuenta que no es del equipo y no pertenece a ninguna banda viva. */
+const orphanAccountWhere = {
+  isPlatformAdmin: false,
+  memberships: { none: { tenant: { deletedAt: null } } },
+} satisfies Prisma.UserWhereInput;
+
 @Injectable()
 export class OpsService {
   constructor(
@@ -46,17 +52,32 @@ export class OpsService {
     return { scanned: objects.length, orphans };
   }
 
-  /** Recorre `tenants/` y resume los objetos sin referencia. No borra nada. */
+  private async findOrphanAccounts() {
+    return this.db.system.user.findMany({
+      where: orphanAccountWhere,
+      select: { id: true, email: true, name: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  private async currentOrphanDetail() {
+    const row = await this.db.system.opsHeartbeat.findUnique({ where: { name: ORPHANS } });
+    return row?.detail && typeof row.detail === 'object' && !Array.isArray(row.detail) ? (row.detail as Record<string, unknown>) : {};
+  }
+
+  /** Recorre `tenants/` y las cuentas sin banda que no son del equipo. No borra nada. */
   async scanOrphans(now = new Date()) {
-    const { scanned, orphans } = await this.findOrphans(now);
+    const [{ scanned, orphans }, accounts] = await Promise.all([this.findOrphans(now), this.findOrphanAccounts()]);
+    const accountSample = accounts.slice(0, SAMPLE).map((u) => ({ id: u.id, email: u.email, name: u.name, createdAt: u.createdAt }));
     const detail = {
       scanned,
       count: orphans.length,
       bytes: orphans.reduce((s, o) => s + o.size, 0),
       sample: orphans.slice(0, SAMPLE).map((o) => ({ key: o.key, size: o.size, lastModified: o.lastModified })),
+      accounts: { count: accounts.length, sample: accountSample },
     };
     await this.beat(ORPHANS, 'ok', detail, now);
-    return { count: detail.count, bytes: detail.bytes, scanned };
+    return { count: detail.count, bytes: detail.bytes, scanned, accounts: accounts.length };
   }
 
   /** Borrado explícito: vuelve a calcular los huérfanos en el momento y elimina sólo los que siguen sin referencia. */
@@ -67,8 +88,43 @@ export class OpsService {
       await this.storage.remove(o.key);
       bytes += o.size;
     }
-    await this.beat(ORPHANS, 'ok', { scanned: 0, count: 0, bytes: 0, sample: [], deleted: { count: orphans.length, bytes, at: now } }, now);
+    const prev = await this.currentOrphanDetail();
+    await this.beat(ORPHANS, 'ok', { scanned: 0, count: 0, bytes: 0, sample: [], accounts: prev.accounts, deleted: { count: orphans.length, bytes, at: now } }, now);
     return { deleted: orphans.length, bytes };
+  }
+
+  /**
+   * Borra cuentas que no son del equipo y no tienen banda viva.
+   * Si llegan ids, sólo borra esos y sólo si siguen cumpliendo la condición.
+   */
+  async deleteOrphanAccounts(ids?: string[], now = new Date()) {
+    const rows = await this.db.system.user.findMany({
+      where: { ...orphanAccountWhere, ...(ids ? { id: { in: ids } } : {}) },
+      select: { id: true },
+    });
+    const userIds = rows.map((u) => u.id);
+    if (userIds.length > 0) {
+      await this.db.system.$transaction([
+        this.db.system.musicianProfile.deleteMany({ where: { userId: { in: userIds } } }),
+        this.db.system.user.deleteMany({ where: { id: { in: userIds } } }),
+      ]);
+    }
+    const remaining = ids ? await this.findOrphanAccounts() : [];
+    const prev = await this.currentOrphanDetail();
+    await this.beat(
+      ORPHANS,
+      'ok',
+      {
+        ...prev,
+        accounts: {
+          count: remaining.length,
+          sample: remaining.slice(0, SAMPLE).map((u) => ({ id: u.id, email: u.email, name: u.name, createdAt: u.createdAt })),
+          deleted: { count: userIds.length, at: now },
+        },
+      },
+      now,
+    );
+    return { deleted: userIds.length };
   }
 
   async heartbeats() {

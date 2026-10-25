@@ -27,7 +27,7 @@ export function UserBlocking() {
   return (
     <Card title="Bloqueo de usuarios">
       <p className="small muted">
-        Atajo de moderación. Gestión completa en <Link to="/admin/users">Usuarios</Link>.
+        Bloqueo de cuentas de las bandas. El equipo de la plataforma se gestiona en <Link to="/admin/users">Equipo</Link>.
       </p>
       <TextField label="Buscar usuario" value={term} onChange={(e) => setTerm(e.target.value)} hint="Nombre o email (3 letras como mínimo). Sin búsqueda se muestran los bloqueados." />
       {q.error && <ErrorNote error={q.error} />}

@@ -183,7 +183,7 @@ export class AdminController {
     return { ...t, storageUsedBytes: Number(t.storageUsedBytes) };
   }
 
-  /** Baja lógica de una banda (libera el slug; cancela Stripe si hay suscripción). */
+  /** Baja de una banda: libera el slug, cancela Stripe y borra ficheros y cuentas exclusivas. */
   @HttpCode(200)
   @Delete('tenants/:id')
   async deleteTenant(

@@ -32,6 +32,7 @@ const changePasswordSchema = z
   .refine((b) => b.currentPassword !== b.newPassword, { message: 'La nueva contraseña debe ser distinta', path: ['newPassword'] });
 const forgotSchema = z.object({ email: z.string().email().max(254) });
 const resetSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
+const verifyEmailSchema = z.object({ token: z.string().min(20).max(200) });
 const blankToNull = (v: unknown) =>
   v && typeof v === 'object' && !Array.isArray(v)
     ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, typeof x === 'string' && x.trim() === '' ? null : x]))
@@ -226,6 +227,23 @@ export class AuthController {
   async forgotPassword(@Body(zod(forgotSchema)) body: z.infer<typeof forgotSchema>) {
     await this.auth.requestPasswordReset(body.email);
     return { accepted: true };
+  }
+
+  @Public()
+  @Throttle({ default: { limit: env().RATE_LIMIT_AUTH_MAX, ttl: env().RATE_LIMIT_TTL_MS } })
+  @HttpCode(200)
+  @Post('email/verify')
+  verifyEmail(@Body(zod(verifyEmailSchema)) body: z.infer<typeof verifyEmailSchema>) {
+    return this.auth.verifyEmail(body.token);
+  }
+
+  @ApiBearerAuth()
+  @NoTenant()
+  @Throttle({ default: { limit: env().RATE_LIMIT_AUTH_MAX, ttl: env().RATE_LIMIT_TTL_MS } })
+  @HttpCode(200)
+  @Post('email/send')
+  sendEmailVerification(@Ctx() ctx: RequestContext) {
+    return this.auth.sendEmailVerification(ctx.userId);
   }
 
   @Public()

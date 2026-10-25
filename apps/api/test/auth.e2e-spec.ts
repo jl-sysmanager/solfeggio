@@ -1,5 +1,5 @@
 import { authenticator } from 'otplib';
-import { auth, createTestApp, PASSWORD, resetDb, signupBand, TestCtx } from './helpers';
+import { addUser, auth, createTestApp, PASSWORD, resetDb, signupBand, TestCtx } from './helpers';
 
 const cookieOf = (res: { headers: Record<string, unknown> }) =>
   ((res.headers['set-cookie'] as string[]) ?? []).find((c) => c.startsWith('sf_rt='))!.split(';')[0];
@@ -199,6 +199,7 @@ describe('Autenticación', () => {
   it('permite salir de una banda cuando hay otra y cerrar una cuenta sin bandas', async () => {
     const one = await signupBand(ctx, 'leave-a');
     const two = await ctx.http().post('/api/v1/onboarding').set(auth(one.token)).send({ bandName: 'Leave B', slug: 'leave-b' }).expect(201);
+    await addUser(ctx, { ...one, tenantId: two.body.session.tenant.id }, 'owner', 'leave-b-owner@test.local');
     const left = await ctx
       .http()
       .post('/api/v1/auth/leave-tenant')
@@ -214,5 +215,30 @@ describe('Autenticación', () => {
     await ctx.http().post('/api/v1/auth/close-account').set(auth(login.body.accessToken)).send({ password: PASSWORD, confirm: 'BORRAR' }).expect(400);
     await ctx.http().post('/api/v1/auth/close-account').set(auth(login.body.accessToken)).send({ password: PASSWORD, confirm: 'ELIMINAR' }).expect(204);
     await ctx.http().post('/api/v1/auth/login').send({ email, password: PASSWORD }).expect(401);
+  });
+
+  it('crear una banda exige confirmar el email y el enlace es de un solo uso', async () => {
+    const email = 'verificar@test.local';
+    await ctx.http().post('/api/v1/auth/register').send({ email, password: PASSWORD, name: 'Vera' }).expect(201);
+    const login = await ctx.http().post('/api/v1/auth/login').send({ email, password: PASSWORD }).expect(200);
+    expect(login.body.session.user.emailVerified).toBe(false);
+    const denied = await ctx.http().post('/api/v1/onboarding').set(auth(login.body.accessToken)).send({ bandName: 'Sin verificar', slug: 'sin-verificar' }).expect(403);
+    expect(denied.body.code).toBe('EMAIL_NOT_VERIFIED');
+
+    const first = ctx.jobs.of('email.send').filter((j) => j.data.to === email).at(-1)!;
+    const stale = /verify-email\/([\w-]+)/.exec(first.data.text)![1];
+    await ctx.http().post('/api/v1/auth/email/send').set(auth(login.body.accessToken)).expect(200);
+    await ctx.http().post('/api/v1/auth/email/verify').send({ token: stale }).expect(400);
+    await ctx.http().post('/api/v1/auth/email/verify').send({ token: 'x'.repeat(24) }).expect(400);
+
+    const latest = ctx.jobs.of('email.send').filter((j) => j.data.to === email).at(-1)!;
+    const token = /verify-email\/([\w-]+)/.exec(latest.data.text)![1];
+    expect(token).not.toBe(stale);
+    expect((await ctx.http().post('/api/v1/auth/email/verify').send({ token }).expect(200)).body).toEqual({ verified: true });
+    await ctx.http().post('/api/v1/auth/email/verify').send({ token }).expect(400);
+    expect((await ctx.http().post('/api/v1/auth/email/send').set(auth(login.body.accessToken)).expect(200)).body).toEqual({ verified: true, sent: false });
+
+    const created = await ctx.http().post('/api/v1/onboarding').set(auth(login.body.accessToken)).send({ bandName: 'Ya verificada', slug: 'ya-verificada' }).expect(201);
+    expect(created.body.session.user.emailVerified).toBe(true);
   });
 });

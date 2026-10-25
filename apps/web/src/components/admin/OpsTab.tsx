@@ -103,13 +103,19 @@ function EmailPanel() {
 function StoragePanel() {
   const q = useApi<OpsStorage>('/admin/ops/storage');
   const [confirming, setConfirming] = useState(false);
+  const [accountTarget, setAccountTarget] = useState<'all' | string | null>(null);
   const [typed, setTyped] = useState('');
   const opts = { invalidate: ['/admin/ops/storage'] };
   const scan = useApiMutation(() => post('/admin/ops/storage/orphans/scan'), { success: 'Análisis completado', ...opts });
   const purge = useApiMutation(() => post<{ deleted: number }>('/admin/ops/storage/orphans/delete', { confirm: 'ELIMINAR' }), { success: 'Huérfanos eliminados', ...opts, onSuccess: () => { setConfirming(false); setTyped(''); } });
+  const purgeAccounts = useApiMutation(
+    (ids?: string[]) => post<{ deleted: number }>('/admin/ops/storage/orphans/accounts/delete', { confirm: 'ELIMINAR', ids }),
+    { success: 'Cuentas eliminadas', ...opts, onSuccess: () => { setAccountTarget(null); setTyped(''); } },
+  );
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
   const o = q.data.orphans?.detail;
+  const accounts = o?.accounts;
   return (
     <Card title="Almacenamiento" actions={<Button size="sm" variant="ghost" onClick={() => scan.mutate()} loading={scan.isPending}>Analizar huérfanos</Button>}>
       <p>Total almacenado: <strong>{bytes(q.data.totalBytes)}</strong></p>
@@ -133,6 +139,25 @@ function StoragePanel() {
           </p>
           {o.sample.length > 0 && <ul className="small mono list-plain">{o.sample.slice(0, 10).map((s) => <li key={s.key}>{s.key} · {bytes(s.size)}</li>)}</ul>}
           {o.count > 0 && <div><Button variant="danger" size="sm" onClick={() => setConfirming(true)}>Eliminar huérfanos…</Button></div>}
+          <h3 className="card__title">Cuentas sin banda</h3>
+          {!accounts ? (
+            <p className="small muted">El análisis incluye las cuentas que no son del equipo y no pertenecen a ninguna banda.</p>
+          ) : accounts.count === 0 ? (
+            <p className="small muted">No hay cuentas huérfanas.</p>
+          ) : (
+            <div className="stack">
+              <p>{accounts.count} cuentas que no son del equipo y no pertenecen a ninguna banda.</p>
+              <ul className="small list-plain">
+                {accounts.sample.map((u) => (
+                  <li key={u.id} className="row" style={{ justifyContent: 'space-between' }}>
+                    <span>{u.name} · {u.email}</span>
+                    <Button variant="danger" size="sm" onClick={() => setAccountTarget(u.id)}>Eliminar</Button>
+                  </li>
+                ))}
+              </ul>
+              <div><Button variant="danger" size="sm" onClick={() => setAccountTarget('all')}>Eliminar todas…</Button></div>
+            </div>
+          )}
         </div>
       )}
       <ConfirmModal
@@ -141,12 +166,31 @@ function StoragePanel() {
         confirmLabel="Eliminar definitivamente"
         loading={purge.isPending}
         onConfirm={() => typed === 'ELIMINAR' && purge.mutate()}
-        onClose={() => setConfirming(false)}
+        onClose={() => { setConfirming(false); setTyped(''); }}
         message={
           <div className="stack">
             <p>Se borrarán de forma permanente los archivos sin referencia con más de 24 h. Escribe ELIMINAR para confirmar.</p>
             <TextField label="Confirmación" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
             <FormError error={purge.error} />
+          </div>
+        }
+      />
+      <ConfirmModal
+        open={accountTarget !== null}
+        title="Eliminar cuentas huérfanas"
+        confirmLabel="Eliminar definitivamente"
+        loading={purgeAccounts.isPending}
+        onConfirm={() => typed === 'ELIMINAR' && purgeAccounts.mutate(accountTarget === 'all' ? undefined : accountTarget ? [accountTarget] : undefined)}
+        onClose={() => { setAccountTarget(null); setTyped(''); }}
+        message={
+          <div className="stack">
+            <p>
+              {accountTarget === 'all'
+                ? 'Se borrarán las cuentas que no son del equipo y no pertenecen a ninguna banda. Escribe ELIMINAR para confirmar.'
+                : 'Se borrará esta cuenta. No pertenece al equipo ni a ninguna banda. Escribe ELIMINAR para confirmar.'}
+            </p>
+            <TextField label="Confirmación" value={typed} onChange={(e) => setTyped(e.target.value)} autoComplete="off" />
+            <FormError error={purgeAccounts.error} />
           </div>
         }
       />

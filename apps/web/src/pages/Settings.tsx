@@ -26,17 +26,22 @@ function roleSummary(perms: string[], catalog: PermissionDef[]) {
 }
 
 function TenantTab() {
-  const { reload, can, session, applyTokenSession } = useAuth();
+  const { reload, can, session, applyTokenSession, logout } = useAuth();
   const navigate = useNavigate();
   const q = useApi<Tenant & { region?: string | null }>('/tenant');
   const save = useApiMutation((body: unknown) => patch('/tenant', body), { success: 'Datos de la banda guardados', invalidate: ['/tenant'], onSuccess: () => reload() });
   const [deleting, setDeleting] = useState(false);
   const remove = useApiMutation(
-    (body: { password: string; confirm: 'ELIMINAR' }) => post<{ accessToken: string; session: Session }>('/tenant/delete', body),
+    (body: { password: string; confirm: 'ELIMINAR' }) =>
+      post<{ accessToken: string | null; session: Session | null; accountDeleted: boolean }>('/tenant/delete', body),
     {
       success: 'Banda eliminada',
       onSuccess: (res) => {
-        applyTokenSession(res);
+        if (res.accountDeleted || !res.accessToken || !res.session) {
+          void logout().finally(() => navigate('/login', { replace: true }));
+          return;
+        }
+        applyTokenSession({ accessToken: res.accessToken, session: res.session });
         navigate(res.session.memberships.length ? '/select-band' : '/onboarding', { replace: true });
       },
     },
@@ -96,8 +101,9 @@ function TenantTab() {
         {!deleting ? (
           <div className="stack">
             <p className="small">
-              Se cierra el acceso de todos los usuarios y se cancela la suscripción si la hay. El identificador <code>{t.slug}</code> queda
-              libre. Los datos dejan de estar disponibles en la aplicación (baja lógica). Esta acción no se puede deshacer desde aquí.
+              Se eliminan los ficheros de la banda y las cuentas que sólo pertenecían a ella. Quien también está en otra
+              banda conserva su cuenta, pero pierde el acceso a ésta. Se cancela la suscripción si la hay y el identificador{' '}
+              <code>{t.slug}</code> queda libre. Esta acción no se puede deshacer.
             </p>
             <div>
               <Button variant="danger" onClick={() => setDeleting(true)}>

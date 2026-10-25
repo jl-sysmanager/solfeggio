@@ -20,7 +20,7 @@ function statusChip(u: AdminUser) {
   return <Chip tone="success">Activo</Chip>;
 }
 
-/** Cuentas de plataforma: el equipo tiene el rol básico; una cuenta sin banda se puede eliminar. */
+/** Equipo de administración de la plataforma. Las cuentas de cada banda se gestionan en esa banda. */
 export function UsersTab() {
   const { session } = useAuth();
   const [q, setQ] = useState('');
@@ -48,6 +48,10 @@ export function UsersTab() {
     success: 'Sesiones cerradas',
     ...inv,
   });
+  const grant = useApiMutation((email: string) => post('/admin/users/grant', { email }), {
+    success: 'Incorporado al equipo',
+    ...inv,
+  });
   const remove = useApiMutation((id: string) => del(`/admin/users/${id}`), {
     success: 'Cuenta eliminada',
     ...inv,
@@ -62,6 +66,19 @@ export function UsersTab() {
   return (
     <div className="stack" style={{ gap: 24 }}>
       <Card>
+        <p className="small muted">Cuentas del equipo de la plataforma. Las de cada banda se gestionan dentro de esa banda.</p>
+        <form
+          className="toolbar"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const email = formValues(e.currentTarget).email?.trim();
+            if (email) grant.mutate(email);
+          }}
+        >
+          <TextField label="Añadir al equipo" name="email" type="email" required placeholder="email@dominio" />
+          <Button type="submit" loading={grant.isPending}>Añadir</Button>
+        </form>
+        <FormError error={grant.error} />
         <div className="toolbar">
           <TextField
             label="Buscar"
@@ -84,8 +101,6 @@ export function UsersTab() {
               { value: 'all', label: 'Todos' },
               { value: 'active', label: 'Activos' },
               { value: 'blocked', label: 'Bloqueados' },
-              { value: 'platform', label: 'Equipo de plataforma' },
-              { value: 'unassigned', label: 'Sin banda' },
             ]}
           />
         </div>
@@ -99,7 +114,7 @@ export function UsersTab() {
             rows={list.data.data}
             rowKey={(row) => row.id}
             onRowClick={setSelected}
-            empty="Ningún usuario coincide."
+            empty="Nadie del equipo coincide."
             columns={[
               { key: 'n', header: 'Usuario', render: (row) => `${row.name} · ${row.email}` },
               { key: 's', header: 'Estado', render: statusChip },
@@ -180,9 +195,9 @@ export function UsersTab() {
                     Bloquear
                   </Button>
                 ) : null}
-                {!u.blockedAt && (
-                  <Button loading={patchUser.isPending} onClick={() => patchUser.mutate({ id: u.id, isPlatformAdmin: !u.isPlatformAdmin })}>
-                    {u.isPlatformAdmin ? 'Quitar equipo' : 'Dar equipo'}
+                {!u.blockedAt && u.id !== session?.user.id && (
+                  <Button loading={patchUser.isPending} onClick={() => patchUser.mutate({ id: u.id, isPlatformAdmin: false })}>
+                    Quitar del equipo
                   </Button>
                 )}
                 <Button variant="ghost" loading={revoke.isPending} onClick={() => revoke.mutate(u.id)}>

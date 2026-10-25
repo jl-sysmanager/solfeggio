@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -15,8 +15,9 @@ import { platformAudit } from '../platform/support.util';
 
 const usersQuery = pageQuery.extend({
   q: z.string().trim().max(100).optional(),
-  status: z.enum(['all', 'active', 'blocked', 'platform', 'unassigned']).default('all'),
+  status: z.enum(['all', 'active', 'blocked']).default('all'),
 });
+const grantSchema = z.object({ email: z.string().trim().email().max(254) });
 const blockSchema = z.object({ reason: z.string().trim().min(3).max(1000) });
 const userPatch = z
   .object({ isPlatformAdmin: z.boolean().optional() })
@@ -81,8 +82,8 @@ function presentUser(u: {
 }
 
 /**
- * Cuentas de la plataforma: equipo de administración (rol básico) y el resto de usuarios.
- * Una cuenta sin banda se puede eliminar; si pertenece a alguna, hay que quitarla antes desde esa banda.
+ * Equipo de administración de la plataforma (`isPlatformAdmin`).
+ * Las cuentas de cada banda se gestionan en esa banda. Una cuenta del equipo sin banda se puede eliminar.
  */
 @ApiTags('admin')
 @ApiBearerAuth()
@@ -97,10 +98,9 @@ export class AdminUsersController {
   @Get()
   async list(@Query(zod(usersQuery)) q: z.infer<typeof usersQuery>) {
     const where: Prisma.UserWhereInput = {
+      isPlatformAdmin: true,
       ...(q.status === 'blocked' && { blockedAt: { not: null } }),
       ...(q.status === 'active' && { blockedAt: null }),
-      ...(q.status === 'platform' && { isPlatformAdmin: true }),
-      ...(q.status === 'unassigned' && { memberships: { none: { tenant: { deletedAt: null } } } }),
       ...(q.q && {
         OR: [{ name: { contains: q.q, mode: 'insensitive' } }, { email: { contains: q.q, mode: 'insensitive' } }],
       }),
@@ -110,6 +110,15 @@ export class AdminUsersController {
       this.db.system.user.count({ where }),
     ]);
     return page(rows.map(presentUser), total, q);
+  }
+
+  /** Incorpora al equipo una cuenta ya existente, buscada por email. No lista el resto de usuarios. */
+  @HttpCode(200)
+  @Post('grant')
+  async grant(@Ctx() ctx: RequestContext, @Body(zod(grantSchema)) body: z.infer<typeof grantSchema>) {
+    const user = await this.db.system.user.findUnique({ where: { email: body.email.trim().toLowerCase() }, select: { id: true } });
+    if (!user) throw new NotFoundException({ message: 'No hay ninguna cuenta con ese email', code: 'USER_NOT_FOUND' });
+    return this.update(ctx, user.id, { isPlatformAdmin: true });
   }
 
   @Get(':id')
@@ -161,14 +170,17 @@ export class AdminUsersController {
   }
 
   /**
-   * Borra la cuenta sólo si no queda ninguna banda viva. Quien administra no puede
-   * eliminarse a sí mismo, así que siempre queda al menos esa cuenta de plataforma.
+   * Borra una cuenta del equipo sólo si no queda ninguna banda viva.
+   * Quien administra no puede eliminarse a sí mismo.
    */
   @HttpCode(204)
   @Delete(':id')
   async remove(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
     if (id === ctx.userId) throw new BadRequestException({ message: 'No puedes eliminar tu propia cuenta', code: 'CANNOT_DELETE_SELF' });
     const user = found(await this.db.system.user.findUnique({ where: { id } }), 'Usuario');
+    if (!user.isPlatformAdmin) {
+      throw new BadRequestException({ message: 'Las cuentas de las bandas se gestionan en cada banda', code: 'NOT_PLATFORM_USER' });
+    }
     const bands = await this.db.system.membership.count({ where: { userId: id, tenant: { deletedAt: null } } });
     if (bands > 0) {
       throw new BadRequestException({ message: 'El usuario pertenece a una banda', code: 'USER_HAS_BAND' });

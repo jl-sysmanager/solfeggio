@@ -210,7 +210,7 @@ export function TenantsTab() {
       <ConfirmModal
         open={!!removing}
         title="Eliminar banda"
-        message={`¿Eliminar «${removing?.name}» (${removing?.slug})? Se cierra el acceso de todos los usuarios, se libera el identificador y se cancela la suscripción de Stripe si la hay.`}
+        message={`¿Eliminar «${removing?.name}» (${removing?.slug})? Se borran sus ficheros y las cuentas que sólo pertenecían a esta banda. Se libera el identificador y se cancela la suscripción de Stripe si la hay.`}
         confirmLabel="Eliminar"
         loading={remove.isPending}
         onConfirm={() => removing && remove.mutate(removing.id)}

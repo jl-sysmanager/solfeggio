@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth, RequireTenant, FeaturePage, Guard } from './auth/guards';
 import { AppShell } from './components/AppShell';
 import { Loading } from './components/EmptyState';
-import { LoginPage, RegisterPage, AcceptInvitePage, ForgotPasswordPage, ResetPasswordPage } from './pages/Auth';
+import { LoginPage, RegisterPage, AcceptInvitePage, ForgotPasswordPage, ResetPasswordPage, VerifyEmailPage } from './pages/Auth';
 import { OnboardingPage, TenantPickerPage } from './pages/Onboarding';
 import { DashboardPage } from './pages/Dashboard';
 
@@ -67,6 +67,7 @@ export function App() {
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <Route path="/verify-email/:token" element={<VerifyEmailPage />} />
       <Route path="/invite/:token" element={<AcceptInvitePage />} />
       <Route path="/enroll/:slug" element={<Suspense fallback={<Loading />}><EnrollPublic /></Suspense>} />
       <Route path="/onboarding" element={<RequireAuth><OnboardingPage /></RequireAuth>} />

@@ -7,7 +7,7 @@ export const SCHEDULE_CATALOG = [
   { key: 'platform.snapshot', label: 'Instantánea de métricas', description: 'Guarda las métricas diarias de la plataforma.', pattern: '30 2 * * *' },
   { key: 'support.sla-sweep', label: 'Control de SLA de soporte', description: 'Revisa los plazos de las incidencias de soporte.', pattern: '*/15 * * * *' },
   { key: 'billing.reconcile-addons', label: 'Conciliación de complementos', description: 'Sincroniza los complementos contratados con facturación.', pattern: '15 3 * * *' },
-  { key: 'ops.orphan-scan', label: 'Análisis de archivos huérfanos', description: 'Busca objetos almacenados sin referencia en la base de datos.', pattern: '0 5 * * 0' },
+  { key: 'ops.orphan-scan', label: 'Análisis de huérfanos', description: 'Busca objetos almacenados sin referencia y cuentas que no son del equipo ni de ninguna banda.', pattern: '0 5 * * 0' },
   { key: 'backups.export-tenants', label: 'Copia de las bandas', description: 'Guarda una copia de los datos de cada banda. Restaurarla sustituye la banda original.', pattern: '0 1 * * *' },
 ] as const;
 

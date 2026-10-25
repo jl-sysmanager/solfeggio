@@ -27,6 +27,7 @@ const deliveryEvent = z.object({
 const deliveryBody = z.union([deliveryEvent, z.array(deliveryEvent).min(1).max(100)]);
 const providerParam = z.string().regex(/^[a-z0-9-]{2,30}$/);
 const orphanDelete = z.object({ confirm: z.literal('ELIMINAR') });
+const orphanAccountsDelete = z.object({ confirm: z.literal('ELIMINAR'), ids: z.array(z.string().uuid()).max(100).optional() });
 const restoreBody = z.object({ confirm: z.string().trim().min(2).max(80) });
 const scheduleParam = z.string().refine((value) => !!scheduledTask(value), 'Tarea no permitida');
 const scheduleBody = z.object({
@@ -118,6 +119,15 @@ export class AdminOpsController {
   async deleteOrphans(@Ctx() ctx: RequestContext, @Body(zod(orphanDelete)) _body: z.infer<typeof orphanDelete>) {
     const r = await this.ops.deleteOrphans();
     await platformAudit(this.db.system, ctx, 'ops.orphans.deleted', 'storage', null, r);
+    return r;
+  }
+
+  /** Borra cuentas que no son del equipo y no pertenecen a ninguna banda. Exige confirmación. */
+  @HttpCode(200)
+  @Post('admin/ops/storage/orphans/accounts/delete')
+  async deleteOrphanAccounts(@Ctx() ctx: RequestContext, @Body(zod(orphanAccountsDelete)) body: z.infer<typeof orphanAccountsDelete>) {
+    const r = await this.ops.deleteOrphanAccounts(body.ids);
+    await platformAudit(this.db.system, ctx, 'ops.orphan_accounts.deleted', 'user', null, r);
     return r;
   }
 

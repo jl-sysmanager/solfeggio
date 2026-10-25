@@ -5,6 +5,7 @@ import { SYSTEM_ROLES } from '../iam/permissions';
 import { AuthService } from '../auth/auth.service';
 import type { RequestContext } from '../auth/context';
 import { StripeClient } from '../billing/stripe.provider';
+import { Storage } from '../storage/storage.service';
 import { DEFAULT_INSTRUMENTS } from './instrument-catalog';
 import { buildSetupGuide } from './setup-guide';
 
@@ -31,9 +32,14 @@ export class OnboardingService {
     private readonly audit: Audit,
     private readonly auth: AuthService,
     private readonly stripe: StripeClient,
+    private readonly storage: Storage,
   ) {}
 
   async createBand(userId: string, input: { bandName: string; slug: string; country?: string; timezone?: string }) {
+    const owner = await this.db.system.user.findUnique({ where: { id: userId }, select: { emailVerifiedAt: true } });
+    if (!owner?.emailVerifiedAt) {
+      throw new ForbiddenException({ message: 'Confirma tu email antes de crear la banda', code: 'EMAIL_NOT_VERIFIED' });
+    }
     if (RESERVED_SLUGS.has(input.slug)) throw new ConflictException({ message: 'Ese identificador no está disponible', code: 'SLUG_TAKEN' });
     const taken = await this.db.system.tenant.findUnique({ where: { slug: input.slug } });
     if (taken) throw new ConflictException({ message: 'Ese identificador ya está en uso', code: 'SLUG_TAKEN' });
@@ -127,8 +133,9 @@ export class OnboardingService {
   }
 
   /**
-   * Baja lógica de la banda: deja de ser accesible, libera el slug y cancela Stripe si hay suscripción.
-   * Sólo el propietario (con contraseña) o el panel global.
+   * Baja de la banda: deja de ser accesible, libera el slug y cancela Stripe si hay suscripción.
+   * Borra sus ficheros y las cuentas que no pertenecen a ninguna otra banda. Un administrador
+   * de plataforma conserva la cuenta. Sólo el propietario (con contraseña) o el panel global.
    */
   async softDeleteTenant(tenantId: string, actorUserId: string, meta?: { via?: string }) {
     const tenant = await this.db.system.tenant.findFirst({
@@ -151,17 +158,22 @@ export class OnboardingService {
     const freeSlug = `${tenant.slug.slice(0, 28)}-x-${tenant.id.replace(/-/g, '').slice(0, 8)}`.slice(0, 40);
     await this.db.system.tenant.update({
       where: { id: tenantId },
-      data: { deletedAt: new Date(), status: 'CANCELLED', slug: freeSlug },
+      data: { deletedAt: new Date(), status: 'CANCELLED', slug: freeSlug, logoKey: null, logoMime: null, storageUsedBytes: 0 },
     });
+    const filesDeleted = await this.purgeFiles(tenantId, tenant.logoKey);
+    const { deletedUsers, actorDeleted } = await this.purgeAccounts(tenantId, actorUserId);
     await this.db.tenant(tenantId, async (tx) => {
-      await this.audit.log(tx, { tenantId, userId: actorUserId }, 'tenant.deleted', 'tenant', tenantId, {
+      await this.audit.log(tx, { tenantId, userId: actorDeleted ? '' : actorUserId }, 'tenant.deleted', 'tenant', tenantId, {
         previousSlug: tenant.slug,
         via: meta?.via ?? 'owner',
+        deletedUsers,
+        filesDeleted,
       });
     });
+    return { actorDeleted, deletedUsers, filesDeleted };
   }
 
-  /** Propietario elimina la banda activa (o la indicada) tras confirmar con contraseña. */
+  /** Propietario elimina la banda activa tras confirmar con contraseña. Si su cuenta desaparece, no hay sesión nueva. */
   async deleteBandAsOwner(userId: string, tenantId: string, password: string) {
     await this.auth.verifyPassword(userId, password);
     const membership = await this.db.system.membership.findUnique({
@@ -172,7 +184,64 @@ export class OnboardingService {
     if (membership.role.key !== 'owner') {
       throw new ForbiddenException({ message: 'Sólo el propietario puede eliminar la banda', code: 'OWNER_ONLY' });
     }
-    await this.softDeleteTenant(tenantId, userId, { via: 'owner' });
+    const { actorDeleted } = await this.softDeleteTenant(tenantId, userId, { via: 'owner' });
+    if (actorDeleted) return null;
     return this.auth.reissueWithoutTenant(userId);
+  }
+
+  /** Cuentas exclusivas de la banda. Quien sigue en otra banda, o es administrador de plataforma, se conserva. */
+  private async purgeAccounts(tenantId: string, actorUserId: string) {
+    const memberships = await this.db.system.membership.findMany({ where: { tenantId }, select: { userId: true } });
+    const userIds = [...new Set(memberships.map((m) => m.userId))];
+    const [users, elsewhere] = await Promise.all([
+      this.db.system.user.findMany({ where: { id: { in: userIds } }, select: { id: true, isPlatformAdmin: true } }),
+      this.db.system.membership.findMany({
+        where: { userId: { in: userIds }, tenantId: { not: tenantId }, tenant: { deletedAt: null } },
+        select: { userId: true },
+      }),
+    ]);
+    const stays = new Set(elsewhere.map((m) => m.userId));
+    const drop = users.filter((u) => !u.isPlatformAdmin && !stays.has(u.id)).map((u) => u.id);
+    if (drop.length) {
+      await this.db.system.musicianProfile.deleteMany({ where: { userId: { in: drop } } });
+      await this.db.system.user.deleteMany({ where: { id: { in: drop } } });
+    }
+    await this.db.system.membership.deleteMany({ where: { tenantId } });
+    await this.db.system.invitation.deleteMany({ where: { tenantId } });
+    await this.db.system.refreshToken.updateMany({ where: { tenantId, revokedAt: null }, data: { revokedAt: new Date() } });
+    return { deletedUsers: drop.length, actorDeleted: drop.includes(actorUserId) };
+  }
+
+  /** Objetos de la banda en el almacén, incluido el logotipo y las copias de seguridad. */
+  private async purgeFiles(tenantId: string, logoKey: string | null) {
+    const keys = new Set<string>();
+    if (logoKey?.startsWith(`tenants/${tenantId}/`)) keys.add(logoKey);
+    try {
+      for (const object of await this.storage.list(`tenants/${tenantId}/`)) keys.add(object.key);
+    } catch (err) {
+      this.log.warn(`No se pudo listar el almacén de ${tenantId}: ${(err as Error).message}`);
+    }
+    const [assets, docs, listings, receipts, photos, backups] = await Promise.all([
+      this.db.system.asset.findMany({ where: { tenantId }, select: { fileKey: true } }),
+      this.db.system.document.findMany({ where: { tenantId }, select: { fileKey: true } }),
+      this.db.system.listing.findMany({ where: { tenantId }, select: { imageKeys: true } }),
+      this.db.system.transaction.findMany({ where: { tenantId, receiptKey: { not: null } }, select: { receiptKey: true } }),
+      this.db.system.member.findMany({ where: { tenantId, photoKey: { not: null } }, select: { photoKey: true } }),
+      this.db.system.tenantBackup.findMany({ where: { tenantId }, select: { fileKey: true } }),
+    ]);
+    for (const row of assets) keys.add(row.fileKey);
+    for (const row of docs) keys.add(row.fileKey);
+    for (const row of listings) row.imageKeys.forEach((key) => keys.add(key));
+    for (const row of receipts) if (row.receiptKey) keys.add(row.receiptKey);
+    for (const row of photos) if (row.photoKey) keys.add(row.photoKey);
+    for (const row of backups) keys.add(row.fileKey);
+    let removed = 0;
+    for (const key of keys) {
+      if (!key.startsWith(`tenants/${tenantId}/`) && !key.startsWith(`platform/backups/tenants/${tenantId}/`)) continue;
+      await this.storage.remove(key);
+      removed += 1;
+    }
+    await this.db.system.tenantBackup.deleteMany({ where: { tenantId } });
+    return removed;
   }
 }
