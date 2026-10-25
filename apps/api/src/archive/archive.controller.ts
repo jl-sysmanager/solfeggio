@@ -12,6 +12,7 @@ import { Db } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { MIME_GROUPS, Storage } from '../storage/storage.service';
 import { uploadConfirm, uploadRequest, Uploads } from '../storage/upload';
+import { assertCanSee, canSeeAsset, scoreScope } from './score-access';
 
 const ASSET_MIME = [...MIME_GROUPS.score, ...MIME_GROUPS.audio];
 
@@ -145,8 +146,8 @@ export class ArchiveController {
   @Perm('archive:read')
   @Get('works/:id')
   getWork(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
-    return this.db.tenant(ctx.tenantId, async (tx) =>
-      found(
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const work = found(
         await tx.work.findUnique({
           where: { id },
           include: {
@@ -156,8 +157,11 @@ export class ArchiveController {
           },
         }),
         'Obra',
-      ),
-    );
+      );
+      const scope = await scoreScope(tx, ctx);
+      if (scope !== 'all') work.assets = work.assets.filter((a) => canSeeAsset(a, scope));
+      return { ...work, scoresLimited: scope !== 'all' };
+    });
   }
 
   @Perm('archive:write')
@@ -228,6 +232,7 @@ export class ArchiveController {
   ) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const asset = found(await tx.asset.findUnique({ where: { id } }), 'Archivo');
+      assertCanSee(asset, await scoreScope(tx, ctx));
       const asInline = inline === '1' || inline === 'true';
       return {
         url: await this.storage.downloadUrl(asset.fileKey, asset.fileName, asInline, asset.mimeType),

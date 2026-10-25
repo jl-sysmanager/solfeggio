@@ -63,7 +63,7 @@ export const NAV: NavGroup[] = [
   {
     label: 'Cuenta',
     items: [
-      { to: '/settings', icon: 'settings', label: 'Ajustes', perm: ['tenant:manage', 'roles:manage', 'audit:read'] },
+      { to: '/settings', icon: 'settings', label: 'Ajustes', perm: ['tenant:manage', 'audit:read'] },
       { to: '/billing', icon: 'card', label: 'Plan y facturación', perm: ['billing:manage'] },
       { to: '/incidents', icon: 'lifebuoy', label: 'Soporte', perm: ['incidents:write'] },
       { to: '/account', icon: 'shield', label: 'Mi cuenta' },
@@ -123,6 +123,7 @@ export const ADMIN_NAV: NavGroup[] = [
     label: 'Plataforma',
     items: [
       { to: '/admin/users', icon: 'user', label: 'Equipo' },
+      { to: '/admin/roles', icon: 'shield', label: 'Roles' },
       { to: '/admin/ops', icon: 'storage', label: 'Sistema' },
       { to: '/admin/plans', icon: 'euro', label: 'Planes' },
       { to: '/admin/integrations', icon: 'settings', label: 'Integraciones' },

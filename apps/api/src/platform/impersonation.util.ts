@@ -8,4 +8,4 @@ export const AllowImpersonation = () => SetMetadata(ALLOW_IMPERSONATION, true);
 export const IMPERSONATION_ROLE = { id: 'impersonation', key: 'impersonation', name: 'Ver como (solo lectura)' };
 
 /** Todos los permisos de lectura; nunca `members:sensitive` ni los de escritura o gestión. */
-export const IMPERSONATION_PERMISSIONS: string[] = ALL_PERMISSIONS.filter((p) => p.endsWith(':read'));
+export const IMPERSONATION_PERMISSIONS: string[] = ALL_PERMISSIONS.filter((p) => p.endsWith(':read') || p === 'archive:all');

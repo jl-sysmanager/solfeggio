@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { patch, post } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
 import type { Paginated } from '../../api/types';
-import type { Family, Student } from '../../api/types-school';
+import type { Family, SchoolSettings, Student, TuitionTariff } from '../../api/types-school';
 import { useAuth } from '../../auth/AuthProvider';
-import { date, fullName } from '../../lib/format';
+import { date, fullName, money } from '../../lib/format';
 import { studentStatus } from '../../lib/labels-school';
 import { Person } from '../Avatar';
 import { Button } from '../Button';
@@ -20,11 +20,13 @@ import { Modal } from '../Modal';
 
 const NEW_FAMILY = '__new__';
 
-type StudentLike = Pick<Student, 'id' | 'familyId' | 'firstName' | 'lastName' | 'birthDate' | 'email' | 'phone' | 'instrument' | 'imageConsent' | 'pickupAuthorized' | 'status' | 'notes'>;
+type StudentLike = Pick<Student, 'id' | 'familyId' | 'firstName' | 'lastName' | 'birthDate' | 'email' | 'phone' | 'instrument' | 'imageConsent' | 'pickupAuthorized' | 'status' | 'notes' | 'tuitionTariffId'>;
 
 /** Alta y edición de alumno. Permite crear la familia en el mismo paso. */
 export function StudentFormModal({ open, onClose, student }: { open: boolean; onClose: () => void; student?: StudentLike | null }) {
   const families = useApi<Family[]>(open ? '/school/families' : null);
+  const settings = useApi<SchoolSettings>(open ? '/school/settings' : null);
+  const tariffs = useApi<TuitionTariff[]>(open && settings.data?.feeMode === 'FIXED' ? '/school/tariffs' : null);
   const [familyChoice, setFamilyChoice] = useState<string>('');
   const close = () => {
     setFamilyChoice('');
@@ -52,6 +54,7 @@ export function StudentFormModal({ open, onClose, student }: { open: boolean; on
         instrument: v.instrument ?? null, familyId: v.familyId && v.familyId !== NEW_FAMILY ? v.familyId : null, imageConsent: consent,
         pickupAuthorized: (v.pickup ?? '').split('\n').map((s) => s.trim()).filter(Boolean),
         notes: v.notes ?? null, ...(student && v.status ? { status: v.status } : {}),
+        ...(settings.data?.feeMode === 'FIXED' ? { tuitionTariffId: v.tariff || null } : {}),
       },
     });
   }
@@ -82,6 +85,16 @@ export function StudentFormModal({ open, onClose, student }: { open: boolean; on
           <TextField label="Email" name="email" type="email" defaultValue={student?.email ?? ''} />
           <TextField label="Teléfono" name="phone" type="tel" defaultValue={student?.phone ?? ''} />
         </div>
+        {settings.data?.feeMode === 'FIXED' && (
+          <SelectField
+            label="Tarifa mensual"
+            name="tariff"
+            placeholder="Sin tarifa (suma de asignaturas)"
+            defaultValue={student?.tuitionTariffId ?? ''}
+            hint="Sustituye al precio de las asignaturas y a los descuentos."
+            options={(tariffs.data ?? []).filter((t) => t.active || t.id === student?.tuitionTariffId).map((t) => ({ value: t.id, label: `${t.name} · ${money(t.monthlyCents)}/mes` }))}
+          />
+        )}
         <Checkbox label="Autoriza el uso de su imagen" name="imageConsent" defaultChecked={student?.imageConsent ?? false} />
         <TextAreaField label="Personas autorizadas para recogerle" name="pickup" rows={3} hint="Una por línea (nombre y DNI parcial)." defaultValue={(student?.pickupAuthorized ?? []).join('\n')} />
         {student && (

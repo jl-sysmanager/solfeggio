@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { del, patch, post, put } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
-import type { Room, SchoolSettings, SchoolYear, StaffUser, Subject, Teacher } from '../../api/types-school';
+import type { Room, SchoolSettings, SchoolYear, StaffUser, Subject, Teacher, TuitionTariff } from '../../api/types-school';
 import { useAuth } from '../../auth/AuthProvider';
 import { date, fullName, money } from '../../lib/format';
 import { subjectKind } from '../../lib/labels-school';
@@ -12,7 +12,7 @@ import { DataTable } from '../DataTable';
 import { Loading } from '../EmptyState';
 import { Checkbox, FormError, SelectField, TextAreaField, TextField, formValues } from '../Field';
 import { Menu } from '../Menu';
-import { Modal } from '../Modal';
+import { ConfirmModal, Modal } from '../Modal';
 import { useToast } from '../Toasts';
 import { centsOrNull, euros } from './common';
 
@@ -276,28 +276,55 @@ function RoomsCard({ write }: { write: boolean }) {
 
 function DiscountsCard({ write }: { write: boolean }) {
   const q = useApi<SchoolSettings>('/school/settings');
-  const save = useApiMutation((body: unknown) => put('/school/settings', body), { success: 'Configuración guardada', invalidate: ['/school/settings'] });
-  const s = q.data;
-  if (!s) return <Loading rows={2} />;
+  if (!q.data) return <Loading rows={2} />;
+  return <DiscountsForm key={q.dataUpdatedAt} settings={q.data} write={write} />;
+}
+
+function DiscountsForm({ settings, write }: { settings: SchoolSettings; write: boolean }) {
+  const [mode, setMode] = useState(settings.feeMode);
+  const [editing, setEditing] = useState<TuitionTariff | null>(null);
+  const [removing, setRemoving] = useState<TuitionTariff | null>(null);
+  const tariffs = useApi<TuitionTariff[]>(mode === 'FIXED' ? '/school/tariffs' : null);
+  const save = useApiMutation((body: unknown) => put('/school/settings', body), { success: 'Configuración guardada', invalidate: ['/school/settings', '/school/tariffs'] });
+  const saveTariff = useApiMutation(
+    (body: { id?: string; name: string; monthlyCents: number; active: boolean }) => (body.id ? patch(`/school/tariffs/${body.id}`, body) : post('/school/tariffs', body)),
+    { success: 'Tarifa guardada', invalidate: ['/school/tariffs'], onSuccess: () => setEditing(null) },
+  );
+  const removeTariff = useApiMutation((id: string) => del(`/school/tariffs/${id}`), { success: 'Tarifa eliminada', invalidate: ['/school/tariffs'], onSuccess: () => setRemoving(null) });
   return (
     <Card title="Descuentos y matrícula online">
       <form
         className="form"
-        key={q.dataUpdatedAt}
         onSubmit={(e) => {
           e.preventDefault();
           const v = formValues(e.currentTarget);
           const pct = (x?: string) => Math.min(100, Math.max(0, Number(x ?? 0) || 0));
-          save.mutate({ siblingDiscountPct: pct(v.sibling), memberDiscountPct: pct(v.member), multiSubjectDiscountPct: pct(v.multi), publicIntro: v.publicIntro ?? null });
+          save.mutate({
+            feeMode: mode,
+            ...(mode === 'PERCENT'
+              ? { siblingDiscountPct: pct(v.sibling), memberDiscountPct: pct(v.member), multiSubjectDiscountPct: pct(v.multi) }
+              : {}),
+            publicIntro: v.publicIntro ?? null,
+          });
         }}
       >
-        <div className="form-row">
-          <TextField label="Hermanos (%)" name="sibling" type="number" min={0} max={100} defaultValue={s.siblingDiscountPct} hint="Del 2.º hermano en adelante." disabled={!write} />
-          <TextField label="Socios de la banda (%)" name="member" type="number" min={0} max={100} defaultValue={s.memberDiscountPct} hint="Alumno o tutor socio." disabled={!write} />
-          <TextField label="Varias asignaturas (%)" name="multi" type="number" min={0} max={100} defaultValue={s.multiSubjectDiscountPct} hint="Con 2 o más matrículas." disabled={!write} />
-        </div>
-        <TextAreaField label="Presentación del formulario público" name="publicIntro" rows={4} defaultValue={s.publicIntro ?? ''} disabled={!write} />
-        <p className="small muted">Los descuentos se suman y nunca superan el 100 %.</p>
+        <SelectField
+          label="Forma de cobro"
+          value={mode}
+          onChange={(e) => setMode(e.target.value as SchoolSettings['feeMode'])}
+          disabled={!write}
+          options={[{ value: 'PERCENT', label: 'Descuentos por porcentaje' }, { value: 'FIXED', label: 'Tarifas fijas mensuales' }]}
+        />
+        {mode === 'PERCENT' && (
+          <div className="form-row">
+            <TextField label="Hermanos (%)" name="sibling" type="number" min={0} max={100} defaultValue={settings.siblingDiscountPct} hint="Del 2.º hermano en adelante." disabled={!write} />
+            <TextField label="Socios de la banda (%)" name="member" type="number" min={0} max={100} defaultValue={settings.memberDiscountPct} hint="Alumno o tutor socio." disabled={!write} />
+            <TextField label="Varias asignaturas (%)" name="multi" type="number" min={0} max={100} defaultValue={settings.multiSubjectDiscountPct} hint="Con 2 o más matrículas." disabled={!write} />
+          </div>
+        )}
+        {mode === 'PERCENT' && <p className="small muted">Los descuentos se suman y nunca superan el 100 %.</p>}
+        {mode === 'FIXED' && <p className="small muted">Cada alumno paga la tarifa de su ficha. Sin tarifa, se cobra la suma de las asignaturas, sin descuentos.</p>}
+        <TextAreaField label="Presentación del formulario público" name="publicIntro" rows={4} defaultValue={settings.publicIntro ?? ''} disabled={!write} />
         <FormError error={save.error} />
         {write && (
           <div className="row">
@@ -307,6 +334,86 @@ function DiscountsCard({ write }: { write: boolean }) {
           </div>
         )}
       </form>
+      {mode === 'FIXED' && (
+        <div className="stack" style={{ marginTop: 16 }}>
+          {tariffs.data && (
+            <DataTable
+              caption="Tarifas mensuales"
+              rows={tariffs.data}
+              rowKey={(t) => t.id}
+              empty="Crea la primera tarifa y asígnala en la ficha del alumno."
+              columns={[
+                { key: 'n', header: 'Tarifa', render: (t) => <span>{t.name} {!t.active && <Chip>Inactiva</Chip>}</span> },
+                { key: 'f', header: 'Mensualidad', render: (t) => money(t.monthlyCents), numeric: true, nowrap: true },
+                { key: 'c', header: 'Alumnos', render: (t) => t._count?.students ?? 0, numeric: true },
+                ...(write
+                  ? [{
+                      key: 'a',
+                      header: 'Acciones',
+                      render: (t: TuitionTariff) => (
+                        <Menu
+                          label={`Acciones de ${t.name}`}
+                          items={[
+                            { label: 'Editar', onSelect: () => setEditing(t) },
+                            { label: 'Eliminar', onSelect: () => setRemoving(t), danger: true },
+                          ]}
+                        />
+                      ),
+                    }]
+                  : []),
+              ]}
+            />
+          )}
+          {write && (
+            <form
+              className="toolbar"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const v = formValues(form);
+                const monthlyCents = centsOrNull(v.fee);
+                if (monthlyCents === null) return;
+                saveTariff.mutate({ name: v.name ?? '', monthlyCents, active: true }, { onSuccess: () => form.reset() });
+              }}
+            >
+              <TextField label="Nueva tarifa" name="name" required placeholder="Familiar" />
+              <TextField label="Importe (€/mes)" name="fee" required inputMode="decimal" placeholder="45,00" />
+              <Button type="submit" variant="ghost" loading={saveTariff.isPending}>Añadir</Button>
+            </form>
+          )}
+          <FormError error={saveTariff.error} />
+        </div>
+      )}
+      <Modal open={!!editing} onClose={() => setEditing(null)} title={editing ? `Editar ${editing.name}` : 'Tarifa'}>
+        <form
+          className="form"
+          key={editing?.id}
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!editing) return;
+            const form = e.currentTarget;
+            const v = formValues(form);
+            const monthlyCents = centsOrNull(v.fee);
+            if (monthlyCents === null) return;
+            saveTariff.mutate({ id: editing.id, name: v.name ?? '', monthlyCents, active: checked(form, 'active') });
+          }}
+        >
+          <TextField label="Nombre" name="name" required defaultValue={editing?.name} />
+          <TextField label="Importe (€/mes)" name="fee" required inputMode="decimal" defaultValue={euros(editing?.monthlyCents)} />
+          <Checkbox label="Activa (se puede asignar)" name="active" defaultChecked={editing?.active ?? true} />
+          <FormError error={saveTariff.error} />
+          <FormFooter onClose={() => setEditing(null)} loading={saveTariff.isPending} />
+        </form>
+      </Modal>
+      <ConfirmModal
+        open={!!removing}
+        title="Eliminar tarifa"
+        message={removing ? `Se eliminará ${removing.name}. No se puede si algún alumno la tiene asignada.` : ''}
+        confirmLabel="Eliminar"
+        onConfirm={() => removing && removeTariff.mutate(removing.id)}
+        onClose={() => setRemoving(null)}
+        loading={removeTariff.isPending}
+      />
     </Card>
   );
 }

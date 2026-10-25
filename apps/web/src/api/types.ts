@@ -102,6 +102,7 @@ export interface Member {
   nationalId?: string | null;
   address?: string | null;
   instrument?: string | null;
+  secondaryInstrument?: string | null;
   sectionId?: string | null;
   section?: Section | null;
   status: MemberStatus;
@@ -160,6 +161,8 @@ export interface Work {
   notes?: string | null;
   versions?: WorkVersion[];
   assets?: Asset[];
+  /** Sin el permiso de ver todas las partituras, la obra sólo incluye las del socio y los audios. */
+  scoresLimited?: boolean;
 }
 
 export type EventType = 'REHEARSAL' | 'PERFORMANCE' | 'MEETING' | 'OTHER';

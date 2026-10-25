@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AdminController } from './admin/admin.controller';
+import { AdminRolesController } from './admin/admin-roles.controller';
 import { AdminUsersController } from './admin/admin-users.controller';
 import { AgendaController } from './agenda/agenda.controller';
 import { ArchiveController } from './archive/archive.controller';
@@ -91,6 +92,7 @@ import { TreasuryExtrasController } from './treasury/treasury-extras.controller'
     BillingController,
     AdminController,
     AdminUsersController,
+    AdminRolesController,
     IntegrationsController,
     SchoolController,
     SchoolPublicController,

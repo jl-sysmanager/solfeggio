@@ -25,6 +25,7 @@ const memberFields = z.object({
   nationalId: z.string().trim().max(20).nullable().optional(),
   address: optionalText(300),
   instrument: z.string().trim().max(60).nullable().optional(),
+  secondaryInstrument: z.string().trim().max(60).nullable().optional(),
   sectionId: z.string().uuid().nullable().optional(),
   joinedAt: isoDate.optional(),
   consentData: z.boolean().optional(),
@@ -37,8 +38,16 @@ const blankToNull = (v: unknown) =>
   v && typeof v === 'object' && !Array.isArray(v)
     ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, typeof x === 'string' && x.trim() === '' ? null : x]))
     : v;
-const memberBase = z.preprocess(blankToNull, memberFields);
-const memberPatch = z.preprocess(blankToNull, memberFields.partial());
+const distinctInstruments = (b: { instrument?: string | null; secondaryInstrument?: string | null }) =>
+  !b.instrument || !b.secondaryInstrument || b.instrument !== b.secondaryInstrument;
+const memberBase = z.preprocess(blankToNull, memberFields).refine(distinctInstruments, {
+  message: 'El instrumento secundario debe ser distinto del principal',
+  path: ['secondaryInstrument'],
+});
+const memberPatch = z.preprocess(blankToNull, memberFields.partial()).refine(distinctInstruments, {
+  message: 'El instrumento secundario debe ser distinto del principal',
+  path: ['secondaryInstrument'],
+});
 const listQuery = pageQuery.extend({
   // Los selectores de socios cargan la plantilla activa entera en una sola página.
   pageSize: z.coerce.number().int().min(1).max(1000).default(25),
@@ -199,6 +208,11 @@ export class MembersController {
       if (m.anonymizedAt) throw new BadRequestException({ message: 'El socio está anonimizado', code: 'ANONYMIZED' });
       if (body.nationalId !== undefined && !ctx.permissions.has('members:sensitive')) {
         throw new BadRequestException({ message: 'No puedes modificar datos sensibles', code: 'FORBIDDEN' });
+      }
+      const instrument = body.instrument !== undefined ? body.instrument : m.instrument;
+      const secondary = body.secondaryInstrument !== undefined ? body.secondaryInstrument : m.secondaryInstrument;
+      if (instrument && secondary && instrument === secondary) {
+        throw new BadRequestException({ message: 'El instrumento secundario debe ser distinto del principal', code: 'SAME_INSTRUMENT' });
       }
       const updated = await tx.member.update({
         where: { id },

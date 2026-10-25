@@ -265,6 +265,7 @@ export class AuthService {
           phone: true,
           address: true,
           instrument: true,
+          secondaryInstrument: true,
           consentImages: true,
           photoKey: true,
           section: { select: { id: true, name: true } },
@@ -297,6 +298,7 @@ export class AuthService {
       phone?: string | null;
       address?: string | null;
       instrument?: string | null;
+      secondaryInstrument?: string | null;
       consentImages?: boolean;
     },
   ) {
@@ -314,6 +316,7 @@ export class AuthService {
       data.phone !== undefined ||
       data.address !== undefined ||
       data.instrument !== undefined ||
+      data.secondaryInstrument !== undefined ||
       data.consentImages !== undefined;
 
     if (memberFields) {
@@ -325,6 +328,11 @@ export class AuthService {
         }
         const current = await tx.member.findUniqueOrThrow({ where: { id: membership.memberId } });
         if (current.anonymizedAt) throw new BadRequestException({ message: 'La ficha está anonimizada', code: 'ANONYMIZED' });
+        const instrument = data.instrument !== undefined ? data.instrument : current.instrument;
+        const secondary = data.secondaryInstrument !== undefined ? data.secondaryInstrument : current.secondaryInstrument;
+        if (instrument && secondary && instrument === secondary) {
+          throw new BadRequestException({ message: 'El instrumento secundario debe ser distinto del principal', code: 'SAME_INSTRUMENT' });
+        }
         await tx.member.update({
           where: { id: membership.memberId },
           data: {
@@ -333,6 +341,7 @@ export class AuthService {
             ...(data.phone !== undefined && { phone: data.phone }),
             ...(data.address !== undefined && { address: data.address }),
             ...(data.instrument !== undefined && { instrument: data.instrument }),
+            ...(data.secondaryInstrument !== undefined && { secondaryInstrument: data.secondaryInstrument }),
             ...(data.consentImages !== undefined && { consentImages: data.consentImages }),
           },
         });

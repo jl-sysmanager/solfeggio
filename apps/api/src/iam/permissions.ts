@@ -2,7 +2,6 @@ export const PERMISSIONS = [
   { key: 'tenant:manage', group: 'Banda', label: 'Configurar la banda' },
   { key: 'billing:manage', group: 'Banda', label: 'Gestionar suscripción y facturas' },
   { key: 'users:manage', group: 'Banda', label: 'Gestionar usuarios e invitaciones' },
-  { key: 'roles:manage', group: 'Banda', label: 'Gestionar roles y permisos' },
   { key: 'audit:read', group: 'Banda', label: 'Consultar auditoría' },
   { key: 'members:read', group: 'Secretaría', label: 'Ver socios' },
   { key: 'members:write', group: 'Secretaría', label: 'Altas, bajas y edición de socios' },
@@ -11,6 +10,7 @@ export const PERMISSIONS = [
   { key: 'documents:read', group: 'Secretaría', label: 'Ver documentos' },
   { key: 'documents:write', group: 'Secretaría', label: 'Subir y borrar documentos' },
   { key: 'archive:read', group: 'Archivo', label: 'Consultar archivo musical' },
+  { key: 'archive:all', group: 'Archivo', label: 'Ver partituras de todos los instrumentos' },
   { key: 'archive:write', group: 'Archivo', label: 'Editar archivo musical' },
   { key: 'events:read', group: 'Ensayos', label: 'Ver ensayos y actuaciones' },
   { key: 'events:write', group: 'Ensayos', label: 'Planificar ensayos y actuaciones' },
@@ -51,7 +51,7 @@ export const SYSTEM_ROLES: { key: string; name: string; permissions: Permission[
     key: 'director',
     name: 'Director',
     permissions: [
-      'members:read', 'archive:read', 'archive:write', 'events:read', 'events:write', 'calls:manage',
+      'members:read', 'archive:read', 'archive:all', 'archive:write', 'events:read', 'events:write', 'calls:manage',
       'attendance:read', 'attendance:write', 'attendance:self', 'communications:send', 'documents:read',
       'wardrobe:read', 'instruments:read', 'market:read', 'incidents:write', 'school:read', 'school:teach',
       'performances:read', 'reinforcements:manage', 'governance:read', 'governance:vote',
@@ -81,7 +81,7 @@ export const SYSTEM_ROLES: { key: string; name: string; permissions: Permission[
     name: 'Responsable de material',
     permissions: [
       'wardrobe:read', 'wardrobe:write', 'instruments:read', 'instruments:write', 'members:read',
-      'market:read', 'market:write', 'events:read', 'attendance:self', 'archive:read', 'incidents:write',
+      'market:read', 'market:write', 'events:read', 'attendance:self', 'archive:read', 'archive:all', 'incidents:write',
       'governance:read', 'governance:vote',
     ],
   },
@@ -91,7 +91,7 @@ export const SYSTEM_ROLES: { key: string; name: string; permissions: Permission[
     key: 'archivist',
     name: 'Archivero',
     permissions: [
-      'archive:read', 'archive:write', 'events:read', 'attendance:self', 'market:read', 'governance:read', 'governance:vote',
+      'archive:read', 'archive:all', 'archive:write', 'events:read', 'attendance:self', 'market:read', 'governance:read', 'governance:vote',
       'incidents:write',
     ],
   },

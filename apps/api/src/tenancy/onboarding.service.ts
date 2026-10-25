@@ -64,9 +64,10 @@ export class OnboardingService {
     const firstName = nameParts[0] || 'Propietario';
     const lastName = nameParts.slice(1).join(' ') || '-';
 
+    const catalog = await this.roleCatalog(tenant.id);
     await this.db.tenant(tenant.id, async (tx) => {
       await tx.role.createMany({
-        data: SYSTEM_ROLES.map((r) => ({ tenantId: tenant.id, key: r.key, name: r.name, permissions: r.permissions, isSystem: true })),
+        data: catalog.map((r) => ({ tenantId: tenant.id, key: r.key, name: r.name, permissions: r.permissions, isSystem: r.isSystem })),
       });
       const owner = await tx.role.findUniqueOrThrow({ where: { tenantId_key: { tenantId: tenant.id, key: 'owner' } } });
       // El propietario es socio nº 1 y usuario: así tiene ficha, foto, convocatorias y autogestión de perfil.
@@ -116,6 +117,21 @@ export class OnboardingService {
         dismissed: !!membership.setupGuideDismissedAt,
       });
     });
+  }
+
+  /** Copia el catálogo vivo de otra banda. La primera banda usa los roles de sistema. */
+  private async roleCatalog(exceptTenantId: string) {
+    const source = await this.db.system.tenant.findFirst({
+      where: { deletedAt: null, id: { not: exceptTenantId } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!source) return SYSTEM_ROLES.map((r) => ({ ...r, isSystem: true }));
+    const roles = await this.db.system.role.findMany({
+      where: { tenantId: source.id },
+      select: { key: true, name: true, permissions: true, isSystem: true },
+    });
+    return roles.length ? roles : SYSTEM_ROLES.map((r) => ({ ...r, isSystem: true }));
   }
 
   async setDismissed(ctx: RequestContext, dismissed: boolean) {

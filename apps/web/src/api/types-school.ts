@@ -9,12 +9,23 @@ export type SessionStatus = 'SCHEDULED' | 'CANCELLED' | 'DONE';
 export type ClassAttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
 export type TuitionStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED';
 
+export type SchoolFeeMode = 'PERCENT' | 'FIXED';
+
 export interface SchoolSettings {
+  feeMode: SchoolFeeMode;
   siblingDiscountPct: number;
   memberDiscountPct: number;
   multiSubjectDiscountPct: number;
   publicIntro: string | null;
   slug?: string;
+}
+
+export interface TuitionTariff {
+  id: string;
+  name: string;
+  monthlyCents: number;
+  active: boolean;
+  _count?: { students: number };
 }
 
 export interface Guardian {
@@ -138,6 +149,8 @@ export interface Student {
   bandStage: BandStage;
   memberId: string | null;
   notes: string | null;
+  tuitionTariffId?: string | null;
+  tuitionTariff?: { id: string; name: string; monthlyCents: number } | null;
   family?: { id: string; name: string } | null;
   enrollments?: { id: string; status: EnrollmentStatus; group: { id: string; name: string; yearId: string; subject: { name: string } } }[];
 }
@@ -205,6 +218,8 @@ export interface TuitionDetail {
   lines: { groupId: string; label: string; cents: number }[];
   discounts: { kind: 'SIBLING' | 'MEMBER' | 'MULTI_SUBJECT'; pct: number }[];
   pct: number;
+  tariff?: { id: string; name: string; cents: number };
+  tariffMissing?: boolean;
 }
 
 export interface TuitionCharge {

@@ -434,6 +434,8 @@ model Member {
   nationalIdEnc String?
   address       String?
   instrument    String?
+  /// Segundo instrumento: también abre sus particellas en el archivo.
+  secondaryInstrument String?
   sectionId     String?      @db.Uuid
   section       Section?     @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   status        MemberStatus @default(ACTIVE)
@@ -1039,6 +1041,12 @@ enum StudentStatus {
   LEFT
 }
 
+/// Cómo se calcula la mensualidad: descuentos en % o una tarifa fija asignada al alumno.
+enum SchoolFeeMode {
+  PERCENT
+  FIXED
+}
+
 enum StudentBandStage {
   NONE
   EDUCANDO
@@ -1048,6 +1056,8 @@ enum StudentBandStage {
 model SchoolSettings {
   id                      String   @id @default(uuid()) @db.Uuid
   tenantId                String   @unique @map("tenant_id") @db.Uuid
+  /// PERCENT: descuentos en % sobre las asignaturas. FIXED: tarifa mensual asignada al alumno.
+  feeMode                 SchoolFeeMode @default(PERCENT)
   /// Descuentos en porcentaje sobre la mensualidad.
   siblingDiscountPct      Int      @default(0)
   memberDiscountPct       Int      @default(0)
@@ -1057,6 +1067,21 @@ model SchoolSettings {
   updatedAt               DateTime @updatedAt
 
   @@map("school_settings")
+}
+
+/// Precio mensual fijo. En modo FIXED sustituye a la suma de asignaturas y a los descuentos.
+model TuitionTariff {
+  id           String   @id @default(uuid()) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  name         String
+  monthlyCents Int
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  students     Student[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("tuition_tariffs")
 }
 
 model Family {
@@ -1112,6 +1137,9 @@ model Student {
   memberId         String?          @unique @db.Uuid
   member           Member?          @relation(fields: [memberId], references: [id], onDelete: SetNull)
   notes            String?
+  /// Tarifa mensual fija. Sólo se cobra así cuando la escuela está en modo FIXED.
+  tuitionTariffId  String?          @db.Uuid
+  tuitionTariff    TuitionTariff?   @relation(fields: [tuitionTariffId], references: [id], onDelete: Restrict)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 

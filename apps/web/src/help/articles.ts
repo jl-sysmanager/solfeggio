@@ -150,6 +150,7 @@ export const ARTICLES: Record<string, HelpArticle> = {
           'Configura cursos e instrumentos de la escuela.',
           'Da de alta alumnos o recibe matrículas por el enlace público de inscripción.',
           'Lleva mensualidades y el seguimiento académico desde la ficha del alumno.',
+          'En Configuración elige descuentos por porcentaje o tarifas fijas mensuales, y asigna la tarifa en la ficha del alumno.',
           'Los tutores usan el Portal de familias con su propio acceso.',
         ],
       },
@@ -341,13 +342,12 @@ export const ARTICLES: Record<string, HelpArticle> = {
   settings: {
     id: 'settings',
     title: 'Ajustes',
-    summary: 'Datos de la banda, roles personalizados, secciones e integración de calendario.',
+    summary: 'Datos de la banda, secciones e instrumentos de la plantilla.',
     sections: [
       {
         heading: 'Qué configurar',
         bullets: [
           'Ficha legal: razón social, CIF, logotipo y comunidad (salen en documentos).',
-          'Roles y permisos: adapta qué puede hacer cada cargo.',
           'Secciones e instrumentos de la plantilla.',
           'Auditoría: historial de cambios sensibles (si tienes permiso).',
         ],

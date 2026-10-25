@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Pa
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
-import { Ctx, Perm } from '../auth/decorators';
+import { Ctx, NoTenant, Perm } from '../auth/decorators';
 import { randomToken, sha256 } from '../common/crypto';
 import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
@@ -13,40 +13,7 @@ import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { Jobs } from '../jobs/jobs.service';
 import { LimitsService } from '../tenancy/limits.service';
-import { ALL_PERMISSIONS, PERMISSIONS } from './permissions';
-
-const permList = z.array(z.enum(ALL_PERMISSIONS as [string, ...string[]])).max(ALL_PERMISSIONS.length);
-const roleKeySchema = z.string().regex(/^[a-z][a-z0-9_]{1,31}$/);
-const roleCreate = z.object({
-  /** Opcional: si falta, se genera a partir del nombre (UI no técnica). */
-  key: roleKeySchema.optional(),
-  name: z.string().trim().min(2).max(60),
-  permissions: permList.default([]),
-});
-const rolePatch = z.object({ name: z.string().trim().min(2).max(60).optional(), permissions: permList.optional() });
-
-/** Clave interna de rol a partir del nombre visible (sin acentos, máx. 32). */
-function roleKeyFromName(name: string): string {
-  const base = name
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 28);
-  if (!base) return 'rol';
-  return (base.match(/^[a-z]/) ? base : `r_${base}`).slice(0, 32);
-}
-
-async function uniqueRoleKey(tx: Tx, tenantId: string, preferred: string): Promise<string> {
-  let key = preferred.slice(0, 32);
-  let n = 2;
-  while (await tx.role.findUnique({ where: { tenantId_key: { tenantId, key } } })) {
-    const suffix = `_${n++}`;
-    key = `${preferred.slice(0, Math.max(1, 32 - suffix.length))}${suffix}`;
-  }
-  return key;
-}
+import { PERMISSIONS } from './permissions';
 
 function presentRole<T extends { _count?: { memberships: number } }>(role: T) {
   const { _count, ...rest } = role;
@@ -80,6 +47,7 @@ export class IamController {
     private readonly jobs: Jobs,
   ) {}
 
+  @NoTenant()
   @Get('permissions')
   permissions() {
     return PERMISSIONS;
@@ -112,7 +80,7 @@ export class IamController {
     });
   }
 
-  @Perm('roles:manage')
+  @Perm('users:manage')
   @Get('roles')
   async roles(@Ctx() ctx: RequestContext) {
     const rows = await this.db.tenant(ctx.tenantId, (tx) =>
@@ -121,48 +89,28 @@ export class IamController {
     return rows.map(presentRole);
   }
 
-  @Perm('roles:manage')
+  /** La banda sólo consulta. Crear, editar y borrar el catálogo es del panel de plataforma. */
+  private async rolesArePlatformOnly(ctx: RequestContext, id: string) {
+    await this.db.tenant(ctx.tenantId, async (tx) => {
+      found(await tx.role.findUnique({ where: { id } }), 'Rol');
+    });
+    throw new ForbiddenException({ message: 'Los roles se gestionan en el panel de la plataforma', code: 'ROLES_PLATFORM_ONLY' });
+  }
+
   @Post('roles')
-  createRole(@Ctx() ctx: RequestContext, @Body(zod(roleCreate)) body: z.infer<typeof roleCreate>) {
-    this.assertCeiling(ctx, body.permissions);
-    return this.db.tenant(ctx.tenantId, async (tx) => {
-      const preferred = body.key ?? roleKeyFromName(body.name);
-      const key = await uniqueRoleKey(tx, ctx.tenantId, preferred);
-      const role = await tx.role.create({
-        data: { key, name: body.name, permissions: body.permissions, tenantId: ctx.tenantId },
-        include: { _count: { select: { memberships: true } } },
-      });
-      await this.audit.log(tx, ctx, 'role.created', 'role', role.id, { key, name: body.name, permissions: body.permissions });
-      return presentRole(role);
-    });
+  createRole() {
+    throw new ForbiddenException({ message: 'Los roles se gestionan en el panel de la plataforma', code: 'ROLES_PLATFORM_ONLY' });
   }
 
-  @Perm('roles:manage')
   @Patch('roles/:id')
-  updateRole(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(rolePatch)) body: z.infer<typeof rolePatch>) {
-    return this.db.tenant(ctx.tenantId, async (tx) => {
-      const role = found(await tx.role.findUnique({ where: { id } }), 'Rol');
-      if (role.key === 'owner' && body.permissions) {
-        throw new BadRequestException({ message: 'Los permisos del propietario no se pueden modificar', code: 'OWNER_IMMUTABLE' });
-      }
-      if (body.permissions) this.assertCeiling(ctx, body.permissions.filter((p) => !role.permissions.includes(p)));
-      const updated = await tx.role.update({ where: { id }, data: body });
-      await this.audit.log(tx, ctx, 'role.updated', 'role', id, body);
-      return updated;
-    });
+  updateRole(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    return this.rolesArePlatformOnly(ctx, id);
   }
 
-  @Perm('roles:manage')
   @HttpCode(204)
   @Delete('roles/:id')
-  async deleteRole(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
-    await this.db.tenant(ctx.tenantId, async (tx) => {
-      const role = found(await tx.role.findUnique({ where: { id }, include: { _count: { select: { memberships: true } } } }), 'Rol');
-      if (role.isSystem) throw new BadRequestException({ message: 'Los roles de sistema no se pueden borrar', code: 'SYSTEM_ROLE' });
-      if (role._count.memberships > 0) throw new BadRequestException({ message: 'El rol tiene usuarios asignados', code: 'ROLE_IN_USE' });
-      await tx.role.delete({ where: { id } });
-      await this.audit.log(tx, ctx, 'role.deleted', 'role', id);
-    });
+  deleteRole(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    return this.rolesArePlatformOnly(ctx, id);
   }
 
   @Perm('users:manage')

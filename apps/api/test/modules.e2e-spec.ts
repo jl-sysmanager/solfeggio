@@ -94,6 +94,45 @@ describe('Flujos de los módulos', () => {
       expect(detail.body.versions).toHaveLength(1);
       expect(detail.body.assets[0]).toMatchObject({ kind: 'PART', instrument: 'Clarinete 1', versionId: version.id });
     });
+
+    it('un músico sólo ve las partituras de su instrumento y del secundario', async () => {
+      const roles = (await ctx.http().get('/api/v1/roles').set(auth(band.token)).expect(200)).body as { key: string; permissions: string[] }[];
+      const perms = (key: string) => roles.find((r) => r.key === key)!.permissions;
+      expect(perms('director')).toContain('archive:all');
+      expect(perms('archivist')).toContain('archive:all');
+      expect(perms('material_manager')).toContain('archive:all');
+      expect(perms('musician')).not.toContain('archive:all');
+      expect(perms('secretary')).not.toContain('archive:all');
+      expect(perms('teacher')).not.toContain('archive:all');
+
+      const work = (await ctx.http().post('/api/v1/works').set(auth(band.token)).send({ title: 'Visibilidad' }).expect(201)).body;
+      const file = async (kind: 'SCORE' | 'PART' | 'AUDIO', instrument: string | null, fileName: string) => {
+        const mimeType = kind === 'AUDIO' ? 'audio/mpeg' : 'application/pdf';
+        const up = await ctx.http().post(`/api/v1/works/${work.id}/assets/upload-url`).set(auth(band.token)).send({ fileName, mimeType, sizeBytes: 400 }).expect(201);
+        ctx.storage.objects.set(up.body.fileKey, 400);
+        return (await ctx.http().post(`/api/v1/works/${work.id}/assets`).set(auth(band.token)).send({ ...up.body, kind, instrument, fileName, mimeType, sizeBytes: 400 }).expect(201)).body as { id: string };
+      };
+      const score = await file('SCORE', null, 'guion.pdf');
+      const clarinet = await file('PART', 'Clarinete 1º', 'cl.pdf');
+      const trumpet = await file('PART', 'Trompeta', 'tp.pdf');
+      const flute = await file('PART', 'Flauta', 'fl.pdf');
+      const audio = await file('AUDIO', null, 'toma.mp3');
+
+      const token = await addUser(ctx, band, 'musician', 'lucia-musico@flow.local', members[0].id);
+      expect((await ctx.http().patch('/api/v1/auth/profile').set(auth(token)).send({ secondaryInstrument: 'Clarinete' }).expect(400)).body.code).toBe('SAME_INSTRUMENT');
+      await ctx.http().patch('/api/v1/auth/profile').set(auth(token)).send({ secondaryInstrument: 'Flauta' }).expect(200);
+
+      const seen = await ctx.http().get(`/api/v1/works/${work.id}`).set(auth(token)).expect(200);
+      expect(seen.body.scoresLimited).toBe(true);
+      expect(seen.body.assets.map((a: { id: string }) => a.id).sort()).toEqual([clarinet.id, flute.id, audio.id].sort());
+      expect((await ctx.http().get(`/api/v1/assets/${trumpet.id}/download`).set(auth(token)).expect(403)).body.code).toBe('SCORE_FORBIDDEN');
+      expect((await ctx.http().get(`/api/v1/assets/${score.id}/download`).set(auth(token)).expect(403)).body.code).toBe('SCORE_FORBIDDEN');
+      await ctx.http().get(`/api/v1/assets/${clarinet.id}/download`).set(auth(token)).expect(200);
+
+      const owner = await ctx.http().get(`/api/v1/works/${work.id}`).set(auth(band.token)).expect(200);
+      expect(owner.body.scoresLimited).toBe(false);
+      expect(owner.body.assets).toHaveLength(5);
+    });
   });
 
   describe('Ensayos, asistencia y agenda', () => {

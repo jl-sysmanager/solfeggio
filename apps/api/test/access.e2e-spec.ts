@@ -24,20 +24,17 @@ describe('Revisión de accesos', () => {
     musician = await addUser(ctx, band, 'musician', 'musico@access.local');
     treasurer = await addUser(ctx, band, 'treasurer', 'tesorero@access.local');
     archivist = await addUser(ctx, band, 'archivist', 'archivero@access.local');
-    billingRoleId = (await post('/roles', band.token, { key: 'facturacion', name: 'Facturación', permissions: ['billing:manage', 'events:read'] }).expect(201)).body.id;
+    await ctx.db.system.user.update({ where: { id: band.userId }, data: { isPlatformAdmin: true } });
+    await post('/admin/roles', band.token, { key: 'facturacion', name: 'Facturación', permissions: ['billing:manage', 'events:read'] }).expect(201);
+    billingRoleId = await roleId('facturacion');
   });
   afterAll(() => ctx.app.close());
 
   describe('sin escalada de privilegios', () => {
-    it('un administrador no puede concederse permisos que no tiene', async () => {
+    it('la banda no puede crear ni editar roles', async () => {
       const adminRole = await roleId('admin');
-      const res = await patch(`/roles/${adminRole}`, admin, { permissions: ['billing:manage', 'tenant:manage', 'roles:manage', 'users:manage'] }).expect(403);
-      expect(res.body.code).toBe('PERMISSION_CEILING');
-      expect(res.body.details.permissions).toEqual(['billing:manage']);
-      const created = await post('/roles', admin, { key: 'tesoreria_plus', name: 'Tesorería plus', permissions: ['finance:read', 'billing:manage'] }).expect(403);
-      expect(created.body.code).toBe('PERMISSION_CEILING');
-      // Dentro de su techo sí puede crear roles y quitar permisos.
-      await post('/roles', admin, { key: 'lectores', name: 'Lectores', permissions: ['archive:read', 'events:read'] }).expect(201);
+      expect((await patch(`/roles/${adminRole}`, admin, { permissions: ['users:manage'] }).expect(403)).body.code).toBe('ROLES_PLATFORM_ONLY');
+      expect((await post('/roles', band.token, { name: 'Lectores', permissions: ['archive:read'] }).expect(403)).body.code).toBe('ROLES_PLATFORM_ONLY');
     });
 
     it('sólo un propietario asigna el rol de propietario o toca a otros propietarios', async () => {
@@ -64,7 +61,7 @@ describe('Revisión de accesos', () => {
 
     it('los roles asignables respetan el techo de quien los pide', async () => {
       const asAdmin = (await get('/roles/assignable', admin).expect(200)).body.map((r: { key: string }) => r.key);
-      expect(asAdmin).toEqual(expect.arrayContaining(['musician', 'teacher', 'archivist', 'lectores']));
+      expect(asAdmin).toEqual(expect.arrayContaining(['musician', 'teacher', 'archivist']));
       expect(asAdmin).not.toContain('owner');
       expect(asAdmin).not.toContain('facturacion');
       const asOwner = (await get('/roles/assignable', band.token).expect(200)).body.map((r: { key: string }) => r.key);

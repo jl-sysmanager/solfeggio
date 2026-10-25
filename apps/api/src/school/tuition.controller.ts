@@ -47,6 +47,7 @@ export class TuitionController {
         tx.student.findMany({
           where: { status: 'ACTIVE' },
           include: {
+            tuitionTariff: { select: { id: true, name: true, monthlyCents: true } },
             family: { include: { guardians: { select: { memberId: true } } } },
             enrollments: { where: { status: 'ACTIVE', group: { yearId: body.yearId } }, include: { group: { include: { subject: true } } } },
           },

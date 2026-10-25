@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Param, Patch, Post, Put, Query, Res, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import type { Response } from 'express';
@@ -13,6 +13,7 @@ import { Audit } from '../audit/audit.service';
 import { Storage } from '../storage/storage.service';
 import { LimitsService } from '../tenancy/limits.service';
 import { BookletEntry, buildCatalog, extractPages, extractRange, loadPdf, mergeBooklet, normalizeInstrument, suggestParts } from './parts';
+import { assertCanSee, canSeeAsset, partMatches, scoreScope } from './score-access';
 
 const PDF = 'application/pdf';
 const DAY = 86_400_000;
@@ -131,8 +132,12 @@ export class ArchiveExtrasController {
     const { asset, extra } = await this.db.tenant(ctx.tenantId, async (tx) => {
       found(await tx.work.findUnique({ where: { id: workId } }), 'Obra');
       const asset = found(await tx.asset.findFirst({ where: { id: assetId, workId } }), 'Archivo');
-      const members = await tx.member.findMany({ where: { instrument: { not: null } }, distinct: ['instrument'], select: { instrument: true } });
-      return { asset, extra: members.map((m) => m.instrument!) };
+      assertCanSee(asset, await scoreScope(tx, ctx));
+      const members = await tx.member.findMany({
+        where: { OR: [{ instrument: { not: null } }, { secondaryInstrument: { not: null } }] },
+        select: { instrument: true, secondaryInstrument: true },
+      });
+      return { asset, extra: [...new Set(members.flatMap((m) => [m.instrument, m.secondaryInstrument].filter((s): s is string => !!s)))] };
     });
     if (asset.mimeType !== PDF) throw new BadRequestException({ message: 'Sólo se pueden dividir ficheros PDF', code: 'NOT_A_PDF' });
     if (asset.kind !== 'SCORE' && asset.kind !== 'OTHER') {
@@ -274,13 +279,15 @@ export class ArchiveExtrasController {
   instruments(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const b = await this.loadBooklet(tx, id);
+      const scope = await scoreScope(tx, ctx);
       const parts = await tx.asset.findMany({
         where: { workId: { in: b.items.map((i) => i.workId) }, kind: 'PART', mimeType: PDF, instrument: { not: null } },
         select: { workId: true, instrument: true },
         orderBy: { createdAt: 'asc' },
       });
+      const visible = parts.filter((p) => canSeeAsset({ kind: 'PART', instrument: p.instrument }, scope));
       const byKey = new Map<string, { instrument: string; works: Set<string> }>();
-      for (const p of parts) {
+      for (const p of visible) {
         const key = normalizeInstrument(p.instrument!);
         if (!key) continue;
         if (!byKey.has(key)) byKey.set(key, { instrument: p.instrument!, works: new Set() });
@@ -297,6 +304,10 @@ export class ArchiveExtrasController {
   async bookletPdf(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Query(zod(instrumentQuery)) q: z.infer<typeof instrumentQuery>, @Res({ passthrough: true }) res: Response) {
     const key = normalizeInstrument(q.instrument);
     const { booklet, parts } = await this.db.tenant(ctx.tenantId, async (tx) => {
+      const scope = await scoreScope(tx, ctx);
+      if (scope !== 'all' && !scope.some((mine) => partMatches(q.instrument, mine))) {
+        throw new ForbiddenException({ message: 'Esta partitura no es de tu instrumento', code: 'SCORE_FORBIDDEN' });
+      }
       const booklet = await this.loadBooklet(tx, id);
       const parts = await tx.asset.findMany({
         where: { workId: { in: booklet.items.map((i) => i.workId) }, kind: 'PART', mimeType: PDF, instrument: { not: null } },

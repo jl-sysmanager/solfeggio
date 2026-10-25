@@ -215,11 +215,14 @@ export default function WorkDetailPage() {
       </div>
 
       <Card title="Partituras, particellas y audios">
+        {w.scoresLimited && (
+          <p className="small muted">Ves los audios y las particellas de tus instrumentos. El guion y el resto requieren el permiso de ver todas las partituras.</p>
+        )}
         <DataTable
           caption="Ficheros de la obra"
           rows={w.assets ?? []}
           rowKey={(a) => a.id}
-          empty="Aún no hay ficheros. Sube la partitura general y las particellas."
+          empty={w.scoresLimited ? 'No hay partituras de tus instrumentos ni audios en esta obra.' : 'Aún no hay ficheros. Sube la partitura general y las particellas.'}
           onRowClick={(a) => openAsset(a)}
           columns={[
             { key: 'k', header: 'Tipo', render: (a) => assetKind[a.kind] },

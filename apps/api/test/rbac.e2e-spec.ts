@@ -54,21 +54,29 @@ describe('RBAC, planes y estado del tenant', () => {
     expect(detail.body.calls.every((c: { memberId: string }) => c.memberId === memberId)).toBe(true);
   });
 
-  it('los roles son configurables y el cambio se aplica al instante', async () => {
-    const roles = await ctx.http().get('/api/v1/roles').set(auth(band.token)).expect(200);
+  it('el panel de plataforma cambia un rol y afecta a todas las bandas al instante', async () => {
+    await ctx.db.system.user.update({ where: { id: band.userId }, data: { isPlatformAdmin: true } });
+    const roles = await ctx.http().get('/api/v1/admin/roles').set(auth(band.token)).expect(200);
     const m = roles.body.find((r: { key: string }) => r.key === 'musician');
-    await ctx.http().patch(`/api/v1/roles/${m.id}`).set(auth(band.token)).send({ permissions: [...m.permissions, 'members:read'] }).expect(200);
+    const other = await signupBand(ctx, 'rbac-otra');
+    await ctx.http().patch('/api/v1/admin/roles/musician').set(auth(band.token)).send({ permissions: [...m.permissions, 'members:read'] }).expect(200);
     await ctx.http().get('/api/v1/members').set(auth(musician)).expect(200);
-    await ctx.http().patch(`/api/v1/roles/${m.id}`).set(auth(band.token)).send({ permissions: m.permissions }).expect(200);
+    const copied = (await ctx.http().get('/api/v1/roles').set(auth(other.token)).expect(200)).body.find((r: { key: string }) => r.key === 'musician');
+    expect(copied.permissions).toContain('members:read');
+    await ctx.http().patch('/api/v1/admin/roles/musician').set(auth(band.token)).send({ permissions: m.permissions }).expect(200);
     await ctx.http().get('/api/v1/members').set(auth(musician)).expect(403);
+    await ctx.http().post('/api/v1/roles').set(auth(band.token)).send({ name: 'Desde la banda' }).expect(403);
+    await ctx.db.system.user.update({ where: { id: band.userId }, data: { isPlatformAdmin: false } });
   });
 
   it('no se admiten permisos inexistentes ni borrar roles de sistema', async () => {
-    await ctx.http().post('/api/v1/roles').set(auth(band.token)).send({ key: 'archivero', name: 'Archivero', permissions: ['archive:write', 'root:all'] }).expect(400);
-    const created = await ctx.http().post('/api/v1/roles').set(auth(band.token)).send({ key: 'archivero', name: 'Archivero', permissions: ['archive:read', 'archive:write'] }).expect(201);
-    await ctx.http().delete(`/api/v1/roles/${created.body.id}`).set(auth(band.token)).expect(204);
-    const owner = (await ctx.http().get('/api/v1/roles').set(auth(band.token))).body.find((r: { key: string }) => r.key === 'owner');
-    await ctx.http().delete(`/api/v1/roles/${owner.id}`).set(auth(band.token)).expect(400);
+    await ctx.db.system.user.update({ where: { id: band.userId }, data: { isPlatformAdmin: true } });
+    await ctx.http().post('/api/v1/admin/roles').set(auth(band.token)).send({ key: 'archivero', name: 'Archivero', permissions: ['archive:write', 'root:all'] }).expect(400);
+    await ctx.http().post('/api/v1/admin/roles').set(auth(band.token)).send({ key: 'archivero', name: 'Archivero', permissions: ['archive:read', 'archive:write'] }).expect(201);
+    await ctx.http().delete('/api/v1/admin/roles/archivero').set(auth(band.token)).expect(204);
+    await ctx.http().delete('/api/v1/admin/roles/owner').set(auth(band.token)).expect(400);
+    await ctx.http().patch('/api/v1/roles/00000000-0000-4000-8000-000000000099').set(auth(musician)).expect(404);
+    await ctx.db.system.user.update({ where: { id: band.userId }, data: { isPlatformAdmin: false } });
   });
 
   it('la banda no puede quedarse sin propietario', async () => {
@@ -107,7 +115,7 @@ describe('RBAC, planes y estado del tenant', () => {
 
     it('se respeta el límite de socios del plan', async () => {
       const small = await signupBand(ctx, 'small-band', 'FREE');
-      await ctx.db.system.plan.update({ where: { code: 'FREE' }, data: { maxMembers: 2 } });
+      await ctx.db.system.plan.update({ where: { code: 'FREE' }, data: { maxMembers: 3 } });
       await ctx.http().post('/api/v1/members').set(auth(small.token)).send({ firstName: 'A', lastName: 'A' }).expect(201);
       await ctx.http().post('/api/v1/members').set(auth(small.token)).send({ firstName: 'B', lastName: 'B' }).expect(201);
       const res = await ctx.http().post('/api/v1/members').set(auth(small.token)).send({ firstName: 'C', lastName: 'C' }).expect(403);

@@ -250,6 +250,12 @@ export default function StudentDetailPage() {
               <dd>{s.pickupAuthorized.length ? s.pickupAuthorized.join(', ') : '—'}</dd>
               <dt>Socio</dt>
               <dd>{s.member ? <Link to={`/members/${s.member.id}`}>Nº {s.member.memberNumber}</Link> : '—'}</dd>
+              {s.tuitionTariff && (
+                <>
+                  <dt>Tarifa</dt>
+                  <dd>{s.tuitionTariff.name} · {money(s.tuitionTariff.monthlyCents)}/mes</dd>
+                </>
+              )}
               {s.notes && (
                 <>
                   <dt>Observaciones</dt>

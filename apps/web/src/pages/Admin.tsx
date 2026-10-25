@@ -21,6 +21,7 @@ import { ModerationTab } from '../components/admin/ModerationTab';
 import { OpsTab } from '../components/admin/OpsTab';
 import { BrandTab } from '../components/admin/BrandTab';
 import { TenantsTab } from '../components/admin/TenantsTab';
+import { RolesTab } from '../components/admin/RolesTab';
 import { UsersTab } from '../components/admin/UsersTab';
 
 /** Cierra dependencias al marcar una funcionalidad (misma regla que el API). */
@@ -174,6 +175,7 @@ const SECTIONS: Record<string, Section> = {
   moderation: { eyebrow: 'Atención', title: 'Moderación', description: 'Anuncios de BandMarket, denuncias de la bolsa de refuerzos y bloqueo de usuarios.', content: () => <ModerationTab /> },
   announcements: { eyebrow: 'Atención', title: 'Avisos', description: 'Avisos dentro de la aplicación para todas las bandas o para un segmento.', content: () => <AnnouncementsTab /> },
   users: { eyebrow: 'Plataforma', title: 'Equipo', description: 'Cuentas de administración de la plataforma. Las cuentas de cada banda se gestionan en esa banda.', content: () => <UsersTab /> },
+  roles: { eyebrow: 'Plataforma', title: 'Roles y permisos', description: 'Catálogo único para todas las bandas. Cada banda asigna el cargo, pero no cambia lo que permite.', content: () => <RolesTab /> },
   ops: { eyebrow: 'Plataforma', title: 'Sistema', description: 'Colas de trabajos, correo, almacenamiento, tareas programadas y copias de seguridad.', content: () => <OpsTab /> },
   plans: { eyebrow: 'Plataforma', title: 'Planes', description: 'Precios, límites y funcionalidades de cada plan.', content: () => <PlansTab /> },
   integrations: { eyebrow: 'Plataforma', title: 'Integraciones', description: 'Pagos, correo y destino de copias: credenciales, estado y prueba de conexión.', content: () => <IntegrationsTab /> },

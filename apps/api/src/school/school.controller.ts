@@ -26,11 +26,14 @@ const phone = z.string().trim().max(30).nullable().optional();
 const minute = z.number().int().min(0).max(1440);
 
 const settingsSchema = z.object({
+  feeMode: z.enum(['PERCENT', 'FIXED']).optional(),
   siblingDiscountPct: pct.optional(),
   memberDiscountPct: pct.optional(),
   multiSubjectDiscountPct: pct.optional(),
   publicIntro: optionalText(4000),
 });
+const tariffFields = z.object({ name: name80, monthlyCents: cents, active: z.boolean().optional() });
+const tariffPatch = tariffFields.partial();
 const familyFields = z.object({ name: text(120), notes: optionalText(2000) });
 const familyBase = z.preprocess(blankToNull, familyFields);
 const familyPatch = z.preprocess(blankToNull, familyFields.partial());
@@ -59,6 +62,7 @@ const studentFields = z.object({
   pickupAuthorized: z.array(z.string().trim().min(1).max(120)).max(10).optional(),
   status: studentStatus.optional(),
   notes: optionalText(2000),
+  tuitionTariffId: z.string().uuid().nullable().optional(),
 });
 const studentBase = z.preprocess(blankToNull, studentFields);
 const studentPatch = z.preprocess(blankToNull, studentFields.partial());
@@ -174,7 +178,7 @@ export class SchoolController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const s = await tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId } });
       const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { slug: true } });
-      return { siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, publicIntro: null, ...s, slug: tenant?.slug };
+      return { feeMode: 'PERCENT' as const, siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, publicIntro: null, ...s, slug: tenant?.slug };
     });
   }
 
@@ -185,6 +189,47 @@ export class SchoolController {
       const s = await tx.schoolSettings.upsert({ where: { tenantId: ctx.tenantId }, create: { ...body, tenantId: ctx.tenantId }, update: body });
       await this.audit.log(tx, ctx, 'school.settings_updated', 'school_settings', s.id, changedFields(body));
       return s;
+    });
+  }
+
+  @Perm('school:read')
+  @Get('tariffs')
+  tariffs(@Ctx() ctx: RequestContext) {
+    return this.db.tenant(ctx.tenantId, (tx) =>
+      tx.tuitionTariff.findMany({ include: { _count: { select: { students: true } } }, orderBy: { name: 'asc' } }),
+    );
+  }
+
+  @Perm('school:write')
+  @Post('tariffs')
+  createTariff(@Ctx() ctx: RequestContext, @Body(zod(tariffFields)) body: z.infer<typeof tariffFields>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const t = await tx.tuitionTariff.create({ data: { ...body, tenantId: ctx.tenantId } });
+      await this.audit.log(tx, ctx, 'tuition_tariff.created', 'tuition_tariff', t.id, changedFields(body));
+      return t;
+    });
+  }
+
+  @Perm('school:write')
+  @Patch('tariffs/:id')
+  updateTariff(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(tariffPatch)) body: z.infer<typeof tariffPatch>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      found(await tx.tuitionTariff.findUnique({ where: { id } }), 'Tarifa');
+      const t = await tx.tuitionTariff.update({ where: { id }, data: body });
+      await this.audit.log(tx, ctx, 'tuition_tariff.updated', 'tuition_tariff', id, changedFields(body));
+      return t;
+    });
+  }
+
+  @Perm('school:write')
+  @HttpCode(204)
+  @Delete('tariffs/:id')
+  async deleteTariff(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    await this.db.tenant(ctx.tenantId, async (tx) => {
+      const t = found(await tx.tuitionTariff.findUnique({ where: { id }, include: { _count: { select: { students: true } } } }), 'Tarifa');
+      if (t._count.students > 0) throw new BadRequestException({ message: 'Hay alumnos con esta tarifa', code: 'TARIFF_IN_USE' });
+      await tx.tuitionTariff.delete({ where: { id } });
+      await this.audit.log(tx, ctx, 'tuition_tariff.deleted', 'tuition_tariff', id);
     });
   }
 
@@ -471,6 +516,7 @@ export class SchoolController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       if (body.status !== 'LEFT') await this.limits.assertCanAddStudent(tx, ctx.tenantId);
       if (body.familyId) found(await tx.family.findUnique({ where: { id: body.familyId } }), 'Familia');
+      await this.assertTariff(tx, body.tuitionTariffId);
       const { birthDate, ...rest } = body;
       const s = await tx.student.create({ data: { ...rest, birthDate: birthDate ? toDate(birthDate) : null, tenantId: ctx.tenantId } });
       await this.audit.log(tx, ctx, 'student.created', 'student', s.id, changedFields(body));
@@ -487,6 +533,7 @@ export class SchoolController {
           where: { id },
           include: {
             family: { include: { guardians: true } },
+            tuitionTariff: { select: { id: true, name: true, monthlyCents: true } },
             member: { select: { id: true, memberNumber: true, firstName: true, lastName: true, status: true } },
             enrollments: {
               include: { group: { include: { ...groupInclude, year: { select: { id: true, name: true } } } }, grades: { orderBy: { term: 'asc' } } },
@@ -517,6 +564,7 @@ export class SchoolController {
       const current = found(await tx.student.findUnique({ where: { id } }), 'Alumno');
       if (current.status === 'LEFT' && body.status && body.status !== 'LEFT') await this.limits.assertCanAddStudent(tx, ctx.tenantId);
       if (body.familyId) found(await tx.family.findUnique({ where: { id: body.familyId } }), 'Familia');
+      await this.assertTariff(tx, body.tuitionTariffId, current.tuitionTariffId);
       const { birthDate, ...rest } = body;
       const s = await tx.student.update({ where: { id }, data: { ...rest, ...(birthDate !== undefined && { birthDate: birthDate ? toDate(birthDate) : null }) } });
       if (body.status === 'LEFT' && current.status !== 'LEFT') {
@@ -1187,5 +1235,12 @@ export class SchoolController {
 
   private sensitiveDenied() {
     return new BadRequestException({ message: 'No puedes modificar datos sensibles', code: 'FORBIDDEN' });
+  }
+
+  /** La tarifa tiene que ser de esta banda. Una inactiva sólo se conserva si el alumno ya la tenía. */
+  private async assertTariff(tx: Tx, id: string | null | undefined, currentId?: string | null) {
+    if (!id) return;
+    const tariff = found(await tx.tuitionTariff.findUnique({ where: { id } }), 'Tarifa');
+    if (!tariff.active && id !== currentId) throw new BadRequestException({ message: 'La tarifa no está activa', code: 'TARIFF_INACTIVE' });
   }
 }

@@ -23,6 +23,7 @@ interface ProfileMember {
   phone?: string | null;
   address?: string | null;
   instrument?: string | null;
+  secondaryInstrument?: string | null;
   consentImages: boolean;
   hasPhoto?: boolean;
   photoUrl?: string | null;
@@ -72,6 +73,7 @@ function ProfileTab({ profile, onChanged }: { profile: ProfileResponse; onChange
                 lastName: String(fd.get('lastName') ?? '').trim(),
                 phone: String(fd.get('phone') ?? '').trim() || null,
                 instrument: String(fd.get('instrument') ?? '').trim() || null,
+                secondaryInstrument: String(fd.get('secondaryInstrument') ?? '').trim() || null,
                 address: String(fd.get('address') ?? '').trim() || null,
                 consentImages: fd.get('consentImages') === 'on',
               });
@@ -89,6 +91,12 @@ function ProfileTab({ profile, onChanged }: { profile: ProfileResponse; onChange
               <TextField label="Email" name="email" defaultValue={profile.user.email} readOnly hint="El email de la cuenta no se puede cambiar desde aquí." />
               <TextField label="Teléfono" name="phone" defaultValue={m.phone ?? ''} maxLength={30} autoComplete="tel" />
               <InstrumentField name="instrument" defaultValue={m.instrument ?? ''} />
+              <InstrumentField
+                label="Instrumento secundario"
+                name="secondaryInstrument"
+                defaultValue={m.secondaryInstrument ?? ''}
+                hint="También verás las partituras de este instrumento."
+              />
               <TextField label="Dirección" name="address" defaultValue={m.address ?? ''} maxLength={300} autoComplete="street-address" />
               <Checkbox name="consentImages" label="Autorizo el uso de mi imagen en publicaciones de la banda" defaultChecked={m.consentImages} />
             </>

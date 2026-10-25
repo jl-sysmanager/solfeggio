@@ -48,12 +48,17 @@ const profileSchema = z.preprocess(
       phone: z.string().trim().max(30).nullable().optional(),
       address: optionalText(300),
       instrument: z.string().trim().max(60).nullable().optional(),
+      secondaryInstrument: z.string().trim().max(60).nullable().optional(),
       consentImages: z.boolean().optional(),
     })
     .refine((b) => Object.keys(b).length > 0, { message: 'Sin cambios' })
     .refine((b) => !(b.firstName && !b.lastName) && !(b.lastName && !b.firstName), {
       message: 'Nombre y apellidos van juntos',
       path: ['lastName'],
+    })
+    .refine((b) => !b.instrument || !b.secondaryInstrument || b.instrument !== b.secondaryInstrument, {
+      message: 'El instrumento secundario debe ser distinto del principal',
+      path: ['secondaryInstrument'],
     }),
 );
 const leaveSchema = z.object({ password: z.string().min(1).max(128), tenantId: z.string().uuid().optional() });

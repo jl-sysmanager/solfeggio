@@ -53,6 +53,7 @@ export function MemberFormModal({ open, onClose, member }: { open: boolean; onCl
       birthDate: v.birthDate ?? null,
       address: v.address ?? null,
       instrument: v.instrument ?? null,
+      secondaryInstrument: v.secondaryInstrument ?? null,
       sectionId: v.sectionId ?? null,
       notes: v.notes ?? null,
       consentImages: fd.get('consentImages') === 'on',
@@ -76,6 +77,7 @@ export function MemberFormModal({ open, onClose, member }: { open: boolean; onCl
         </div>
         <div className="form-row">
           <InstrumentField name="instrument" defaultValue={member?.instrument ?? ''} />
+          <InstrumentField label="Instrumento secundario" name="secondaryInstrument" defaultValue={member?.secondaryInstrument ?? ''} />
           <SelectField
             label="Sección"
             name="sectionId"
@@ -424,7 +426,7 @@ export default function MembersPage() {
                 ),
               },
               { key: 'access', header: 'Acceso', render: (m) => accessLabel(m), nowrap: true },
-              { key: 'inst', header: 'Instrumento', render: (m) => m.instrument ?? '—' },
+              { key: 'inst', header: 'Instrumento', render: (m) => [m.instrument, m.secondaryInstrument].filter(Boolean).join(' · ') || '—' },
               { key: 'sec', header: 'Sección', render: (m) => m.section?.name ?? '—' },
               { key: 'joined', header: 'Alta', render: (m) => date(m.joinedAt), nowrap: true },
               { key: 'status', header: 'Estado', render: (m) => <StatusChip value={m.status} map={memberStatus} /> },

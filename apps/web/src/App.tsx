@@ -106,7 +106,7 @@ export function App() {
       <Route path="/governance" element={<Mod perm={['governance:read']} feature="governance" title="Gobierno"><Governance /></Mod>} />
       <Route path="/governance/assemblies/:id" element={<Mod perm={['governance:read']} feature="governance" title="Asamblea"><AssemblyDetail /></Mod>} />
 
-      <Route path="/settings" element={<Shell><Guard perm={['tenant:manage', 'roles:manage', 'audit:read']}><Settings /></Guard></Shell>} />
+      <Route path="/settings" element={<Shell><Guard perm={['tenant:manage', 'audit:read']}><Settings /></Guard></Shell>} />
       <Route path="/billing" element={<Shell><Guard perm={['billing:manage']}><Billing /></Guard></Shell>} />
       <Route path="/incidents" element={<Shell><Guard perm={['incidents:write']}><Incidents /></Guard></Shell>} />
       <Route path="/admin" element={<Navigate to="/admin/metrics" replace />} />

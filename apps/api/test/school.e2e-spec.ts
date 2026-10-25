@@ -202,9 +202,9 @@ describe('Escuela de música', () => {
 
       await patch(`/school/families/${family.id}`, { name: '=HYPERLINK("x")' }).expect(200);
       const csv = await get('/school/tuition/export.csv?period=2026-10').expect(200);
-      expect(csv.text).toContain('ES9121000418450200051332');
       expect(csv.text).toContain('81.75');
       expect(csv.text).toContain(`"'=HYPERLINK(""x"")"`);
+      await patch(`/school/families/${family.id}`, { name: 'Familia Pérez' }).expect(200);
 
       const charge = byStudent(alvaro.id);
       await post(`/school/tuition/charges/${charge.id}/pay`, { date: '2026-10-06' }).expect(200);
@@ -219,6 +219,35 @@ describe('Escuela de música', () => {
 
       // El profesor no ve la tesorería de la escuela.
       await get('/school/tuition/charges', teacherToken).expect(403);
+    });
+
+    it('con tarifas fijas el alumno paga la tarifa asignada', async () => {
+      await put('/school/settings', { feeMode: 'FIXED' }).expect(200);
+      const reduced = (await post('/school/tariffs', { name: 'Reducida', monthlyCents: 4000 }).expect(201)).body;
+      await post('/school/tariffs', { name: 'Reducida', monthlyCents: 1000 }).expect(409);
+      const spare = (await post('/school/tariffs', { name: 'Sin uso', monthlyCents: 1000 }).expect(201)).body;
+      await patch(`/school/students/${alvaro.id}`, { tuitionTariffId: reduced.id }).expect(200);
+      await patch(`/school/tariffs/${spare.id}`, { active: false }).expect(200);
+      const inactive = await patch(`/school/students/${lucia.id}`, { tuitionTariffId: spare.id }).expect(400);
+      expect(inactive.body.code).toBe('TARIFF_INACTIVE');
+      await del(`/school/tariffs/${reduced.id}`).expect(400);
+      await del(`/school/tariffs/${spare.id}`).expect(204);
+      const foreign = (await post('/school/tariffs', { name: 'Ajena', monthlyCents: 500 }, B.token).expect(201)).body;
+      await patch(`/school/students/${lucia.id}`, { tuitionTariffId: foreign.id }).expect(404);
+      await patch(`/school/students/${lucia.id}`, { tuitionTariffId: null }).expect(200);
+
+      const issued = await post('/school/tuition/issue', { yearId: year.id, period: '2026-11', dueDate: '2026-11-05' }).expect(201);
+      expect(issued.body.created).toBe(2);
+      const list = await get('/school/tuition/charges?period=2026-11').expect(200);
+      const byStudent = (id: string) => list.body.data.find((c: { studentId: string }) => c.studentId === id);
+      expect(byStudent(alvaro.id)).toMatchObject({ baseCents: 4000, discountCents: 0, amountCents: 4000 });
+      expect(byStudent(alvaro.id).detail.tariff).toMatchObject({ name: 'Reducida', cents: 4000 });
+      // Lucía no tiene tarifa: paga la asignatura (3000), sin el descuento de hermana ni de socio.
+      expect(byStudent(lucia.id)).toMatchObject({ baseCents: 3000, discountCents: 0, amountCents: 3000, detail: { tariffMissing: true } });
+
+      await put('/school/settings', { feeMode: 'PERCENT' }).expect(200);
+      await patch(`/school/students/${alvaro.id}`, { tuitionTariffId: null }).expect(200);
+      await ctx.db.system.tuitionCharge.deleteMany({ where: { period: '2026-11', studentId: { in: [alvaro.id, lucia.id] } } });
     });
   });
 
