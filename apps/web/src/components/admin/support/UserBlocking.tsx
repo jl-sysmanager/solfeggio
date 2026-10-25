@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { post } from '../../../api/client';
 import { useApi, useApiMutation } from '../../../api/hooks';
 import type { ModUser } from '../../../api/types-admin-support';
@@ -16,7 +17,7 @@ export function UserBlocking() {
   const [term, setTerm] = useState('');
   const [blocking, setBlocking] = useState<ModUser | null>(null);
   const q = useApi<ModUser[]>('/admin/moderation/users', term.trim().length >= 3 ? { q: term.trim() } : { blocked: 'true' });
-  const opts = { invalidate: ['/admin/moderation'] };
+  const opts = { invalidate: ['/admin/moderation', '/admin/users'] };
   const block = useApiMutation((v: { id: string; reason: string }) => post(`/admin/moderation/users/${v.id}/block`, { reason: v.reason }), {
     success: 'Usuario bloqueado',
     ...opts,
@@ -25,6 +26,9 @@ export function UserBlocking() {
   const unblock = useApiMutation((id: string) => post(`/admin/moderation/users/${id}/unblock`), { success: 'Usuario desbloqueado', ...opts });
   return (
     <Card title="Bloqueo de usuarios">
+      <p className="small muted">
+        Atajo de moderación. Gestión completa en <Link to="/admin/users">Usuarios</Link>.
+      </p>
       <TextField label="Buscar usuario" value={term} onChange={(e) => setTerm(e.target.value)} hint="Nombre o email (3 letras como mínimo). Sin búsqueda se muestran los bloqueados." />
       {q.error && <ErrorNote error={q.error} />}
       <DataTable

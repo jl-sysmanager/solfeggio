@@ -227,6 +227,7 @@ Lectura [finance:read], escritura [finance:write].
 ## Panel global (`isPlatformAdmin`, sin tenant)
 - `GET /admin/summary` → `{ support: { open, overdue }, moderation: { pending } }`: pendientes para los avisos del menú lateral (incidencias abiertas y fuera de plazo; anuncios por revisar y denuncias sin resolver)
 - `GET /admin/metrics` → `{ tenants: { total, byStatus }, mrrCents, openIncidents, pendingListings }`
+- `GET /admin/users?q&status=all|active|blocked|platform&page` → directorio paginado (`id, name, email, mfaEnabled, isPlatformAdmin, blockedAt, blockedReason, lastLoginAt, createdAt, memberships[{ tenantId, tenantName, slug, roleName, roleKey, status }]`). `GET /admin/users/:id` añade `activeSessions`. `POST …/:id/block { reason }` · `POST …/:id/unblock` (mismas reglas que Moderación: no self, no admin). `PATCH …/:id { isPlatformAdmin? }` (no self-demote; no promover si está bloqueado; debe quedar ≥1 admin; auditoría `user.updated`; al quitar admin se revocan sesiones). `POST …/:id/revoke-sessions` (no self).
 - `GET /admin/tenants?q&status&page` · `GET /admin/tenants/:id` · `PATCH /admin/tenants/:id { status?, planCode?, addons?, studentSeats? }` (add-ons y plazas de alumno del add-on Escuela) · `DELETE /admin/tenants/:id { confirm: "ELIMINAR" }` (baja lógica)
 - `GET /admin/plans` · `PATCH /admin/plans/:id`
 - `GET /admin/market/pending` (con `waitingHours` y `slaBreached` frente a las 24 h) · `POST /admin/market/listings/:id/moderate { approve, note? }`

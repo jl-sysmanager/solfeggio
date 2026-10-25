@@ -21,6 +21,7 @@ import { ModerationTab } from '../components/admin/ModerationTab';
 import { OpsTab } from '../components/admin/OpsTab';
 import { BrandTab } from '../components/admin/BrandTab';
 import { TenantsTab } from '../components/admin/TenantsTab';
+import { UsersTab } from '../components/admin/UsersTab';
 
 /** Cierra dependencias al marcar una funcionalidad (misma regla que el API). */
 function withDeps(catalog: FeatureModule[], selected: Set<string>, key: string, on: boolean): Set<string> {
@@ -172,6 +173,7 @@ const SECTIONS: Record<string, Section> = {
   support: { eyebrow: 'Atención', title: 'Soporte', description: 'Incidencias de todas las bandas, con responsable, plazo de respuesta y conversación.', content: () => <IncidentsTab /> },
   moderation: { eyebrow: 'Atención', title: 'Moderación', description: 'Anuncios de BandMarket, denuncias de la bolsa de refuerzos y bloqueo de usuarios.', content: () => <ModerationTab /> },
   announcements: { eyebrow: 'Atención', title: 'Avisos', description: 'Avisos dentro de la aplicación para todas las bandas o para un segmento.', content: () => <AnnouncementsTab /> },
+  users: { eyebrow: 'Plataforma', title: 'Usuarios', description: 'Directorio de cuentas: bandas, MFA, bloqueo, equipo de plataforma y cierre de sesiones.', content: () => <UsersTab /> },
   ops: { eyebrow: 'Plataforma', title: 'Sistema', description: 'Colas de trabajos, correo, almacenamiento, tareas programadas y copias de seguridad.', content: () => <OpsTab /> },
   plans: { eyebrow: 'Plataforma', title: 'Planes', description: 'Precios, límites y funcionalidades de cada plan.', content: () => <PlansTab /> },
   integrations: { eyebrow: 'Plataforma', title: 'Integraciones', description: 'Pagos, correo y destino de copias: credenciales, estado y prueba de conexión.', content: () => <IntegrationsTab /> },
