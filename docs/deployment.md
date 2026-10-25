@@ -42,7 +42,7 @@ pnpm dev
 | Mailpit (emails) | http://localhost:8025 |
 | S3 local (SeaweedFS) | http://localhost:8333 (credenciales de [`infra/s3/s3.json`](../infra/s3/s3.json), sólo en desarrollo) |
 
-- El almacenamiento local es **SeaweedFS** con API S3, porque las imágenes de MinIO ya no se pueden descargar de los registros públicos. Con `NODE_ENV=development`, la API crea el bucket `S3_BUCKET` al arrancar si no existe; en otros entornos el bucket lo aprovisiona la infraestructura.
+- El almacenamiento local es **SeaweedFS** con API S3, porque las imágenes de MinIO ya no se pueden descargar de los registros públicos. Con `NODE_ENV=development`, la API crea el bucket `S3_BUCKET` al arrancar si no existe; en otros entornos el bucket lo aprovisiona la infraestructura. En todos los entornos la API aplica CORS del bucket desde `CORS_ORIGINS`/`APP_URL` para que el PUT prefirmado del navegador no falle.
 - `pnpm db:migrate` aplica las migraciones con `DATABASE_MIGRATION_URL`, el rol propietario. La API usa `DATABASE_URL`, el rol `solfeggio_app`, que crea [`infra/postgres/01-app-role.sh`](../infra/postgres/01-app-role.sh) al inicializar el volumen, y `SYSTEM_DATABASE_URL` (propietario) para las tareas de sistema. Si el volumen ya existía antes de ese script, recréalo con `docker compose down -v`.
 - El seed lee `PLATFORM_ADMIN_EMAIL`, `SEED_DEMO`, `SEED_PASSWORD` y `STRIPE_PRICE_*`. Con `SEED_DEMO=true` crea la banda `banda-demo` con los usuarios `propietario@`, `director@`, `tesorero@` y `musico@demo.solfeggio.local`. La contraseña por defecto, sólo para desarrollo, está documentada en [`apps/api/prisma/seed.ts`](../apps/api/prisma/seed.ts).
 

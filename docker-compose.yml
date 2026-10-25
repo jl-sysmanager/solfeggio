@@ -57,7 +57,7 @@ services:
       interval: 5s
 
   # Almacenamiento S3-compatible local (SeaweedFS). En producción: S3, R2, Scaleway, etc.
-  # allowedOrigins: respaldo CORS; el API también aplica PutBucketCors al arrancar en development.
+  # allowedOrigins: respaldo CORS; el API también aplica PutBucketCors al arrancar.
   s3:
     image: chrislusf/seaweedfs:3.85
     command: server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json -s3.allowedOrigins=http://localhost:5173,http://localhost:8080

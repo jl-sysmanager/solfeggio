@@ -43,7 +43,10 @@ export async function uploadFile(uploadUrlPath: string, file: File): Promise<Upl
     await uploadToPresigned(uploadUrl, file, meta.mimeType);
   } catch (e) {
     if (e instanceof TypeError) {
-      throw new ApiError(0, 'No se pudo subir el fichero al almacenamiento (CORS o red). Comprueba S3 y vuelve a intentarlo.');
+      throw new ApiError(
+        0,
+        'No se pudo subir el fichero (failed to fetch). Suele ser CORS del bucket o CSP: en web S3_ORIGIN debe incluir el host del bucket; en api, APP_URL/CORS_ORIGINS el dominio de la web.',
+      );
     }
     throw e;
   }

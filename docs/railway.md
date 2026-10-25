@@ -128,7 +128,8 @@ PORT=8080
 # Red privada: nombre del servicio api y su puerto
 API_UPSTREAM=http://${{api.RAILWAY_PRIVATE_DOMAIN}}:3000
 # Origen de las URLs prefirmadas del bucket (política CSP); admite comodines
-S3_ORIGIN=https://*.storage.railway.app
+# Incluye el host con y sin comodín (path-style vs virtual-hosted)
+S3_ORIGIN=https://*.storage.railway.app https://storage.railway.app
 ```
 
 En **Settings → Networking → Generate Domain** crea el dominio público con el puerto `8080`. Pon `/healthz` como ruta de healthcheck.
@@ -149,13 +150,15 @@ Cada despliegue posterior repite el paso de release al arrancar la API: es idemp
 
 Los archivos (partituras, documentos, fotos) suben y bajan directamente entre el navegador y el bucket con URLs prefirmadas, así que el bucket debe aceptar CORS desde tu dominio.
 
-**Bucket de Railway.** Copia el nombre, la clave de acceso y el secreto de la pestaña **Credentials** a las variables `S3_*` de `api` y `worker`. Los buckets usan URLs virtuales (`<bucket>.storage.railway.app`), por eso `S3_FORCE_PATH_STYLE=false` y `S3_ORIGIN=https://*.storage.railway.app`. Si la pestaña indica estilo de ruta para un bucket antiguo, pon `S3_FORCE_PATH_STYLE=true`. Aplica el CORS con la CLI de AWS y las credenciales del bucket:
+**Bucket de Railway.** Copia el nombre, la clave de acceso y el secreto de la pestaña **Credentials** a las variables `S3_*` de `api` y `worker`. Los buckets usan URLs virtuales (`<bucket>.storage.railway.app`), por eso `S3_FORCE_PATH_STYLE=false` y en `web` `S3_ORIGIN=https://*.storage.railway.app https://storage.railway.app`. Si la pestaña indica estilo de ruta para un bucket antiguo, pon `S3_FORCE_PATH_STYLE=true`.
+
+Al arrancar, `api` aplica CORS del bucket con los orígenes de `APP_URL`/`CORS_ORIGINS` (debe ser el dominio público de `web`). Si las subidas fallan con «failed to fetch» antes de redesplegar, puedes forzarlo con la CLI:
 
 ```bash
 AWS_ACCESS_KEY_ID=<clave> AWS_SECRET_ACCESS_KEY=<secreto> aws s3api put-bucket-cors \
   --endpoint-url https://storage.railway.app \
   --bucket <nombre-del-bucket> \
-  --cors-configuration '{"CORSRules":[{"AllowedOrigins":["https://<tu-dominio>"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["Content-Type"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]}'
+  --cors-configuration '{"CORSRules":[{"AllowedOrigins":["https://<tu-dominio>"],"AllowedMethods":["GET","PUT","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag"],"MaxAgeSeconds":3600}]}'
 ```
 
 **S3 externo (AWS S3, Cloudflare R2).** Pon su endpoint en `S3_ENDPOINT` y `S3_PUBLIC_ENDPOINT`, la región en `S3_REGION` y su origen en `S3_ORIGIN` de `web`. Para R2 usa `S3_REGION=auto` y `S3_FORCE_PATH_STYLE=true`. En la UE, elige una región europea para cumplir con el RGPD.
@@ -186,9 +189,10 @@ AWS_ACCESS_KEY_ID=<clave> AWS_SECRET_ACCESS_KEY=<secreto> aws s3api put-bucket-c
 | `permission denied for table …` | El release no pudo conceder permisos: revisa los registros del primer arranque de `api` y que `DATABASE_MIGRATION_URL` use el usuario propietario |
 | `web` responde 502 en `/api` | El API no es alcanzable: comprueba `API_UPSTREAM`, que `api` tenga `PORT=3000` y mira la nota de IPv6 del apartado 3 |
 | Railway marca el servicio como no saludable | `PORT` no coincide con el que escucha el servicio (`api`: 3000, `web`: 8080) o la ruta de healthcheck está mal |
-| Las subidas de archivos fallan en el navegador | CORS del bucket sin tu dominio, o `S3_ORIGIN` de `web` no incluye el origen del bucket (política CSP) |
+| Subida: `failed to fetch` / «No se pudo subir el fichero» | 1) En `web`: `S3_ORIGIN=https://*.storage.railway.app https://storage.railway.app`. 2) En `api`: `APP_URL`/`CORS_ORIGINS` = dominio de la web; redespliega `api` para que aplique CORS al bucket. 3) En DevTools → Network, el PUT al host `*.storage.railway.app` debe ser 200 (si no aparece o es CORS error, es bucket/CSP) |
 | Todos los usuarios comparten IP en los registros o el límite de peticiones salta pronto | Falta `TRUST_PROXY=2` en `api` |
 | Los correos no salen | Configura el proveedor en **Panel global → Integraciones**; hasta entonces el envío se descarta con un aviso en el registro del `worker` |
+| Build Failed: `frontend grpc server closed unexpectedly` | Fallo transitorio del builder de Railway (BuildKit), no del Dockerfile. En el despliegue fallido: ⋮ → **Redeploy**, o Ctrl/Cmd+K → **Deploy latest commit**. Si persiste: variable `NO_CACHE=1` en el servicio, redesplegar y quitarla tras un build OK. `api` y `worker` comparten `apps/api/Dockerfile`; si `api` construye bien, el worker debería también |
 
 ## 9. Lista de comprobación antes de abrir el registro
 

@@ -48,17 +48,24 @@ export class Storage implements OnApplicationBootstrap {
     this.signer = new S3Client({ ...base, endpoint: e.S3_PUBLIC_ENDPOINT ?? e.S3_ENDPOINT });
   }
 
-  /** En desarrollo crea el bucket y el CORS del navegador; en producción lo aprovisiona la infraestructura. */
+  /**
+   * En desarrollo crea el bucket si falta. En todos los entornos aplica CORS del bucket desde
+   * CORS_ORIGINS/APP_URL: sin él el PUT prefirmado del navegador falla con «failed to fetch».
+   */
   async onApplicationBootstrap() {
-    if (env().NODE_ENV !== 'development' || !env().S3_ENDPOINT) return;
-    const bucket = env().S3_BUCKET;
-    try {
-      await this.client.send(new HeadBucketCommand({ Bucket: bucket }));
-    } catch {
-      await this.client.send(new CreateBucketCommand({ Bucket: bucket })).catch((e) => log.warn(`No se pudo crear el bucket: ${e.message}`));
+    const e = env();
+    if (!e.S3_ACCESS_KEY_ID) return;
+    const bucket = e.S3_BUCKET;
+    if (e.NODE_ENV === 'development' && e.S3_ENDPOINT) {
+      try {
+        await this.client.send(new HeadBucketCommand({ Bucket: bucket }));
+      } catch {
+        await this.client.send(new CreateBucketCommand({ Bucket: bucket })).catch((err) => log.warn(`No se pudo crear el bucket: ${err.message}`));
+      }
     }
-    // Sin CORS el PUT prefirmado desde Vite/nginx falla en el navegador (mismo fallo que el logotipo antes de subirlo por API).
-    const origins = env().CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
+    const origins = [...new Set(
+      [...e.CORS_ORIGINS.split(','), e.APP_URL].map((o) => o.trim()).filter(Boolean),
+    )];
     if (!origins.length) return;
     await this.client
       .send(
@@ -69,7 +76,8 @@ export class Storage implements OnApplicationBootstrap {
               {
                 AllowedOrigins: origins,
                 AllowedMethods: ['GET', 'PUT', 'HEAD'],
-                AllowedHeaders: ['Content-Type', 'Content-Length'],
+                // * : el navegador puede enviar cabeceras extra; listar sólo Content-Type rompe algunos S3-compatibles.
+                AllowedHeaders: ['*'],
                 ExposeHeaders: ['ETag'],
                 MaxAgeSeconds: 3600,
               },
@@ -77,7 +85,7 @@ export class Storage implements OnApplicationBootstrap {
           },
         }),
       )
-      .catch((e) => log.warn(`No se pudo configurar CORS del bucket: ${e.message}`));
+      .catch((err) => log.warn(`No se pudo configurar CORS del bucket: ${err.message}`));
   }
 
   validate(mimeType: string, sizeBytes: number, allowed: readonly string[]) {
