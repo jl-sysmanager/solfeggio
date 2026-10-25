@@ -61,7 +61,7 @@ function DocumentPreviewModal({ doc, onClose }: { doc: DocumentItem | null; onCl
   return (
     <Modal open={!!doc} onClose={onClose} title={doc?.title ?? 'Documento'} size="lg">
       {loading && <Loading />}
-      {error && <ErrorNote error={error} />}
+      {error ? <ErrorNote error={error} /> : null}
       {!loading && url && canPreview && (
         <div className="doc-preview">
           {isImage ? <img src={url} alt={doc?.title ?? ''} /> : <iframe title={doc?.title ?? 'Vista previa'} src={url} />}

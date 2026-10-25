@@ -43,10 +43,10 @@ export function renderBrandedEmail(input: { subject: string; text: string; homeU
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="width:100%;max-width:560px;">
 <tr><td style="background:${COBALT};padding:22px 28px 18px;border-radius:6px 6px 0 0;">
 <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-<td width="36" height="36" align="center" valign="middle" style="width:36px;height:36px;background:${GLAZE};border-radius:6px;">
-<div style="width:28px;height:28px;line-height:28px;border:1.5px solid ${COBALT_DEEP};border-radius:4px;font-family:${FONT};font-size:16px;font-weight:800;color:${COBALT_DEEP};">S</div>
+<td width="36" height="36" align="center" valign="middle" style="width:36px;height:36px;background:${COBALT};border-radius:6px;border:1.5px solid ${GLAZE};">
+<div style="width:28px;height:28px;line-height:28px;margin:3px;border:1.5px solid ${GLAZE};border-radius:4px;font-family:Georgia,'Times New Roman',serif;font-size:18px;color:#FFFFFF;">&#119070;</div>
 </td>
-<td style="padding-left:12px;font-family:${FONT};font-size:20px;font-weight:800;letter-spacing:-0.01em;color:#FFFFFF;">Solfeamos</td>
+<td style="padding-left:12px;font-family:${FONT};font-size:20px;font-weight:800;letter-spacing:-0.01em;color:#FFFFFF;">Solf<span style="border-bottom:2px solid ${OCHRE};padding-bottom:1px;">eamos</span></td>
 </tr></table>
 </td></tr>
 <tr><td style="background:${OCHRE};height:3px;font-size:0;line-height:0;">&nbsp;</td></tr>

@@ -9,7 +9,7 @@ import { Card } from '../components/Card';
 import { StatusChip } from '../components/Chip';
 import { DataTable, Pagination } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
-import { SelectField, TextField, formValues } from '../components/Field';
+import { FormError, SelectField, TextField, formValues } from '../components/Field';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
 import { Tabs, type TabDef } from '../components/Tabs';

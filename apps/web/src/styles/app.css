@@ -105,7 +105,7 @@ table,
 .icon { flex: none; }
 .nowrap { white-space: nowrap; }
 
-/* Marca: placa esmaltada con la «S» + nombre en Archivo estrecha */
+/* Marca: placa esmaltada (clave de sol) + wordmark «Solfeamos» con ocre bajo «eamos» */
 .wordmark {
   display: inline-flex;
   align-items: center;
@@ -114,26 +114,24 @@ table,
   font-weight: var(--weight-heavy);
   font-stretch: var(--stretch-display);
   letter-spacing: -0.01em;
-  color: var(--text-strong);
+  color: var(--cobalt-900);
+  line-height: 1;
 }
-.wordmark::before {
-  content: 'S';
-  display: inline-grid;
-  place-items: center;
+.wordmark__mark,
+.wordmark__logo {
   width: 32px;
   height: 32px;
+  flex: none;
   border-radius: var(--radius-md);
-  background: var(--plaque-bg);
-  color: var(--plaque-text);
-  outline: 1.5px solid var(--plaque-rule);
-  outline-offset: -4px;
-  font-size: var(--text-base);
-  font-weight: var(--weight-heavy);
+}
+.wordmark__logo { object-fit: contain; background: #fff; }
+.wordmark__name { display: inline-block; }
+.wordmark__accent {
+  border-bottom: 2px solid var(--ochre);
+  padding-bottom: 1px;
 }
 .sidenav .wordmark { color: var(--sidebar-text-strong); }
-.sidenav .wordmark::before { background: var(--glaze); color: var(--cobalt-900); outline-color: var(--cobalt-900); }
-.wordmark--logo::before { content: none; }
-.wordmark__logo { width: 32px; height: 32px; object-fit: contain; border-radius: var(--radius-md); background: #fff; }
+.sidenav .wordmark__accent { border-bottom-color: var(--ochre); }
 .sidenav__logo { width: 36px; height: 36px; object-fit: contain; border-radius: var(--radius-md); background: #fff; flex: none; }
 .brand { display: inline-flex; align-items: center; text-decoration: none; }
 .brand:hover { text-decoration: none; }
@@ -852,8 +850,9 @@ input[type='file'].input { padding: 6px 12px; line-height: 22px; }
   gap: var(--space-6);
 }
 .auth__aside .wordmark { color: #fff; font-size: 1.375rem; }
-.auth__aside .wordmark::before { background: var(--glaze); color: var(--cobalt-900); outline-color: var(--cobalt-900); width: 40px; height: 40px; outline-offset: -5px; }
+.auth__aside .wordmark__mark,
 .auth__aside .wordmark__logo { width: 40px; height: 40px; }
+.auth__aside .wordmark__accent { border-bottom-color: var(--ochre); }
 @media (min-width: 960px) {
   .auth__aside { padding: var(--space-10); justify-content: space-between; min-height: 100vh; }
 }
