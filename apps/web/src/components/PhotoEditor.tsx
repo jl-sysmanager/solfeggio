@@ -23,7 +23,9 @@ export function PhotoEditor({
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const file = (e.currentTarget.elements.namedItem('photo') as HTMLInputElement).files?.[0];
+    // * Guardamos la referencia: tras await, e.currentTarget puede ser null (evento sintético).
+    const form = e.currentTarget;
+    const file = (form.elements.namedItem('photo') as HTMLInputElement).files?.[0];
     if (!file) return;
     if (file.size > MAX_BYTES) {
       setError(new ApiError(400, 'La foto no puede superar 1 MB'));
@@ -33,7 +35,7 @@ export function PhotoEditor({
     setError(null);
     try {
       await api(confirmPath, { method: 'POST', rawBody: file, contentType: file.type || 'application/octet-stream' });
-      e.currentTarget.reset();
+      form.reset();
       onChanged();
     } catch (err) {
       setError(err);
