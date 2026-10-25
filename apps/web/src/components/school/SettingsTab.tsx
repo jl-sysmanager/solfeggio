@@ -323,7 +323,7 @@ function DiscountsForm({ settings, write }: { settings: SchoolSettings; write: b
             <TextField label="Varias asignaturas (%)" name="multi" type="number" min={0} max={100} defaultValue={settings.multiSubjectDiscountPct} hint="Con 2 o más matrículas." disabled={!write} />
           </div>
         )}
-        <TextField label="Familia (€)" name="family" inputMode="decimal" defaultValue={euros(settings.familyDiscountCents)} hint="El 2.º alumno resta el importe, el 3.º el doble y así sucesivamente. También con tarifa fija." disabled={!write} />
+        <TextField label="Familia (€)" name="family" inputMode="decimal" defaultValue={euros(settings.familyDiscountCents)} hint="El mismo importe por cada alumno adicional. Con 5 €, el 2.º resta 5 € y el 3.º otros 5 €. También con tarifa fija." disabled={!write} />
         {mode === 'PERCENT' && <p className="small muted">Los porcentajes se suman y no superan el 100 %. El descuento de familia se resta después y el cargo no baja de cero.</p>}
         {mode === 'FIXED' && <p className="small muted">Cada alumno paga la tarifa de su ficha. Sin tarifa, se cobra la suma de las asignaturas. El descuento de familia se resta igual.</p>}
         <TextAreaField label="Presentación del formulario público" name="publicIntro" rows={4} defaultValue={settings.publicIntro ?? ''} disabled={!write} />

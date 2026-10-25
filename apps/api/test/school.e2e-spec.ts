@@ -274,16 +274,17 @@ describe('Escuela de música', () => {
       const luciaCapped = capped.body.data.find((c: { studentId: string }) => c.studentId === lucia.id);
       expect(luciaCapped).toMatchObject({ discountCents: 3000, amountCents: 0 });
 
-      // El 2.º resta una vez el importe y el 3.º el doble, sobre el total de cada alumno.
+      // El 2.º y el 3.º restan el mismo importe: 5 € + 5 € = 10 € en la familia.
       await put('/school/settings', { familyDiscountCents: 500 }).expect(200);
       const nerea = (await post('/school/students', { familyId: family.id, firstName: 'Nerea', lastName: 'Pérez', birthDate: '2019-01-01' }).expect(201)).body;
       await post('/school/enrollments', { studentId: nerea.id, groupId: gTheory.id }).expect(201);
       await post('/school/tuition/issue', { yearId: year.id, period: '2027-03', dueDate: '2027-03-05' }).expect(201);
       const three = await get('/school/tuition/charges?period=2027-03').expect(200);
       const byRank = (id: string) => three.body.data.find((c: { studentId: string }) => c.studentId === id);
+      expect(byRank(alvaro.id).detail.discounts.some((d: { kind: string }) => d.kind === 'FAMILY')).toBe(false);
       expect(byRank(lucia.id).detail.discounts).toContainEqual({ kind: 'FAMILY', pct: 0, cents: 500 });
-      expect(byRank(nerea.id)).toMatchObject({ baseCents: 3000, discountCents: 1450, amountCents: 1550 });
-      expect(byRank(nerea.id).detail.discounts).toContainEqual({ kind: 'FAMILY', pct: 0, cents: 1000 });
+      expect(byRank(nerea.id)).toMatchObject({ baseCents: 3000, discountCents: 950, amountCents: 2050 });
+      expect(byRank(nerea.id).detail.discounts).toContainEqual({ kind: 'FAMILY', pct: 0, cents: 500 });
       await patch(`/school/students/${nerea.id}`, { status: 'LEFT' }).expect(200);
 
       await put('/school/settings', { familyDiscountCents: 0 }).expect(200);

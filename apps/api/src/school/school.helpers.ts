@@ -180,8 +180,8 @@ type StudentForTuition = Prisma.StudentGetPayload<{
  * Calcula las mensualidades de un periodo.
  * PERCENT: descuentos en % sumados (máximo 100) por hermanos (del 2º en adelante),
  * socio (el alumno o algún tutor es socio) y varias asignaturas (2 o más matrículas).
- * El descuento fijo de familia se resta del total de cada alumno según su puesto:
- * el 2.º resta el importe, el 3.º el doble y así sucesivamente. El cargo no baja de cero.
+ * Cada alumno adicional de la familia resta el mismo importe fijo (el 2.º, 5 €; el 3.º, otros 5 €).
+ * El cargo no baja de cero.
  * FIXED: el alumno paga la tarifa asignada. Sin tarifa, paga la suma de asignaturas.
  * El descuento de familia se resta también en este modo.
  */
@@ -201,14 +201,9 @@ export function computeTuition(
     byFamily.set(s.familyId, [...(byFamily.get(s.familyId) ?? []), s]);
   }
   const siblings = new Set<string>();
-  // Puesto en la familia (0 = el mayor). El descuento de familia es puesto × importe.
-  const familyRank = new Map<string, number>();
   for (const list of byFamily.values()) {
     const sorted = [...list].sort((a, b) => (a.birthDate?.getTime() ?? Infinity) - (b.birthDate?.getTime() ?? Infinity) || a.createdAt.getTime() - b.createdAt.getTime());
-    sorted.forEach((s, index) => {
-      familyRank.set(s.id, index);
-      if (index > 0) siblings.add(s.id);
-    });
+    sorted.slice(1).forEach((s) => siblings.add(s.id));
   }
   return students
     .filter((s) => s.enrollments.length)
@@ -232,7 +227,7 @@ export function computeTuition(
         pct = Math.min(100, discounts.reduce((sum, d) => sum + d.pct, 0));
       }
       let discountCents = Math.round((baseCents * pct) / 100);
-      const familyCents = Math.min((familyRank.get(s.id) ?? 0) * (settings.familyDiscountCents ?? 0), baseCents - discountCents);
+      const familyCents = siblings.has(s.id) ? Math.min(settings.familyDiscountCents ?? 0, baseCents - discountCents) : 0;
       if (familyCents > 0) discounts.push({ kind: 'FAMILY', pct: 0, cents: familyCents });
       discountCents += familyCents;
       const detail: TuitionDetail = {
