@@ -222,7 +222,7 @@ El equipo de plataforma configura Stripe y el envío de correo desde **Panel glo
 
 - Las claves siguen el formato `tenants/{tenantId}/{área}/{uuid}.{ext}`, con las áreas `documents`, `archive` y `market`. La clave se genera en el servidor a partir del `tid` del token; el nombre original sólo se guarda en la base de datos.
 - La subida se hace en dos pasos (`apps/api/src/storage/upload.ts`):
-  1. `upload-url` (`/documents/upload-url`, `/works/:id/assets/upload-url`, `/market/images/upload-url`) valida el MIME contra la lista permitida (PDF, MusicXML, imágenes, audio, ofimática según el área) y el tamaño (`MAX_UPLOAD_MB`), y devuelve un `PUT` prefirmado válido 5 minutos. La firma incluye `Content-Type` y `Content-Length`: S3 rechaza la subida si el navegador envía otro tipo u otro tamaño.
+  1. `upload-url` (`/documents/upload-url`, `/works/:id/assets/upload-url`, `/market/images/upload-url`) valida el MIME contra la lista permitida (PDF, MusicXML, imágenes, audio, ofimática según el área) y el tamaño (`MAX_UPLOAD_MB`), y devuelve un `PUT` prefirmado válido 5 minutos. La firma incluye `Content-Type`; el tamaño real se comprueba con `HeadObject` al confirmar.
   2. El navegador sube el archivo directamente a S3.
   3. La confirmación (`POST /documents`, `POST /works/:id/assets`) comprueba que la clave empieza por el prefijo del tenant y del área, hace `HeadObject` para obtener el tamaño **real** y reserva la cuota del plan de forma atómica. Si el registro falla, el objeto se borra y la cuota se libera.
 - Las descargas usan un `GET` prefirmado válido 5 minutos, que sólo se emite tras cargar el registro a través de RLS.

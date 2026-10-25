@@ -20,7 +20,7 @@
 - **CSRF:** la API no usa cookies de sesión. La única cookie es la del refresh, que es `SameSite=Strict` y tiene el path restringido; las peticiones autenticadas usan la cabecera `Authorization`.
 - **Validación:** todos los cuerpos, parámetros y queries se validan con **zod** (`ZodPipe`), que descarta los campos desconocidos. Los ids de ruta deben ser UUID. Los listados limitan `pageSize` a 200 o menos.
 - **Errores:** un filtro global devuelve el formato estándar sin trazas, y los detalles internos sólo van a los logs.
-- **Subidas de archivos:** lista de tipos MIME permitidos por área, tamaño máximo (`MAX_UPLOAD_MB`), claves generadas en el servidor, `Content-Type` y `Content-Length` firmados en la URL prefirmada, y verificación con `HeadObject` (tamaño real) antes de registrar el archivo. El análisis antivirus está pendiente.
+- **Subidas de archivos:** lista de tipos MIME permitidos por área, tamaño máximo (`MAX_UPLOAD_MB`), claves generadas en el servidor, `Content-Type` firmado en la URL prefirmada, y verificación con `HeadObject` (tamaño real) antes de registrar el archivo. El análisis antivirus está pendiente.
 - **Exportación CSV:** las celdas que empiezan por `=`, `+`, `-` o `@` se prefijan con `'` para evitar inyección de fórmulas.
 - **Dependencias:** Dependabot semanal y `pnpm audit` en la CI.
 

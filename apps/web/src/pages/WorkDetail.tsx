@@ -47,7 +47,7 @@ function AssetUploadModal({ work, open, onClose }: { work: Work; open: boolean; 
         {work.versions && work.versions.length > 0 && (
           <SelectField label="Versión" name="versionId" placeholder="Original" options={work.versions.map((v) => ({ value: v.id, label: v.name }))} />
         )}
-        <TextField label="Fichero" name="file" type="file" accept="application/pdf,image/*,audio/*,.mscz,.musicxml,.mxl" required />
+        <TextField label="Fichero" name="file" type="file" accept="application/pdf,image/png,image/jpeg,.musicxml,.mxl,.xml,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/flac,audio/aac,.mp3,.m4a,.wav,.ogg,.flac" required />
         <FormError error={upload.error} />
         <div className="modal__footer">
           <Button variant="ghost" onClick={onClose}>

@@ -138,9 +138,13 @@ export const patch = <T>(path: string, body: unknown) => api<T>(path, { method: 
 export const put = <T>(path: string, body: unknown) => api<T>(path, { method: 'PUT', body });
 export const del = <T>(path: string) => api<T>(path, { method: 'DELETE' });
 
-/** Sube un fichero a una URL prefirmada (S3/MinIO). */
-export async function uploadToPresigned(url: string, file: File) {
-  const res = await fetch(url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'application/octet-stream' } });
+/** Sube un fichero a una URL prefirmada (S3/MinIO). El Content-Type debe coincidir con el firmado. */
+export async function uploadToPresigned(url: string, file: File, mimeType?: string) {
+  const res = await fetch(url, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': mimeType || file.type || 'application/octet-stream' },
+  });
   if (!res.ok) throw new ApiError(res.status, 'No se pudo subir el fichero');
 }
 

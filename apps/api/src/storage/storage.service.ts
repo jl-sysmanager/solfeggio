@@ -1,5 +1,15 @@
 import { BadRequestException, Global, Injectable, Logger, Module, OnApplicationBootstrap } from '@nestjs/common';
-import { CreateBucketCommand, DeleteObjectCommand, GetObjectCommand, HeadBucketCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+  HeadBucketCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  PutBucketCorsCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'node:crypto';
 import { env } from '../config/env';
@@ -12,6 +22,7 @@ export const MIME_GROUPS = {
 } as const;
 
 const URL_TTL_SECONDS = 300;
+const log = new Logger('Storage');
 
 /**
  * Almacenamiento S3-compatible. Las claves siempre empiezan por `tenants/{tenantId}/` y se generan
@@ -37,14 +48,36 @@ export class Storage implements OnApplicationBootstrap {
     this.signer = new S3Client({ ...base, endpoint: e.S3_PUBLIC_ENDPOINT ?? e.S3_ENDPOINT });
   }
 
-  /** En desarrollo crea el bucket si no existe; en producción lo aprovisiona la infraestructura. */
+  /** En desarrollo crea el bucket y el CORS del navegador; en producción lo aprovisiona la infraestructura. */
   async onApplicationBootstrap() {
     if (env().NODE_ENV !== 'development' || !env().S3_ENDPOINT) return;
+    const bucket = env().S3_BUCKET;
     try {
-      await this.client.send(new HeadBucketCommand({ Bucket: env().S3_BUCKET }));
+      await this.client.send(new HeadBucketCommand({ Bucket: bucket }));
     } catch {
-      await this.client.send(new CreateBucketCommand({ Bucket: env().S3_BUCKET })).catch((e) => new Logger('Storage').warn(`No se pudo crear el bucket: ${e.message}`));
+      await this.client.send(new CreateBucketCommand({ Bucket: bucket })).catch((e) => log.warn(`No se pudo crear el bucket: ${e.message}`));
     }
+    // Sin CORS el PUT prefirmado desde Vite/nginx falla en el navegador (mismo fallo que el logotipo antes de subirlo por API).
+    const origins = env().CORS_ORIGINS.split(',').map((o) => o.trim()).filter(Boolean);
+    if (!origins.length) return;
+    await this.client
+      .send(
+        new PutBucketCorsCommand({
+          Bucket: bucket,
+          CORSConfiguration: {
+            CORSRules: [
+              {
+                AllowedOrigins: origins,
+                AllowedMethods: ['GET', 'PUT', 'HEAD'],
+                AllowedHeaders: ['Content-Type', 'Content-Length'],
+                ExposeHeaders: ['ETag'],
+                MaxAgeSeconds: 3600,
+              },
+            ],
+          },
+        }),
+      )
+      .catch((e) => log.warn(`No se pudo configurar CORS del bucket: ${e.message}`));
   }
 
   validate(mimeType: string, sizeBytes: number, allowed: readonly string[]) {
@@ -78,12 +111,12 @@ export class Storage implements OnApplicationBootstrap {
   }
 
   /**
-   * PUT prefirmado. Se firman Content-Type y Content-Length: S3 rechaza la subida si el navegador
-   * envía otro tipo o tamaño. El cifrado en reposo se configura como cifrado por defecto del bucket.
+   * PUT prefirmado. Sólo se firma Content-Type: firmar Content-Length rompe la subida en el
+   * navegador con varios S3-compatibles. El tamaño real se comprueba después con HeadObject.
    */
-  async uploadUrl(key: string, mimeType: string, sizeBytes: number) {
-    const cmd = new PutObjectCommand({ Bucket: env().S3_BUCKET, Key: key, ContentType: mimeType, ContentLength: sizeBytes });
-    return getSignedUrl(this.signer, cmd, { expiresIn: URL_TTL_SECONDS, signableHeaders: new Set(['content-type', 'content-length']) });
+  async uploadUrl(key: string, mimeType: string, _sizeBytes: number) {
+    const cmd = new PutObjectCommand({ Bucket: env().S3_BUCKET, Key: key, ContentType: mimeType });
+    return getSignedUrl(this.signer, cmd, { expiresIn: URL_TTL_SECONDS, signableHeaders: new Set(['content-type']) });
   }
 
   async downloadUrl(key: string, fileName: string) {
