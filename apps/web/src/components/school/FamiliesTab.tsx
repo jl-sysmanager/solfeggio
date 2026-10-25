@@ -88,7 +88,7 @@ function GuardianModal({ open, onClose, familyId, guardian }: { open: boolean; o
             name="memberId"
             defaultValue={guardian?.memberId ?? ''}
             placeholder="No es socio"
-            hint="Aplica el descuento de socio a sus hijos."
+            hint="Aplica el descuento de socio y, si el socio tiene usuario, permite darle acceso al portal."
             options={(members.data?.data ?? []).map((m) => ({ value: m.id, label: `${m.lastName}, ${m.firstName}` }))}
           />
         )}
@@ -106,6 +106,52 @@ function GuardianModal({ open, onClose, familyId, guardian }: { open: boolean; o
   );
 }
 
+type StaffUser = { id: string; name: string; email: string; role?: { key: string; name: string } };
+
+function LinkPortalModal({ guardian, onClose }: { guardian: Guardian | null; onClose: () => void }) {
+  const users = useApi<StaffUser[]>(guardian ? '/school/staff-users' : null);
+  const link = useApiMutation((userId: string) => post(`/school/guardians/${guardian!.id}/link`, { userId }), {
+    success: 'Usuario vinculado al portal de familias',
+    invalidate: ['/school/families', '/school/staff-users'],
+    onSuccess: onClose,
+  });
+  return (
+    <Modal open={!!guardian} onClose={onClose} title={guardian ? `Vincular portal · ${fullName(guardian)}` : 'Vincular portal'}>
+      <form
+        className="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const v = formValues(e.currentTarget);
+          if (v.userId) link.mutate(v.userId);
+        }}
+      >
+        <p className="small muted">
+          Elige un usuario o socio con acceso a la app. Conserva su rol actual y gana acceso al portal de familias.
+        </p>
+        <SelectField
+          label="Usuario de la banda"
+          name="userId"
+          required
+          placeholder="Selecciona…"
+          options={(users.data ?? []).map((u) => ({
+            value: u.id,
+            label: `${u.name} · ${u.email}${u.role ? ` (${u.role.name})` : ''}`,
+          }))}
+        />
+        <FormError error={link.error} />
+        <div className="modal__footer">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={link.isPending}>
+            Vincular
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
 export function FamiliesTab() {
   const { can } = useAuth();
   const write = can('school:write');
@@ -114,8 +160,16 @@ export function FamiliesTab() {
   const [editing, setEditing] = useState<Family | null>(null);
   const [creating, setCreating] = useState(false);
   const [guardianFor, setGuardianFor] = useState<{ familyId: string; guardian: Guardian | null } | null>(null);
+  const [linking, setLinking] = useState<Guardian | null>(null);
   const [removing, setRemoving] = useState<Guardian | null>(null);
-  const invite = useApiMutation((g: Guardian) => post(`/school/guardians/${g.id}/invite`), { success: 'Invitación enviada al portal de familias', invalidate: ['/school/families'] });
+  const invite = useApiMutation((g: Guardian) => post<{ linked?: boolean }>(`/school/guardians/${g.id}/invite`), {
+    success: 'Portal de familias actualizado',
+    invalidate: ['/school/families', '/school/staff-users'],
+  });
+  const unlink = useApiMutation((g: Guardian) => del(`/school/guardians/${g.id}/link`), {
+    success: 'Acceso al portal retirado',
+    invalidate: ['/school/families', '/school/staff-users'],
+  });
   const remove = useApiMutation((g: Guardian) => del(`/school/guardians/${g.id}`), { success: 'Tutor eliminado', invalidate: ['/school'], onSuccess: () => setRemoving(null) });
 
   function actions(f: Family): MenuItem[] {
@@ -124,7 +178,14 @@ export function FamiliesTab() {
       { label: 'Añadir tutor', onSelect: () => setGuardianFor({ familyId: f.id, guardian: null }) },
       ...f.guardians.flatMap((g) => [
         { label: `Editar a ${g.firstName}`, onSelect: () => setGuardianFor({ familyId: f.id, guardian: g }) },
-        ...(g.email && !g.portalAccess ? [{ label: `Invitar a ${g.firstName} al portal`, onSelect: () => invite.mutate(g) }] : []),
+        ...(!g.portalAccess
+          ? [
+              ...(g.email || g.memberId
+                ? [{ label: `Dar acceso al portal a ${g.firstName}`, onSelect: () => invite.mutate(g) }]
+                : []),
+              { label: `Vincular usuario a ${g.firstName}`, onSelect: () => setLinking(g) },
+            ]
+          : [{ label: `Quitar portal a ${g.firstName}`, onSelect: () => unlink.mutate(g) }]),
         { label: `Eliminar a ${g.firstName}`, onSelect: () => setRemoving(g), danger: true },
       ]),
     ];
@@ -180,6 +241,7 @@ export function FamiliesTab() {
       )}
       <FamilyModal open={creating || !!editing} family={editing} onClose={() => { setCreating(false); setEditing(null); }} />
       <GuardianModal open={!!guardianFor} familyId={guardianFor?.familyId ?? ''} guardian={guardianFor?.guardian} onClose={() => setGuardianFor(null)} />
+      <LinkPortalModal guardian={linking} onClose={() => setLinking(null)} />
       <ConfirmModal
         open={!!removing}
         title="Eliminar tutor"

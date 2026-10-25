@@ -25,6 +25,8 @@ export interface Session {
   permissions: string[];
   plan: { code: PlanCode; name: string; features: string[]; maxUsers: number; maxMembers: number; storageMb: number } | null;
   memberId: string | null;
+  /** Tutor de escuela vinculado: da acceso al portal de familias. */
+  guardianId?: string | null;
   memberships: Membership[];
 }
 

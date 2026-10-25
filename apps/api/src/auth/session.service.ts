@@ -3,6 +3,7 @@ import { featuresFor } from '../billing/entitlements';
 import { Db } from '../db/db.service';
 import { IMPERSONATION_PERMISSIONS, IMPERSONATION_ROLE } from '../platform/impersonation.util';
 import { effectiveLimits } from '../tenancy/effective-limits';
+import { withGuardianPortalAccess } from './effective-permissions';
 
 export interface Session {
   user: { id: string; email: string; name: string; mfaEnabled: boolean; isPlatformAdmin: boolean };
@@ -11,6 +12,8 @@ export interface Session {
   permissions: string[];
   plan: { code: string; name: string; features: string[]; maxUsers: number; maxMembers: number; storageMb: number } | null;
   memberId: string | null;
+  /** Tutor de la escuela vinculado: da acceso al portal de familias aunque el rol sea otro. */
+  guardianId: string | null;
   memberships: { tenantId: string; tenantName: string; slug: string; roleKey: string; roleName: string }[];
   impersonation?: { sessionId: string; tenantName: string; expiresAt: string; reason: string };
 }
@@ -58,7 +61,7 @@ export class SessionService {
           }
         : null,
       role: active ? { id: active.role.id, key: active.role.key, name: active.role.name } : null,
-      permissions: active ? active.role.permissions : [],
+      permissions: active ? withGuardianPortalAccess(active.role.permissions, active.guardianId) : [],
       plan: active
         ? {
             code: active.tenant.plan.code,
@@ -68,6 +71,7 @@ export class SessionService {
           }
         : null,
       memberId: active?.memberId ?? null,
+      guardianId: active?.guardianId ?? null,
       memberships: user.memberships.map((m) => ({
         tenantId: m.tenantId,
         tenantName: m.tenant.name,
@@ -100,6 +104,7 @@ export class SessionService {
         ...effectiveLimits(tenant),
       },
       memberId: null,
+      guardianId: null,
       memberships: [],
       impersonation: { sessionId: imp.id, tenantName: tenant.name, expiresAt: imp.expiresAt.toISOString(), reason: imp.reason },
     };

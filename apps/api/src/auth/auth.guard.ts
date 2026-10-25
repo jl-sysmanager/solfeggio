@@ -8,6 +8,7 @@ import { env } from '../config/env';
 import { AccessTokenPayload, AuthedRequest, RequestContext } from './context';
 import { ALLOW_IMPERSONATION, IMPERSONATION_PERMISSIONS } from '../platform/impersonation.util';
 import { ALLOW_READ_ONLY, FEATURE, IS_PUBLIC, NO_TENANT, PERMS, PLATFORM_ADMIN } from './decorators';
+import { withGuardianPortalAccess } from './effective-permissions';
 
 const tenantEntitlement = {
   plan: true,
@@ -85,7 +86,7 @@ export class AuthGuard implements CanActivate {
         roleKey: membership.role.key,
         memberId: membership.memberId,
         tenantStatus: membership.tenant.status,
-        permissions: new Set(membership.role.permissions),
+        permissions: new Set(withGuardianPortalAccess(membership.role.permissions, membership.guardianId)),
         features: await featuresFor(this.db, membership.tenant),
       });
       this.touch(membership.id, membership.lastSeenAt);

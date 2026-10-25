@@ -9,6 +9,7 @@ describe('Escuela de música', () => {
   const post = (path: string, body: object = {}, token = A.token) => ctx.http().post(api(path)).set(auth(token)).send(body);
   const patch = (path: string, body: object, token = A.token) => ctx.http().patch(api(path)).set(auth(token)).send(body);
   const put = (path: string, body: object, token = A.token) => ctx.http().put(api(path)).set(auth(token)).send(body);
+  const del = (path: string, token = A.token) => ctx.http().delete(api(path)).set(auth(token));
 
   // Estado compartido entre los pasos del flujo.
   let prevYear: { id: string };
@@ -276,10 +277,13 @@ describe('Escuela de música', () => {
     it('invita al tutor, acepta y ve sólo a su familia', async () => {
       const inv = await post(`/school/guardians/${guardian.id}/invite`).expect(201);
       expect(inv.body.guardianId).toBe(guardian.id);
+      expect(inv.body.linked).toBeFalsy();
       const mail = ctx.jobs.of('email.send').find((j) => j.data.to === 'marta@familia.local')!;
       const token = /invite\/([\w-]+)/.exec(mail.data.text)![1];
       const acc = await ctx.http().post(api('/auth/invitations/accept')).send({ token, name: 'Marta Pérez', password: PASSWORD }).expect(200);
       expect(acc.body.session.role.key).toBe('family');
+      expect(acc.body.session.permissions).toContain('school:family');
+      expect(acc.body.session.guardianId).toBe(guardian.id);
       familyToken = acc.body.accessToken;
       await post(`/school/guardians/${guardian.id}/invite`).expect(409);
 
@@ -291,6 +295,29 @@ describe('Escuela de música', () => {
       // La familia no accede al back-office.
       await get('/school/students', familyToken).expect(403);
       await get('/school/family').expect(404);
+    });
+
+    it('un músico de la banda puede ser tutor y conservar su rol', async () => {
+      const musicianToken = await addUser(ctx, A, 'musician', 'musico-tutor@test.local');
+      const other = await post(`/school/families/${family.id}/guardians`, {
+        firstName: 'Luis',
+        lastName: 'Músico',
+        email: 'musico-tutor@test.local',
+        relationship: 'Padre',
+      }).expect(201);
+      const linked = await post(`/school/guardians/${other.body.id}/invite`).expect(201);
+      expect(linked.body).toMatchObject({ linked: true, guardianId: other.body.id });
+      const me = await get('/auth/me', musicianToken).expect(200);
+      expect(me.body.role.key).toBe('musician');
+      expect(me.body.permissions).toContain('school:family');
+      expect(me.body.guardianId).toBe(other.body.id);
+      const portal = await get('/school/family', musicianToken).expect(200);
+      expect(portal.body.family.name).toBe('Familia Pérez');
+      await get('/school/students', musicianToken).expect(403);
+      await del(`/school/guardians/${other.body.id}/link`).expect(204);
+      const after = await get('/auth/me', musicianToken).expect(200);
+      expect(after.body.permissions).not.toContain('school:family');
+      expect(after.body.guardianId).toBeNull();
     });
 
     it('los avisos llegan a las familias del grupo', async () => {

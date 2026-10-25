@@ -45,6 +45,7 @@ const guardianFields = z.object({
 });
 const guardianBase = z.preprocess(blankToNull, guardianFields);
 const guardianPatch = z.preprocess(blankToNull, guardianFields.partial());
+const guardianLinkSchema = z.object({ userId: z.string().uuid() });
 const studentStatus = z.enum(['ACTIVE', 'INACTIVE', 'LEFT']);
 const studentFields = z.object({
   familyId: z.string().uuid().nullable().optional(),
@@ -264,9 +265,12 @@ export class SchoolController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       found(await tx.family.findUnique({ where: { id: familyId } }), 'Familia');
       if (body.nationalId && !ctx.permissions.has('members:sensitive')) throw this.sensitiveDenied();
-      if (body.memberId) found(await tx.member.findUnique({ where: { id: body.memberId } }), 'Socio');
+      const member = body.memberId ? found(await tx.member.findUnique({ where: { id: body.memberId } }), 'Socio') : null;
       const { nationalId, ...rest } = body;
-      const g = await tx.guardian.create({ data: { ...rest, email: rest.email?.toLowerCase(), nationalIdEnc: encrypt(nationalId), familyId, tenantId: ctx.tenantId } });
+      const email = (rest.email ?? member?.email)?.toLowerCase() ?? null;
+      const g = await tx.guardian.create({
+        data: { ...rest, email, nationalIdEnc: encrypt(nationalId), familyId, tenantId: ctx.tenantId },
+      });
       await this.audit.log(tx, ctx, 'guardian.created', 'guardian', g.id, changedFields(body));
       return serializeGuardian(g, ctx);
     });
@@ -276,13 +280,23 @@ export class SchoolController {
   @Patch('guardians/:id')
   updateGuardian(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(guardianPatch)) body: z.infer<typeof guardianPatch>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
-      found(await tx.guardian.findUnique({ where: { id } }), 'Tutor');
+      const current = found(await tx.guardian.findUnique({ where: { id } }), 'Tutor');
       if (body.nationalId !== undefined && !ctx.permissions.has('members:sensitive')) throw this.sensitiveDenied();
-      if (body.memberId) found(await tx.member.findUnique({ where: { id: body.memberId } }), 'Socio');
+      const member = body.memberId ? found(await tx.member.findUnique({ where: { id: body.memberId } }), 'Socio') : null;
       const { nationalId, ...rest } = body;
+      const email =
+        rest.email !== undefined
+          ? rest.email?.toLowerCase() ?? null
+          : !current.email && member?.email
+            ? member.email.toLowerCase()
+            : undefined;
       const g = await tx.guardian.update({
         where: { id },
-        data: { ...rest, ...(rest.email && { email: rest.email.toLowerCase() }), ...(nationalId !== undefined && { nationalIdEnc: encrypt(nationalId) }) },
+        data: {
+          ...rest,
+          ...(email !== undefined && { email }),
+          ...(nationalId !== undefined && { nationalIdEnc: encrypt(nationalId) }),
+        },
       });
       await this.audit.log(tx, ctx, 'guardian.updated', 'guardian', id, changedFields(body));
       return serializeGuardian(g, ctx);
@@ -302,38 +316,119 @@ export class SchoolController {
     });
   }
 
-  /** Invita al tutor al portal de familias con el rol «Familia». Reenviar sustituye la invitación pendiente. */
+  /**
+   * Da acceso al portal de familias.
+   * Si el email del tutor ya es usuario de la banda (o el socio vinculado tiene usuario), se vincula al momento.
+   * Si no, envía invitación con rol «Familia» (reenviar sustituye la pendiente).
+   */
   @Perm('school:write')
   @Post('guardians/:id/invite')
   async inviteGuardian(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
     const token = randomToken(32);
     const result = await this.db.tenant(ctx.tenantId, async (tx) => {
       const g = found(await tx.guardian.findUnique({ where: { id } }), 'Tutor');
-      if (!g.email) throw new BadRequestException({ message: 'El tutor no tiene email', code: 'GUARDIAN_NO_EMAIL' });
       if (await tx.membership.findFirst({ where: { guardianId: id } })) {
         throw new ConflictException({ message: 'El tutor ya tiene acceso al portal', code: 'ALREADY_LINKED' });
       }
+
+      // Socio con cuenta en la app: se vincula sin cambiar su rol.
+      if (g.memberId) {
+        const byMember = await tx.membership.findFirst({ where: { memberId: g.memberId, status: 'ACTIVE' } });
+        if (byMember) {
+          if (byMember.guardianId) {
+            throw new ConflictException({ message: 'Ese socio ya está vinculado a otro tutor', code: 'MEMBER_ALREADY_GUARDIAN' });
+          }
+          await tx.membership.update({ where: { id: byMember.id }, data: { guardianId: id } });
+          await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
+          await this.audit.log(tx, ctx, 'guardian.linked', 'guardian', id, { membershipId: byMember.id, via: 'member' });
+          return { linked: true as const, guardianId: id, membershipId: byMember.id };
+        }
+      }
+
+      if (!g.email) throw new BadRequestException({ message: 'El tutor no tiene email', code: 'GUARDIAN_NO_EMAIL' });
+      const email = g.email.toLowerCase();
+
+      // Usuario ya en la banda con el mismo email.
+      const existingUser = await this.db.system.user.findUnique({ where: { email }, select: { id: true } });
+      if (existingUser) {
+        const byUser = await tx.membership.findUnique({ where: { tenantId_userId: { tenantId: ctx.tenantId, userId: existingUser.id } } });
+        if (byUser?.status === 'ACTIVE') {
+          if (byUser.guardianId) {
+            throw new ConflictException({ message: 'Ese usuario ya está vinculado a otro tutor', code: 'USER_ALREADY_GUARDIAN' });
+          }
+          await tx.membership.update({ where: { id: byUser.id }, data: { guardianId: id } });
+          await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
+          await this.audit.log(tx, ctx, 'guardian.linked', 'guardian', id, { membershipId: byUser.id, via: 'email' });
+          return { linked: true as const, guardianId: id, membershipId: byUser.id };
+        }
+      }
+
       await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
       await this.limits.assertCanAddUser(tx, ctx.tenantId);
       const role = await tx.role.findUnique({ where: { tenantId_key: { tenantId: ctx.tenantId, key: 'family' } } });
       if (!role) throw new BadRequestException({ message: 'No existe el rol Familia', code: 'ROLE_MISSING' });
-      const email = g.email.toLowerCase();
+      // Sólo asociar memberId si nadie más lo tiene ya en una membresía.
+      const memberTaken = g.memberId ? await tx.membership.findFirst({ where: { memberId: g.memberId } }) : null;
       const inv = await tx.invitation.create({
         data: {
-          tenantId: ctx.tenantId, email, roleId: role.id, guardianId: id, tokenHash: sha256(token),
-          invitedBy: ctx.userId, expiresAt: new Date(Date.now() + 7 * 86_400_000),
+          tenantId: ctx.tenantId,
+          email,
+          roleId: role.id,
+          guardianId: id,
+          memberId: g.memberId && !memberTaken ? g.memberId : undefined,
+          tokenHash: sha256(token),
+          invitedBy: ctx.userId,
+          expiresAt: new Date(Date.now() + 7 * 86_400_000),
         },
       });
       await this.audit.log(tx, ctx, 'invitation.created', 'invitation', inv.id, { guardianId: id, role: role.key });
-      return { id: inv.id, email, roleId: role.id, guardianId: id, expiresAt: inv.expiresAt };
+      return { linked: false as const, id: inv.id, email, roleId: role.id, guardianId: id, expiresAt: inv.expiresAt, token };
     });
+
+    if (result.linked) return { linked: true, guardianId: result.guardianId, membershipId: result.membershipId };
+
     const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
     await this.jobs.add('email.send', {
       to: result.email,
       subject: `Invitación a ${tenant.name} en Solfeamos`,
-      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${env().APP_URL}/invite/${token}`,
+      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${env().APP_URL}/invite/${result.token}`,
     });
-    return result;
+    const { token: _t, ...publicResult } = result;
+    return publicResult;
+  }
+
+  /** Vincula un usuario ya activo de la banda como tutor del portal (sin cambiar su rol). */
+  @Perm('school:write')
+  @Post('guardians/:id/link')
+  linkGuardian(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(guardianLinkSchema)) body: z.infer<typeof guardianLinkSchema>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      found(await tx.guardian.findUnique({ where: { id } }), 'Tutor');
+      if (await tx.membership.findFirst({ where: { guardianId: id } })) {
+        throw new ConflictException({ message: 'El tutor ya tiene acceso al portal', code: 'ALREADY_LINKED' });
+      }
+      const m = found(
+        await tx.membership.findUnique({ where: { tenantId_userId: { tenantId: ctx.tenantId, userId: body.userId } } }),
+        'Usuario',
+      );
+      if (m.status !== 'ACTIVE') throw new BadRequestException({ message: 'El usuario no está activo en la banda', code: 'USER_INACTIVE' });
+      if (m.guardianId) throw new ConflictException({ message: 'Ese usuario ya está vinculado a otro tutor', code: 'USER_ALREADY_GUARDIAN' });
+      await tx.membership.update({ where: { id: m.id }, data: { guardianId: id } });
+      await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
+      await this.audit.log(tx, ctx, 'guardian.linked', 'guardian', id, { membershipId: m.id, userId: body.userId, via: 'manual' });
+      return { linked: true, guardianId: id, membershipId: m.id };
+    });
+  }
+
+  @Perm('school:write')
+  @HttpCode(204)
+  @Delete('guardians/:id/link')
+  async unlinkGuardian(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    await this.db.tenant(ctx.tenantId, async (tx) => {
+      found(await tx.guardian.findUnique({ where: { id } }), 'Tutor');
+      const updated = await tx.membership.updateMany({ where: { guardianId: id }, data: { guardianId: null } });
+      if (updated.count === 0) throw new BadRequestException({ message: 'El tutor no tiene acceso al portal', code: 'NOT_LINKED' });
+      await this.audit.log(tx, ctx, 'guardian.unlinked', 'guardian', id);
+    });
   }
 
   // ── Alumnos ────────────────────────────────────────────────────────────────

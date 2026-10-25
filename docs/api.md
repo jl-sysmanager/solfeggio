@@ -59,9 +59,10 @@ type Session = {
   user: { id; email; name; mfaEnabled; isPlatformAdmin };
   tenant: { id; name; slug; status; timezone } | null;
   role: { id; key; name } | null;
-  permissions: string[];
+  permissions: string[]; // incluye `school:family` si la membresía tiene tutor vinculado
   plan: { code; name; features: string[]; maxUsers; maxMembers; storageMb } | null;
   memberId: string | null;
+  guardianId: string | null;
   memberships: Membership[];
 };
 ```
@@ -185,7 +186,7 @@ Lectura [performances:read], escritura [performances:write].
 ### Escuela de música {school}
 Lectura [school:read], escritura [school:write], docencia [school:teach]. Un profesor vinculado a un usuario sin school:write sólo actúa sobre sus grupos (403 `NOT_YOUR_GROUP`).
 - `GET|PUT /school/settings` (descuentos por hermanos, por socio y por varias asignaturas; texto público)
-- Familias y tutores: `GET|POST /school/families?q` · `GET|PATCH|DELETE /school/families/:id` · `POST /school/families/:id/guardians` · `PATCH|DELETE /school/guardians/:id` · `POST /school/guardians/:id/invite` (invitación al portal con el rol Familia; 409 `ALREADY_LINKED`). NIF del tutor cifrado; en claro y editable sólo con members:sensitive.
+- Familias y tutores: `GET|POST /school/families?q` · `GET|PATCH|DELETE /school/families/:id` · `POST /school/families/:id/guardians` · `PATCH|DELETE /school/guardians/:id` · `POST /school/guardians/:id/invite` (vincula al momento si el email/socio ya es usuario de la banda; si no, invita con rol Familia; 409 `ALREADY_LINKED`) · `POST /school/guardians/:id/link { userId }` · `DELETE /school/guardians/:id/link`. Un usuario/socio vinculado conserva su rol y obtiene `school:family`. NIF del tutor cifrado; en claro y editable sólo con members:sensitive.
 - Alumnos: `GET /school/students?q&status&familyId&groupId&page` · `POST /school/students` (403 `PLAN_LIMIT` según plazas) · `GET|PATCH /school/students/:id` · `GET /school/students/:id/report-card?yearId` (boletín) · `POST /school/students/:id/promote { stage: EDUCANDO|MUSICIAN, sectionId? }` [+ members:write] crea la ficha de socio
 - Cursos: `GET|POST /school/years` · `PATCH /school/years/:id` (festivos, matrícula abierta, curso actual) · `POST /school/years/:id/copy-from { sourceYearId, renewEnrollments }` (renovación) · `GET /school/years/:id/conflicts`
 - `GET|POST /school/subjects` · `PATCH /school/subjects/:id` · `GET|POST /school/teachers` · `PATCH /school/teachers/:id` · `GET /school/staff-users` · `GET|POST /school/rooms` · `PATCH|DELETE /school/rooms/:id`
