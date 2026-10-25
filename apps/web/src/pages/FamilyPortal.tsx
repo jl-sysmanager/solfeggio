@@ -31,7 +31,6 @@ export default function FamilyPortalPage() {
       <div className="stack" style={{ gap: 24 }}>
         <p>
           Hola, <strong>{d.guardian.firstName}</strong>. {d.family.name}
-          {d.family.ibanMasked && <span className="muted small"> · Domiciliación en {d.family.ibanMasked}</span>}
         </p>
         {d.notices.length > 0 && (
           <Card title="Avisos" tone="cream">

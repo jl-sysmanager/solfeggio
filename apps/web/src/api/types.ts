@@ -82,7 +82,6 @@ export interface Member {
   phone?: string | null;
   birthDate?: string | null;
   nationalId?: string | null;
-  iban?: string | null;
   address?: string | null;
   instrument?: string | null;
   sectionId?: string | null;

@@ -19,7 +19,7 @@ describe('Aislamiento entre tenants', () => {
     b = await signupBand(ctx, 'banda-b');
     const http = () => ctx.http();
 
-    ids.member = (await http().post('/api/v1/members').set(auth(a.token)).send({ firstName: 'Ana', lastName: 'Secreta', iban: 'ES9121000418450200051332', nationalId: '12345678Z' }).expect(201)).body.id;
+    ids.member = (await http().post('/api/v1/members').set(auth(a.token)).send({ firstName: 'Ana', lastName: 'Secreta', nationalId: '12345678Z' }).expect(201)).body.id;
     ids.composer = (await http().post('/api/v1/composers').set(auth(a.token)).send({ name: 'Compositor A' }).expect(201)).body.id;
     ids.work = (await http().post('/api/v1/works').set(auth(a.token)).send({ title: 'Marcha Exclusiva', composerId: ids.composer, tags: ['privada'] }).expect(201)).body.id;
     ids.event = (await http().post('/api/v1/events').set(auth(a.token)).send({ type: 'REHEARSAL', title: 'Ensayo A', startsAt: '2030-01-10T18:00:00Z', endsAt: '2030-01-10T20:00:00Z' }).expect(201)).body.id;
@@ -268,9 +268,8 @@ describe('Aislamiento entre tenants', () => {
   });
 
   it('los datos sensibles se guardan cifrados en la base de datos', async () => {
-    const raw = await ctx.db.system.$queryRaw<{ ibanEnc: string; nationalIdEnc: string }[]>`SELECT "ibanEnc", "nationalIdEnc" FROM members WHERE id = ${ids.member}::uuid`;
-    expect(raw[0].ibanEnc).toMatch(/^v1:/);
-    expect(raw[0].ibanEnc).not.toContain('ES91');
+    const raw = await ctx.db.system.$queryRaw<{ nationalIdEnc: string }[]>`SELECT "nationalIdEnc" FROM members WHERE id = ${ids.member}::uuid`;
+    expect(raw[0].nationalIdEnc).toMatch(/^v1:/);
     expect(raw[0].nationalIdEnc).not.toContain('12345678Z');
   });
 });

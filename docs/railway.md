@@ -48,7 +48,7 @@ openssl rand -base64 32   # DATA_ENCRYPTION_KEY
 openssl rand -hex 16      # LOG_HASH_SALT
 ```
 
-> **`DATA_ENCRYPTION_KEY` cifra DNI, IBAN y semillas MFA.** Guárdala en un gestor de contraseñas: si se pierde, esos datos no se pueden recuperar. Para rotarla, mira [security-gdpr.md](security-gdpr.md).
+> **`DATA_ENCRYPTION_KEY` cifra DNI y semillas MFA.** Guárdala en un gestor de contraseñas: si se pierde, esos datos no se pueden recuperar. Para rotarla, mira [security-gdpr.md](security-gdpr.md).
 
 Crea las variables comunes una sola vez en **Project Settings → Shared Variables** (`APP_DB_PASSWORD`, `JWT_ACCESS_SECRET`, `JWT_REFRESH_SECRET`, `DATA_ENCRYPTION_KEY`, `LOG_HASH_SALT`) y compártelas con `api` y `worker`, o cópialas en ambos. Las referencias a ellas se escriben `${{shared.NOMBRE}}`.
 

@@ -70,9 +70,9 @@ export function TuitionTab() {
           <YearSelect years={years} value={yearId} onChange={(id) => { setYearId(id); setPage(1); }} />
           <TextField label="Mes" type="month" value={period} onChange={(e) => { setPeriod(e.target.value); setPage(1); }} />
           <SelectField label="Estado" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} placeholder="Todos" options={Object.entries(tuitionStatus).map(([value, { label }]) => ({ value, label }))} />
-          {can('members:sensitive') && period && (
-            <Button variant="ghost" onClick={() => downloadFile(`/school/tuition/export.csv?period=${period}`, `remesa-escuela-${period}.csv`).catch(toast.error)}>
-              Remesa CSV
+          {can('finance:read') && period && (
+            <Button variant="ghost" onClick={() => downloadFile(`/school/tuition/export.csv?period=${period}`, `cargos-escuela-${period}.csv`).catch(toast.error)}>
+              Exportar CSV
             </Button>
           )}
         </div>

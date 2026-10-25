@@ -66,7 +66,7 @@ function ImpersonateModal({ tenantId, tenantName, open, onClose }: { tenantId: s
           start.mutate({ reason: v.reason ?? '', minutes: Number(v.minutes ?? 30) });
         }}
       >
-        <p className="small muted">Acceso de solo lectura, sin datos sensibles (DNI, IBAN). Queda registrado y la banda lo verá en su auditoría.</p>
+        <p className="small muted">Acceso de solo lectura, sin datos sensibles (DNI). Queda registrado y la banda lo verá en su auditoría.</p>
         <TextAreaField label="Motivo" name="reason" required minLength={10} maxLength={500} hint="Mínimo 10 caracteres." />
         <TextField label="Duración (minutos)" name="minutes" type="number" min={5} max={60} defaultValue={30} />
         <FormError error={start.error} />

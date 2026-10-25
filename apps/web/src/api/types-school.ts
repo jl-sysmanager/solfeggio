@@ -34,10 +34,7 @@ export interface Guardian {
 export interface Family {
   id: string;
   name: string;
-  ibanHolder: string | null;
   notes: string | null;
-  iban?: string | null;
-  ibanMasked: string | null;
   guardians: Guardian[];
   students?: { id: string; firstName: string; lastName: string; status: StudentStatus }[];
 }
@@ -257,7 +254,7 @@ export interface ReportCard {
 
 export interface FamilyPortalData {
   guardian: { id: string; firstName: string; lastName: string };
-  family: { id: string; name: string; ibanMasked: string | null };
+  family: { id: string; name: string };
   students: {
     id: string;
     firstName: string;

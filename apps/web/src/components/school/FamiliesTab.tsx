@@ -16,8 +16,6 @@ import { Menu, type MenuItem } from '../Menu';
 import { ConfirmModal, Modal } from '../Modal';
 
 function FamilyModal({ open, onClose, family }: { open: boolean; onClose: () => void; family?: Family | null }) {
-  const { can } = useAuth();
-  const sensitive = can('members:sensitive');
   const save = useApiMutation((body: unknown) => (family ? patch(`/school/families/${family.id}`, body) : post('/school/families', body)), {
     success: family ? 'Familia actualizada' : 'Familia creada',
     invalidate: ['/school'],
@@ -31,18 +29,10 @@ function FamilyModal({ open, onClose, family }: { open: boolean; onClose: () => 
         onSubmit={(e) => {
           e.preventDefault();
           const v = formValues(e.currentTarget);
-          save.mutate({ name: v.name, ibanHolder: v.ibanHolder ?? null, notes: v.notes ?? null, ...(sensitive ? { iban: v.iban ?? null } : {}) });
+          save.mutate({ name: v.name, notes: v.notes ?? null });
         }}
       >
         <TextField label="Nombre" name="name" required defaultValue={family?.name} placeholder="Familia García López" />
-        <div className="form-row">
-          <TextField label="Titular de la cuenta" name="ibanHolder" defaultValue={family?.ibanHolder ?? ''} />
-          {sensitive ? (
-            <TextField label="IBAN para domiciliar" name="iban" defaultValue={family?.iban ?? ''} autoComplete="off" hint="Se guarda cifrado." />
-          ) : (
-            <p className="small muted">IBAN: {family?.ibanMasked ?? 'sin datos'} (necesitas permiso de datos sensibles para editarlo)</p>
-          )}
-        </div>
         <TextAreaField label="Notas" name="notes" defaultValue={family?.notes ?? ''} />
         <FormError error={save.error} />
         <div className="modal__footer">
@@ -183,7 +173,6 @@ export function FamiliesTab() {
                 header: 'Alumnos',
                 render: (f) => (f.students?.length ? f.students.map((s, i) => <span key={s.id}>{i > 0 && ', '}<Link to={`/school/students/${s.id}`}>{s.firstName}</Link></span>) : '—'),
               },
-              { key: 'i', header: 'Cuenta', render: (f) => <span className="mono">{f.ibanMasked ?? '—'}</span>, nowrap: true },
               ...(write ? [{ key: 'a', header: 'Acciones', render: (f: Family) => <Menu label={`Acciones de ${f.name}`} items={actions(f)} /> }] : []),
             ]}
           />

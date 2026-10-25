@@ -109,7 +109,7 @@ Objetivo: aumentar el ingreso por banda con la escuela y los cobros, y que el m�
 | Escuela · Oferta educativa | Asignaturas (instrumento, lenguaje musical, conjunto), niveles, grupos y profesores | ✅ |
 | Escuela · Horarios y aulas | Detección de conflictos de aula, profesor y alumno; recuperación de clases; calendario escolar con festivos | ✅ |
 | Escuela · Asistencia y evaluación | Asistencia a clase (`ClassAttendance`, con los mismos estados que la de la banda), notas por trimestre y boletines imprimibles desde el navegador | ✅ |
-| Escuela · Mensualidades | Descuentos por hermanos, por ser socio de la banda y por varias asignaturas; emisión, cobro y exportación CSV con el IBAN de cada familia para domiciliar (falta generar la remesa SEPA pain.008) | 🟡 |
+| Escuela · Mensualidades | Descuentos por hermanos, por ser socio de la banda y por varias asignaturas; emisión, cobro y exportación CSV de cargos (sin IBAN; remesa SEPA fuera de alcance) | 🟡 |
 | Escuela · Paso a la banda | Alumno → educando → músico de la banda sin volver a introducir datos | ✅ |
 | Escuela · Portal de familias | Horario, faltas, notas, recibos y avisos del profesor | ✅ |
 | Plan o add-on Escuela | Plazas de alumno por plan y add-on por banda desde el panel global, con cobro automático en Stripe (cuota fija y precio por plaza) | ✅ |

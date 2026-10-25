@@ -270,7 +270,6 @@ export default function StudentDetailPage() {
                     {g.memberId && <Chip tone="info">Socio</Chip>}
                   </li>
                 ))}
-                <li className="small muted">Cuenta: {s.family.ibanMasked ?? 'sin domiciliar'}</li>
               </ul>
             )}
           </Card>

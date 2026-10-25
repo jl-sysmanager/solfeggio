@@ -203,8 +203,6 @@ export interface ExternalMusician {
   email: string | null;
   phone: string | null;
   nationalId?: string | null;
-  iban?: string | null;
-  ibanMasked: string | null;
   hasNationalId: boolean;
   createdAt: string;
 }

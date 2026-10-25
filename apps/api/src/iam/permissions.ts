@@ -6,7 +6,7 @@ export const PERMISSIONS = [
   { key: 'audit:read', group: 'Banda', label: 'Consultar auditoría' },
   { key: 'members:read', group: 'Secretaría', label: 'Ver socios' },
   { key: 'members:write', group: 'Secretaría', label: 'Altas, bajas y edición de socios' },
-  { key: 'members:sensitive', group: 'Secretaría', label: 'Ver DNI e IBAN' },
+  { key: 'members:sensitive', group: 'Secretaría', label: 'Ver DNI' },
   { key: 'communications:send', group: 'Secretaría', label: 'Enviar comunicaciones' },
   { key: 'documents:read', group: 'Secretaría', label: 'Ver documentos' },
   { key: 'documents:write', group: 'Secretaría', label: 'Subir y borrar documentos' },

@@ -4,7 +4,7 @@ import { ExternalMusician, MusicianProfile, Prisma, ReinforcementRequest } from 
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, RequireFeature } from '../auth/decorators';
-import { decrypt, encrypt, mask } from '../common/crypto';
+import { decrypt, encrypt } from '../common/crypto';
 import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam, isoDate, isoDateTime, optionalText, toDate } from '../common/schemas';
@@ -60,7 +60,6 @@ const externalFields = z.object({
   email: z.string().email().max(254).nullable().optional(),
   phone: z.string().trim().max(30).nullable().optional(),
   nationalId: z.string().trim().toUpperCase().max(20).nullable().optional(),
-  iban: z.string().trim().toUpperCase().regex(/^[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}$/, 'IBAN no válido').nullable().optional(),
 });
 const externalCreate = z.preprocess(blankToNull, externalFields);
 const externalPatch = z.preprocess(blankToNull, externalFields.partial());
@@ -85,15 +84,13 @@ function withholding(grossCents: number, pct: number) {
   return { withholdingCents, netCents: grossCents - withholdingCents };
 }
 
-/** Datos fiscales cifrados: sólo se descifran con `members:sensitive`. */
+/** NIF cifrado: sólo se descifra con `members:sensitive`. */
 function serializeExternal(m: ExternalMusician, ctx: RequestContext) {
-  const { nationalIdEnc, ibanEnc, ...rest } = m;
+  const { nationalIdEnc, ...rest } = m;
   const sensitive = ctx.permissions.has('members:sensitive');
   return {
     ...rest,
     nationalId: sensitive ? decrypt(nationalIdEnc) : undefined,
-    iban: sensitive ? decrypt(ibanEnc) : undefined,
-    ibanMasked: mask(decrypt(ibanEnc)),
     hasNationalId: !!nationalIdEnc,
   };
 }
@@ -462,14 +459,13 @@ export class ReinforcementsController {
   }
 
   private externalData(body: z.infer<typeof externalPatch>, ctx: RequestContext): Prisma.ExternalMusicianUncheckedUpdateInput {
-    const { nationalId, iban, ...rest } = body;
-    if ((nationalId !== undefined || iban !== undefined) && !ctx.permissions.has('members:sensitive')) {
+    const { nationalId, ...rest } = body;
+    if (nationalId !== undefined && !ctx.permissions.has('members:sensitive')) {
       throw new BadRequestException({ message: 'No puedes modificar datos sensibles', code: 'FORBIDDEN' });
     }
     return {
       ...rest,
       ...(nationalId !== undefined && { nationalIdEnc: encrypt(nationalId) }),
-      ...(iban !== undefined && { ibanEnc: encrypt(iban?.replace(/\s+/g, '') ?? null) }),
     };
   }
 

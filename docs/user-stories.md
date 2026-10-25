@@ -213,7 +213,7 @@ Como responsable de material quiero registrar a quién entrego cada prenda y có
 **SEC-01 · Fichas de socios** (Fase 1)
 Como secretario quiero mantener las fichas de los socios con datos de contacto, instrumento y sección.
 - Cuando creo un socio, entonces se le asigna el siguiente número de socio libre.
-- El DNI y el IBAN se guardan cifrados y sólo los ven quienes tienen `members:sensitive`.
+- El DNI se guarda cifrado y sólo lo ven quienes tienen `members:sensitive`. No se almacenan IBAN.
 
 **SEC-02 · Altas y bajas** (Fase 1)
 Como secretario quiero registrar las bajas con su fecha y motivo, y readmitir a antiguos socios.
@@ -226,7 +226,7 @@ Como secretario quiero registrar los consentimientos de tratamiento de datos y d
 **SEC-04 · Derechos RGPD** (Fase 1)
 Como secretario quiero atender las solicitudes de acceso y supresión de los socios.
 - Cuando exporto a un socio, entonces descargo un JSON con sus datos personales, asistencias, recibos y préstamos.
-- Cuando lo anonimizo, entonces su nombre, contacto, DNI, IBAN, dirección y fecha de nacimiento se borran o sustituyen, se registra `anonymizedAt` y se conservan los agregados contables obligatorios.
+- Cuando lo anonimizo, entonces su nombre, contacto, DNI, dirección y fecha de nacimiento se borran o sustituyen, se registra `anonymizedAt` y se conservan los agregados contables obligatorios.
 
 **SEC-05 · Comunicaciones** (Fase 2)
 Como secretario quiero enviar avisos a toda la banda o a secciones concretas.

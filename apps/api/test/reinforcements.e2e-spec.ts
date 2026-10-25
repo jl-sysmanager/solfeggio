@@ -147,22 +147,21 @@ describe('Bolsa de refuerzos', () => {
     ids.musician = acc.body.musicianId;
   });
 
-  it('músicos externos con NIF e IBAN cifrados, visibles sólo con members:sensitive', async () => {
+  it('músicos externos con NIF cifrado, visible sólo con members:sensitive', async () => {
     const m = await http()
       .post('/api/v1/reinforcements/external-musicians')
       .set(auth(a.token))
-      .send({ firstName: 'Pedro', lastName: '=HYPERLINK("http://x")', instrument: 'Tuba', nationalId: '12345678z', iban: 'ES91 2100 0418 4502 0005 1332' })
+      .send({ firstName: 'Pedro', lastName: '=HYPERLINK("http://x")', instrument: 'Tuba', nationalId: '12345678z' })
       .expect(201);
-    expect(m.body).toMatchObject({ nationalId: '12345678Z', iban: 'ES9121000418450200051332', hasNationalId: true });
+    expect(m.body).toMatchObject({ nationalId: '12345678Z', hasNationalId: true });
     ids.pedro = m.body.id;
     const raw = await ctx.db.system.externalMusician.findUniqueOrThrow({ where: { id: ids.pedro } });
     expect(raw.nationalIdEnc).toMatch(/^v1:/);
-    expect(raw.ibanEnc).not.toContain('2100');
+    expect(raw.nationalIdEnc).not.toContain('12345678');
     const asDirector = await http().get('/api/v1/reinforcements/external-musicians').set(auth(aDirector)).expect(200);
     const pedro = asDirector.body.find((x: { id: string }) => x.id === ids.pedro);
     expect(pedro.nationalId).toBeUndefined();
-    expect(pedro.iban).toBeUndefined();
-    expect(pedro.ibanMasked).toMatch(/1332$/);
+    expect(pedro.hasNationalId).toBe(true);
     await http().patch(`/api/v1/reinforcements/external-musicians/${ids.pedro}`).set(auth(aDirector)).send({ nationalId: '00000000T' }).expect(400);
     await http().patch(`/api/v1/reinforcements/external-musicians/${ids.musician}`).set(auth(a.token)).send({ nationalId: '87654321X' }).expect(200);
   });

@@ -28,7 +28,7 @@
 
 - **En tránsito:** TLS 1.2 o superior en todos los puntos de entrada (balanceador o nginx). La conexión a Postgres usa `sslmode=require` y la de Redis, `rediss://`.
 - **En reposo:** discos y volúmenes cifrados en el proveedor, y bucket S3 con **cifrado por defecto** (SSE-S3 o SSE-KMS) configurado en el bucket, no en cada petición.
-- **Campos de la aplicación:** `members.nationalIdEnc`, `members.ibanEnc` y `users.mfaSecretEnc` se cifran con **AES-256-GCM** usando `DATA_ENCRYPTION_KEY` (32 bytes en base64), un IV aleatorio de 12 bytes por valor y una etiqueta de autenticación. El formato es `v1:<iv>:<tag>:<ciphertext>` (base64url).
+- **Campos de la aplicación:** `members.nationalIdEnc`, `external_musicians.nationalIdEnc`, `guardians.nationalIdEnc` y `users.mfaSecretEnc` se cifran con **AES-256-GCM** usando `DATA_ENCRYPTION_KEY` (32 bytes en base64), un IV aleatorio de 12 bytes por valor y una etiqueta de autenticación. El formato es `v1:<iv>:<tag>:<ciphertext>` (base64url). La aplicación no almacena IBAN ni otros datos de cuenta bancaria.
 - **Rotación de la clave de datos:**
   1. Añadir la nueva clave como `DATA_ENCRYPTION_KEY` y mover la anterior a `DATA_ENCRYPTION_KEY_PREVIOUS`.
   2. `decrypt()` prueba primero la clave actual y luego la anterior; los valores nuevos se cifran siempre con la actual.
@@ -51,9 +51,9 @@
 | Roles | Cada banda es **responsable del tratamiento** de los datos de sus socios. Solfeamos actúa como **encargado** (art. 28) y firma una DPA con cada banda (la aceptación explícita en el flujo de onboarding está pendiente). Para los datos de las cuentas de usuario y de facturación, Solfeamos es responsable. |
 | Base legal | Gestión de la relación asociativa (art. 6.1.b) para los datos de socio; obligación legal (6.1.c) para la contabilidad; consentimiento (6.1.a) para la imagen y las comunicaciones no esenciales. |
 | Consentimientos | `members.consentDataAt` y `members.consentImages` registran fecha y alcance. La retirada del consentimiento se registra en la auditoría. |
-| Minimización | Sólo son obligatorios el nombre y los apellidos. El DNI y el IBAN son opcionales y están cifrados. Quien no tiene `members:sensitive` no ve los campos sensibles. |
+| Minimización | Sólo son obligatorios el nombre y los apellidos. El DNI es opcional y está cifrado. Quien no tiene `members:sensitive` no ve los campos sensibles. No se guardan IBAN ni datos de domiciliación. |
 | Derecho de acceso y portabilidad | `GET /members/:id/export` (requiere `members:write` y `members:sensitive`) genera un JSON con la ficha, la sección, las tallas, las asistencias, las convocatorias, los recibos, los préstamos de uniformes e instrumentos, los movimientos contables y los metadatos de sus documentos. |
-| Supresión | `POST /members/:id/anonymize` sustituye nombre y apellidos («Socio anonimizado #N»), borra email, teléfono, fecha de nacimiento, DNI, IBAN, dirección, notas y tallas, desvincula el usuario, marca la baja y fija `anonymizedAt`; después la ficha ya no se puede editar. Se conservan las asistencias y los importes contables durante el plazo legal (6 años, según el Código de Comercio y la normativa fiscal). |
+| Supresión | `POST /members/:id/anonymize` sustituye nombre y apellidos («Socio anonimizado #N»), borra email, teléfono, fecha de nacimiento, DNI, dirección, notas y tallas, desvincula el usuario, marca la baja y fija `anonymizedAt`; después la ficha ya no se puede editar. Se conservan las asistencias y los importes contables durante el plazo legal (6 años, según el Código de Comercio y la normativa fiscal). |
 | Rectificación, oposición y limitación | Edición de la ficha, baja de comunicaciones y cambio de estado del socio a `INACTIVE`. |
 | Retención | Al darse de baja un tenant, los datos se conservan 30 días para poder recuperarlos y después se borran. Las copias de seguridad se rotan en 30 días. Los logs de aplicación se guardan 30 días y la auditoría, 2 años. |
 | Registro de actividades | El documento interno `RAT` lista finalidades, categorías, destinatarios y plazos, y se revisa cada año. |
@@ -87,7 +87,7 @@ Los logs se envían en JSON por la salida estándar al agregador (Loki, CloudWat
 
 ## 8. Acceso del equipo de plataforma
 
-- **«Ver como»:** el equipo de plataforma sólo puede entrar en una banda en modo lectura, con un motivo de al menos 10 caracteres y durante un máximo de 60 minutos. El token no permite escrituras ni ver DNI ni IBAN, no se renueva y deja de valer en cuanto la sesión termina, caduca o se bloquea o degrada al administrador.
+- **«Ver como»:** el equipo de plataforma sólo puede entrar en una banda en modo lectura, con un motivo de al menos 10 caracteres y durante un máximo de 60 minutos. El token no permite escrituras ni ver DNI, no se renueva y deja de valer en cuanto la sesión termina, caduca o se bloquea o degrada al administrador.
 - **Transparencia:** el inicio y el fin de cada acceso se escriben en la auditoría de la propia banda (`platform.impersonation.started` y `platform.impersonation.ended`), y todas las acciones del equipo de plataforma sobre una banda llevan el prefijo `platform.`.
 - **Mínima exposición:** las tablas del panel global (fotos, notas, avisos, registros de correo, latidos, denuncias) no son accesibles para el rol de la aplicación. Las notas internas de soporte no llegan nunca a la banda, ni siquiera con una consulta directa (RLS).
 - **Bloqueo de cuentas:** un usuario bloqueado por moderación pierde el acceso y sus tokens de refresco se revocan. Las acciones de bloqueo quedan en el registro de plataforma.

@@ -4,7 +4,7 @@ import { Member, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, RequireFeature } from '../auth/decorators';
-import { decrypt, encrypt, mask } from '../common/crypto';
+import { decrypt, encrypt } from '../common/crypto';
 import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { idParam, isoDate, optionalText, toDate } from '../common/schemas';
@@ -20,7 +20,6 @@ const memberFields = z.object({
   phone: z.string().trim().max(30).nullable().optional(),
   birthDate: isoDate.nullable().optional(),
   nationalId: z.string().trim().max(20).nullable().optional(),
-  iban: z.string().trim().toUpperCase().regex(/^[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}$/, 'IBAN no válido').nullable().optional(),
   address: optionalText(300),
   instrument: z.string().trim().max(60).nullable().optional(),
   sectionId: z.string().uuid().nullable().optional(),
@@ -52,23 +51,20 @@ type MemberWithSection = Member & { section?: { id: string; name: string } | nul
 
 /** Nunca devolvemos las columnas cifradas; los datos sensibles sólo con permiso explícito. */
 export function serializeMember(m: MemberWithSection, ctx: RequestContext) {
-  const { nationalIdEnc, ibanEnc, ...rest } = m;
+  const { nationalIdEnc, ...rest } = m;
   const sensitive = ctx.permissions.has('members:sensitive');
   return {
     ...rest,
     nationalId: sensitive ? decrypt(nationalIdEnc) : undefined,
-    iban: sensitive ? decrypt(ibanEnc) : undefined,
-    ibanMasked: mask(decrypt(ibanEnc)),
     hasNationalId: !!nationalIdEnc,
   };
 }
 
 function toData(body: z.infer<typeof memberPatch>): Prisma.MemberUncheckedUpdateInput {
-  const { nationalId, iban, birthDate, joinedAt, consentData, consentDataAt, ...rest } = body;
+  const { nationalId, birthDate, joinedAt, consentData, consentDataAt, ...rest } = body;
   return {
     ...rest,
     ...(nationalId !== undefined && { nationalIdEnc: encrypt(nationalId) }),
-    ...(iban !== undefined && { ibanEnc: encrypt(iban?.replace(/\s+/g, '') ?? null) }),
     ...(birthDate !== undefined && { birthDate: birthDate ? toDate(birthDate) : null }),
     ...(joinedAt !== undefined && { joinedAt: toDate(joinedAt) }),
     ...(consentData !== undefined && { consentDataAt: consentData ? new Date() : null }),
@@ -154,7 +150,7 @@ export class MembersController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const m = found(await tx.member.findUnique({ where: { id } }), 'Socio');
       if (m.anonymizedAt) throw new BadRequestException({ message: 'El socio está anonimizado', code: 'ANONYMIZED' });
-      if ((body.nationalId !== undefined || body.iban !== undefined) && !ctx.permissions.has('members:sensitive')) {
+      if (body.nationalId !== undefined && !ctx.permissions.has('members:sensitive')) {
         throw new BadRequestException({ message: 'No puedes modificar datos sensibles', code: 'FORBIDDEN' });
       }
       const updated = await tx.member.update({ where: { id }, data: toData(body), include: { section: { select: { id: true, name: true } } } });
@@ -235,7 +231,7 @@ export class MembersController {
         where: { id },
         data: {
           firstName: 'Socio', lastName: `anonimizado #${m.memberNumber}`, email: null, phone: null, birthDate: null,
-          nationalIdEnc: null, ibanEnc: null, address: null, notes: null, leaveReason: null, consentDataAt: null,
+          nationalIdEnc: null, address: null, notes: null, leaveReason: null, consentDataAt: null,
           consentImages: false, status: 'LEFT', leftAt: m.leftAt ?? new Date(), anonymizedAt: new Date(),
         },
       });

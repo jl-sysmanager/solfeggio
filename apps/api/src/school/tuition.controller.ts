@@ -4,7 +4,6 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, RequireFeature } from '../auth/decorators';
-import { decrypt } from '../common/crypto';
 import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { idParam, isoDate, toDate } from '../common/schemas';
@@ -125,8 +124,8 @@ export class TuitionController {
     });
   }
 
-  /** Remesa para domiciliación (CSV, una línea por familia). No genera SEPA pain.008. */
-  @Perm('finance:read', 'members:sensitive')
+  /** Exportación CSV de cargos (una línea por familia). */
+  @Perm('finance:read')
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @Get('export.csv')
   async csv(@Ctx() ctx: RequestContext, @Query(zod(exportQuery)) q: z.infer<typeof exportQuery>) {
@@ -144,13 +143,16 @@ export class TuitionController {
       const key = c.familyId ?? `student:${c.studentId}`;
       byFamily.set(key, [...(byFamily.get(key) ?? []), c]);
     }
-    const header = ['familia', 'titular', 'iban', 'importe_eur', 'concepto', 'alumnos', 'referencias'];
+    const header = ['familia', 'importe_eur', 'concepto', 'alumnos', 'referencias'];
     const lines = [...byFamily.values()].map((list) => {
       const f = list[0].family;
       const amount = list.reduce((s, c) => s + c.amountCents, 0);
       return [
-        f?.name ?? `${list[0].student.firstName} ${list[0].student.lastName}`, f?.ibanHolder, decrypt(f?.ibanEnc), (amount / 100).toFixed(2),
-        `Mensualidad escuela ${q.period}`, list.map((c) => `${c.student.firstName} ${c.student.lastName}`).join(', '), list.map((c) => c.id).join(' '),
+        f?.name ?? `${list[0].student.firstName} ${list[0].student.lastName}`,
+        (amount / 100).toFixed(2),
+        `Mensualidad escuela ${q.period}`,
+        list.map((c) => `${c.student.firstName} ${c.student.lastName}`).join(', '),
+        list.map((c) => c.id).join(' '),
       ]
         .map(csvCell)
         .join(';');

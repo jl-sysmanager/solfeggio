@@ -516,7 +516,7 @@ function ExternalModal({ musician, onClose }: { musician: ExternalMusician | nul
     const v = formValues(e.currentTarget);
     save.mutate({
       firstName: v.firstName, lastName: v.lastName ?? '', instrument: v.instrument ?? null, email: v.email ?? null, phone: v.phone ?? null,
-      ...(sensitive && { nationalId: v.nationalId ?? null, iban: v.iban ?? null }),
+      ...(sensitive && { nationalId: v.nationalId ?? null }),
     });
   }
   return (
@@ -532,12 +532,9 @@ function ExternalModal({ musician, onClose }: { musician: ExternalMusician | nul
         </div>
         <TextField label="Email" name="email" type="email" defaultValue={m?.email ?? ''} />
         {sensitive ? (
-          <div className="form-row">
-            <TextField label="NIF" name="nationalId" maxLength={20} defaultValue={m?.nationalId ?? ''} hint="Necesario para el modelo 190" />
-            <TextField label="IBAN" name="iban" defaultValue={m?.iban ?? ''} />
-          </div>
+          <TextField label="NIF" name="nationalId" maxLength={20} defaultValue={m?.nationalId ?? ''} hint="Necesario para el modelo 190" />
         ) : (
-          <p className="small muted">El NIF y el IBAN sólo los gestiona quien tiene permiso para ver datos sensibles.</p>
+          <p className="small muted">El NIF sólo lo gestiona quien tiene permiso para ver datos sensibles.</p>
         )}
         <FormError error={save.error} />
         <div className="modal__footer">
@@ -705,7 +702,7 @@ function PaymentsTab() {
               { key: 'n', header: 'Nombre', render: (m) => <strong>{name(m)}</strong> },
               { key: 'i', header: 'Instrumento', render: (m) => m.instrument ?? '—' },
               { key: 'e', header: 'Contacto', render: (m) => [m.email, m.phone].filter(Boolean).join(' · ') || '—' },
-              { key: 'f', header: 'Datos fiscales', render: (m) => `${m.hasNationalId ? 'NIF' : 'Sin NIF'} · ${m.ibanMasked ?? 'sin IBAN'}` },
+              { key: 'f', header: 'Datos fiscales', render: (m) => (m.hasNationalId ? 'NIF' : 'Sin NIF') },
               {
                 key: 'a',
                 header: 'Acciones',

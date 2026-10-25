@@ -135,8 +135,6 @@ export default function MemberDetailPage() {
               <>
                 <dt>DNI / NIE</dt>
                 <dd>{m.nationalId ?? '—'}</dd>
-                <dt>IBAN</dt>
-                <dd>{m.iban ?? '—'}</dd>
               </>
             )}
           </dl>
@@ -202,7 +200,7 @@ export default function MemberDetailPage() {
       <ConfirmModal
         open={anonymize}
         title="Anonimizar socio"
-        message="Se eliminarán de forma irreversible nombre, contacto, DNI, IBAN y dirección. Se conservarán los registros estadísticos y contables sin datos identificativos. Esta acción no se puede deshacer."
+        message="Se eliminarán de forma irreversible nombre, contacto, DNI y dirección. Se conservarán los registros estadísticos y contables sin datos identificativos. Esta acción no se puede deshacer."
         confirmLabel="Anonimizar definitivamente"
         loading={anon.isPending}
         onConfirm={() => anon.mutate(undefined)}

@@ -74,7 +74,7 @@ Cada ruta exige un permiso, indicado entre corchetes; algunas exigen además una
 - `GET /audit-logs?entity&actorId&page` [audit:read]
 
 ### Secretaría {members}
-- `GET /members?q&status&sectionId&page` [members:read] → `Member[]`. Sin el permiso `members:sensitive`, la respuesta omite `nationalId` e `iban`.
+- `GET /members?q&status&sectionId&page` [members:read] → `Member[]`. Sin el permiso `members:sensitive`, la respuesta omite `nationalId`.
 - `POST /members`, `GET|PATCH /members/:id` [members:write]
 - `POST /members/:id/leave { date, reason }` (baja) · `POST /members/:id/rejoin` (alta)
 - `PUT /members/:id/sizes [{ garment, size }]`
@@ -173,13 +173,13 @@ Lectura [performances:read], escritura [performances:write].
 - Cualquier usuario de la banda: `GET|PUT|DELETE /reinforcements/profile` (perfil de músico global) · `GET /reinforcements/requests?instrument&province&from&to&page` (necesidades abiertas de todas las bandas, con el nombre de la banda) · `POST /reinforcements/requests/:id/apply { message }` · `GET /reinforcements/my-applications` · `POST /reinforcements/my-applications/:id/withdraw`
 - [reinforcements:manage]: `GET /reinforcements/requests/mine` · `GET /reinforcements/requests/prefill?eventId` (vacantes de la plantilla) · `POST /reinforcements/requests` · `PATCH|DELETE /reinforcements/requests/:id` · `GET /reinforcements/requests/:id/applications` · `POST /reinforcements/applications/:id/accept|reject`
 - [reinforcements:manage]: `GET /reinforcements/musicians?instrument&province` (sin email ni teléfono) · `POST /reinforcements/musicians/:profileId/contact { requestId, message }` (la plataforma envía el email; la banda no lo ve)
-- [reinforcements:manage]: `GET|POST /reinforcements/external-musicians` · `PATCH|DELETE /reinforcements/external-musicians/:id` (NIF e IBAN cifrados; en claro sólo con members:sensitive)
+- [reinforcements:manage]: `GET|POST /reinforcements/external-musicians` · `PATCH|DELETE /reinforcements/external-musicians/:id` (NIF cifrado; en claro sólo con members:sensitive)
 - [reinforcements:manage]: `GET /reinforcements/payments?year` · `POST /reinforcements/payments` · `PATCH|DELETE /reinforcements/payments/:id` (sin pagar) · `POST /reinforcements/payments/:id/pay { date }` → gasto neto en «Refuerzos» · `GET /reinforcements/payments/summary?year` · `GET /reinforcements/payments/summary.csv?year` [+ members:sensitive] (datos para los modelos 111 y 190)
 
 ### Escuela de música {school}
 Lectura [school:read], escritura [school:write], docencia [school:teach]. Un profesor vinculado a un usuario sin school:write sólo actúa sobre sus grupos (403 `NOT_YOUR_GROUP`).
 - `GET|PUT /school/settings` (descuentos por hermanos, por socio y por varias asignaturas; texto público)
-- Familias y tutores: `GET|POST /school/families?q` · `GET|PATCH|DELETE /school/families/:id` · `POST /school/families/:id/guardians` · `PATCH|DELETE /school/guardians/:id` · `POST /school/guardians/:id/invite` (invitación al portal con el rol Familia; 409 `ALREADY_LINKED`). IBAN y NIF cifrados, en claro y editables sólo con members:sensitive.
+- Familias y tutores: `GET|POST /school/families?q` · `GET|PATCH|DELETE /school/families/:id` · `POST /school/families/:id/guardians` · `PATCH|DELETE /school/guardians/:id` · `POST /school/guardians/:id/invite` (invitación al portal con el rol Familia; 409 `ALREADY_LINKED`). NIF del tutor cifrado; en claro y editable sólo con members:sensitive.
 - Alumnos: `GET /school/students?q&status&familyId&groupId&page` · `POST /school/students` (403 `PLAN_LIMIT` según plazas) · `GET|PATCH /school/students/:id` · `GET /school/students/:id/report-card?yearId` (boletín) · `POST /school/students/:id/promote { stage: EDUCANDO|MUSICIAN, sectionId? }` [+ members:write] crea la ficha de socio
 - Cursos: `GET|POST /school/years` · `PATCH /school/years/:id` (festivos, matrícula abierta, curso actual) · `POST /school/years/:id/copy-from { sourceYearId, renewEnrollments }` (renovación) · `GET /school/years/:id/conflicts`
 - `GET|POST /school/subjects` · `PATCH /school/subjects/:id` · `GET|POST /school/teachers` · `PATCH /school/teachers/:id` · `GET /school/staff-users` · `GET|POST /school/rooms` · `PATCH|DELETE /school/rooms/:id`
@@ -188,7 +188,7 @@ Lectura [school:read], escritura [school:write], docencia [school:teach]. Un pro
 - Clases: `GET /school/groups/:id/sessions?from&to` · `POST /school/groups/:id/sessions/generate { from, to }` (idempotente, salta festivos) · `GET /school/sessions/:id` [school:teach] · `POST /school/sessions/:id/cancel` · `POST /school/sessions/:id/make-up { date, startMin, endMin }` · `PUT /school/sessions/:id/attendance`
 - Notas: `GET /school/groups/:id/grades?term` · `PUT /school/groups/:id/grades { term, grades }` [school:teach]
 - Avisos: `GET /school/notices?groupId` · `POST /school/notices { groupId?, title, body }` · `DELETE /school/notices/:id` [school:teach]
-- Mensualidades [finance:read / finance:write]: `POST /school/tuition/issue { yearId, period, dueDate }` (idempotente) · `GET /school/tuition/charges?yearId&period&status&familyId&studentId` · `POST /school/tuition/charges/:id/pay { date }` → ingreso en «Escuela de música» · `…/waive` · `GET /school/tuition/export.csv?period&status` [+ members:sensitive] (una fila por familia con su IBAN, para domiciliar; no genera el fichero SEPA)
+- Mensualidades [finance:read / finance:write]: `POST /school/tuition/issue { yearId, period, dueDate }` (idempotente) · `GET /school/tuition/charges?yearId&period&status&familyId&studentId` · `POST /school/tuition/charges/:id/pay { date }` → ingreso en «Escuela de música» · `…/waive` · `GET /school/tuition/export.csv?period&status` (una fila por familia con importes; no incluye IBAN)
 - Portal de familias [school:family]: `GET /school/family` → alumnos de la familia, horarios, faltas, notas, recibos y avisos
 - Públicas (sin autenticación, con limitación de peticiones): `GET /public/schools/:slug/offer` · `POST /public/schools/:slug/applications` (consentimiento obligatorio). 404 si la banda no tiene la escuela o no hay matrícula abierta.
 

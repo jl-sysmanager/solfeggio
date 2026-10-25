@@ -2,7 +2,6 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, RequireFeature } from '../auth/decorators';
-import { mask, decrypt } from '../common/crypto';
 import { notFound } from '../common/errors';
 import { Db } from '../db/db.service';
 
@@ -68,7 +67,7 @@ export class FamilyController {
       ]);
       return {
         guardian: { id: guardian.id, firstName: guardian.firstName, lastName: guardian.lastName },
-        family: { id: familyId, name: guardian.family.name, ibanMasked: mask(decrypt(guardian.family.ibanEnc)) },
+        family: { id: familyId, name: guardian.family.name },
         students,
         absences,
         charges,

@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Enrollment, Family, Guardian, Prisma } from '@prisma/client';
 import type { RequestContext } from '../auth/context';
-import { decrypt, mask } from '../common/crypto';
+import { decrypt } from '../common/crypto';
 import { found } from '../common/errors';
 import type { Tx } from '../db/db.service';
 
@@ -24,10 +24,8 @@ export const escapeLike = (q: string) => `%${q.replace(/[\\%_]/g, (c) => `\\${c}
 export const isoWeekday = (d: Date) => ((d.getUTCDay() + 6) % 7) + 1;
 export const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 
-export function serializeFamily<T extends Family>(f: T, ctx: RequestContext) {
-  const { ibanEnc, ...rest } = f;
-  const sensitive = ctx.permissions.has('members:sensitive');
-  return { ...rest, iban: sensitive ? decrypt(ibanEnc) : undefined, ibanMasked: mask(decrypt(ibanEnc)) };
+export function serializeFamily<T extends Family>(f: T, _ctx: RequestContext) {
+  return f;
 }
 
 export function serializeGuardian<T extends Guardian>(g: T, ctx: RequestContext) {

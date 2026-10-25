@@ -30,13 +30,13 @@ describe('Flujos de los módulos', () => {
     });
 
     it('RGPD: exporta y anonimiza conservando registros contables', async () => {
-      const m = (await ctx.http().post('/api/v1/members').set(auth(band.token)).send({ firstName: 'Borrar', lastName: 'Me', email: 'borrar@flow.local', iban: 'ES9121000418450200051332' }).expect(201)).body;
+      const m = (await ctx.http().post('/api/v1/members').set(auth(band.token)).send({ firstName: 'Borrar', lastName: 'Me', email: 'borrar@flow.local', nationalId: '12345678Z' }).expect(201)).body;
       await ctx.http().post('/api/v1/finance/transactions').set(auth(band.token)).send({ kind: 'INCOME', amountCents: 1000, date: '2026-01-01', description: 'Donativo', memberId: m.id }).expect(201);
       const exp = await ctx.http().get(`/api/v1/members/${m.id}/export`).set(auth(band.token)).expect(200);
       expect(exp.body.member.email).toBe('borrar@flow.local');
       expect(exp.body.transactions).toHaveLength(1);
       const anon = await ctx.http().post(`/api/v1/members/${m.id}/anonymize`).set(auth(band.token)).expect(200);
-      expect(anon.body).toMatchObject({ firstName: 'Socio', email: null, status: 'LEFT', iban: null });
+      expect(anon.body).toMatchObject({ firstName: 'Socio', email: null, status: 'LEFT', nationalId: null });
       expect(anon.body.anonymizedAt).toBeTruthy();
       const tx = await ctx.http().get('/api/v1/finance/transactions').set(auth(band.token)).expect(200);
       expect(tx.body.data.some((t: { memberId: string }) => t.memberId === m.id)).toBe(true);

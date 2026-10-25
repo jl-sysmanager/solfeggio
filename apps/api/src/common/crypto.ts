@@ -60,7 +60,7 @@ export function randomToken(bytes = 32): string {
   return randomBytes(bytes).toString('base64url');
 }
 
-/** Enmascara un valor sensible para mostrarlo parcialmente (p. ej. IBAN). */
+/** Enmascara un valor sensible para mostrarlo parcialmente. */
 export function mask(value: string | null, visible = 4): string | null {
   if (!value) return null;
   return value.length <= visible ? '*'.repeat(value.length) : '•'.repeat(value.length - visible) + value.slice(-visible);

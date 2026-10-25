@@ -100,7 +100,6 @@ erDiagram
   Member { uuid tenant_id
     int memberNumber
     text nationalIdEnc "cifrado"
-    text ibanEnc "cifrado"
     enum status "ACTIVE|INACTIVE|LEFT"
     timestamp anonymizedAt }
   Communication { uuid tenant_id
@@ -208,7 +207,7 @@ erDiagram
     enum bandStage "NONE|EDUCANDO|MUSICIAN"
     text[] pickupAuthorized
     bool imageConsent }
-  Family { text ibanEnc "cifrado" }
+  Family { text name }
   ClassSlot { int weekday "1-7"
     int startMin
     int endMin }
@@ -346,10 +345,8 @@ Otras medidas a nivel de base de datos:
 | Columna | Contenido | Quién la ve en claro |
 |---|---|---|
 | `members.nationalIdEnc` | DNI/NIE | Usuarios con `members:sensitive` |
-| `members.ibanEnc` | IBAN para domiciliar cuotas | Usuarios con `members:sensitive` (por defecto, el tesorero entre otros) |
-| `families.ibanEnc` | IBAN de cargo de las mensualidades de la escuela | Usuarios con `members:sensitive` |
 | `guardians.nationalIdEnc` | DNI/NIE del tutor | Usuarios con `members:sensitive` |
-| `external_musicians.nationalIdEnc`, `external_musicians.ibanEnc` | NIF e IBAN de músicos de refuerzo (pagos y retenciones) | Usuarios con `members:sensitive` |
+| `external_musicians.nationalIdEnc` | NIF de músicos de refuerzo (retenciones) | Usuarios con `members:sensitive` |
 | `donors.taxIdEnc` | NIF de donantes (modelo 182) | Usuarios con `members:sensitive`; el resto ve sólo `taxIdHint` |
 | `users.mfaSecretEnc` | Semilla TOTP | Nunca se devuelve. Sólo se usa para verificar códigos |
 

@@ -81,12 +81,9 @@ describe('Escuela de música', () => {
   });
 
   describe('familias y alumnos', () => {
-    it('cifra el IBAN de la familia y sólo lo muestra con members:sensitive', async () => {
-      family = (await post('/school/families', { name: 'Familia Pérez', iban: 'ES91 2100 0418 4502 0005 1332', ibanHolder: 'Marta Pérez' }).expect(201)).body;
-      expect(family).toMatchObject({ iban: 'ES9121000418450200051332' });
-      expect(JSON.stringify(family)).not.toContain('ibanEnc');
-      const raw = await ctx.db.system.family.findUniqueOrThrow({ where: { id: family.id } });
-      expect(raw.ibanEnc).not.toContain('ES91');
+    it('crea familias y bloquea el listado al profesorado', async () => {
+      family = (await post('/school/families', { name: 'Familia Pérez', notes: 'Contacto principal Marta' }).expect(201)).body;
+      expect(family).toMatchObject({ name: 'Familia Pérez' });
 
       member = (await post('/members', { firstName: 'Marta', lastName: 'Pérez' }).expect(201)).body;
       guardian = (await post(`/school/families/${family.id}/guardians`, { firstName: 'Marta', lastName: 'Pérez', relationship: 'Madre', email: 'marta@familia.local', nationalId: '12345678Z', memberId: member.id }).expect(201)).body;
@@ -290,7 +287,7 @@ describe('Escuela de música', () => {
       expect(portal.body.students.map((s: { firstName: string }) => s.firstName).sort()).toEqual(['Lucía', 'Álvaro']);
       expect(portal.body.absences).toHaveLength(1);
       expect(portal.body.charges).toHaveLength(2);
-      expect(portal.body.family.ibanMasked).toMatch(/1332$/);
+      expect(portal.body.family.name).toBe('Familia Pérez');
       // La familia no accede al back-office.
       await get('/school/students', familyToken).expect(403);
       await get('/school/family').expect(404);

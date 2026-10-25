@@ -22,7 +22,7 @@ describe('«Ver como» (impersonación de plataforma)', () => {
     await ctx.db.system.user.update({ where: { id: admin.userId }, data: { isPlatformAdmin: true } });
     adminToken = admin.token;
     // Socio con datos sensibles creado por el propietario de la banda.
-    await ctx.http().post(`${API}/members`).set(auth(band.token)).send({ firstName: 'Lola', lastName: 'Flores', iban: 'ES9121000418450200051332', nationalId: '12345678Z' }).expect(201);
+    await ctx.http().post(`${API}/members`).set(auth(band.token)).send({ firstName: 'Lola', lastName: 'Flores', nationalId: '12345678Z' }).expect(201);
   });
   afterAll(() => ctx.app.close());
 
@@ -53,14 +53,13 @@ describe('«Ver como» (impersonación de plataforma)', () => {
     expect(me.body.permissions.every((p: string) => p.endsWith(':read'))).toBe(true);
   });
 
-  it('oculta IBAN y DNI', async () => {
+  it('oculta el DNI', async () => {
     const { token } = await begin();
     const members = await ctx.http().get(`${API}/members`).set(auth(token)).expect(200);
     const m = members.body.data[0];
-    expect(m.iban ?? null).toBeNull();
     expect(m.nationalId ?? null).toBeNull();
     const own = await ctx.http().get(`${API}/members`).set(auth(band.token)).expect(200);
-    expect(own.body.data[0].iban).toBe('ES9121000418450200051332');
+    expect(own.body.data[0].nationalId).toBe('12345678Z');
   });
 
   it('rechaza cualquier escritura con IMPERSONATION_READ_ONLY', async () => {

@@ -7,7 +7,7 @@
 // - Las tablas globales (planes, usuarios, tokens, eventos de Stripe) no llevan RLS
 //   y sólo se acceden desde servicios de sistema.
 // - Importes en céntimos (Int) y moneda ISO-4217.
-// - Datos personales sensibles (DNI, IBAN, secreto MFA) se guardan cifrados
+// - Datos personales sensibles (DNI, secreto MFA) se guardan cifrados
 //   (AES-256-GCM) en columnas `*Enc`.
 
 generator client {
@@ -405,7 +405,6 @@ model Member {
   phone         String?
   birthDate     DateTime?    @db.Date
   nationalIdEnc String?
-  ibanEnc       String?
   address       String?
   instrument    String?
   sectionId     String?      @db.Uuid
@@ -1033,9 +1032,6 @@ model Family {
   id         String          @id @default(uuid()) @db.Uuid
   tenantId   String          @map("tenant_id") @db.Uuid
   name       String
-  /// Cuenta de cargo de las mensualidades (cifrada) y su titular.
-  ibanEnc    String?
-  ibanHolder String?
   notes      String?
   createdAt  DateTime        @default(now())
   students   Student[]
@@ -1568,7 +1564,7 @@ model ReinforcementApplication {
   @@map("reinforcement_applications")
 }
 
-/// Músico externo (refuerzo) con datos fiscales para pagos y retenciones.
+/// Músico externo (refuerzo) con NIF cifrado para retenciones.
 model ExternalMusician {
   id            String                 @id @default(uuid()) @db.Uuid
   tenantId      String                 @map("tenant_id") @db.Uuid
@@ -1579,7 +1575,6 @@ model ExternalMusician {
   email         String?
   phone         String?
   nationalIdEnc String?
-  ibanEnc       String?
   createdAt     DateTime               @default(now())
   payments      ReinforcementPayment[]
 

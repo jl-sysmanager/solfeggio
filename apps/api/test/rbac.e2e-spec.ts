@@ -11,7 +11,7 @@ describe('RBAC, planes y estado del tenant', () => {
     ctx = await createTestApp();
     await resetDb(ctx.db);
     band = await signupBand(ctx, 'rbac-band');
-    memberId = (await ctx.http().post('/api/v1/members').set(auth(band.token)).send({ firstName: 'Músico', lastName: 'Uno', iban: 'ES9121000418450200051332' }).expect(201)).body.id;
+    memberId = (await ctx.http().post('/api/v1/members').set(auth(band.token)).send({ firstName: 'Músico', lastName: 'Uno', nationalId: '12345678Z' }).expect(201)).body.id;
     musician = await addUser(ctx, band, 'musician', 'musico@rbac.local', memberId);
     director = await addUser(ctx, band, 'director', 'director@rbac.local');
   });
@@ -32,13 +32,13 @@ describe('RBAC, planes y estado del tenant', () => {
     await ctx.http().get('/api/v1/works').set(auth(musician)).expect(200);
   });
 
-  it('el director ve socios pero no sus datos bancarios', async () => {
+  it('el director ve socios pero no el DNI', async () => {
     const res = await ctx.http().get(`/api/v1/members/${memberId}`).set(auth(director)).expect(200);
-    expect(res.body.iban).toBeUndefined();
-    expect(res.body.ibanEnc).toBeUndefined();
-    expect(res.body.ibanMasked).toMatch(/1332$/);
+    expect(res.body.nationalId).toBeUndefined();
+    expect(res.body.nationalIdEnc).toBeUndefined();
+    expect(res.body.hasNationalId).toBe(true);
     const owner = await ctx.http().get(`/api/v1/members/${memberId}`).set(auth(band.token)).expect(200);
-    expect(owner.body.iban).toBe('ES9121000418450200051332');
+    expect(owner.body.nationalId).toBe('12345678Z');
   });
 
   it('el músico responde a su convocatoria y justifica su ausencia', async () => {

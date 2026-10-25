@@ -20,7 +20,6 @@ import {
 } from './school.helpers';
 
 const pct = z.number().int().min(0).max(100);
-const iban = z.string().trim().toUpperCase().regex(/^[A-Z]{2}\d{2}[A-Z0-9 ]{10,30}$/, 'IBAN no válido').nullable().optional();
 const name80 = z.string().trim().min(1).max(80);
 const email = z.string().email().max(254).nullable().optional();
 const phone = z.string().trim().max(30).nullable().optional();
@@ -32,7 +31,7 @@ const settingsSchema = z.object({
   multiSubjectDiscountPct: pct.optional(),
   publicIntro: optionalText(4000),
 });
-const familyFields = z.object({ name: text(120), iban, ibanHolder: z.string().trim().max(120).nullable().optional(), notes: optionalText(2000) });
+const familyFields = z.object({ name: text(120), notes: optionalText(2000) });
 const familyBase = z.preprocess(blankToNull, familyFields);
 const familyPatch = z.preprocess(blankToNull, familyFields.partial());
 const guardianFields = z.object({
@@ -218,9 +217,7 @@ export class SchoolController {
   @Post('families')
   createFamily(@Ctx() ctx: RequestContext, @Body(zod(familyBase)) body: z.infer<typeof familyBase>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
-      if (body.iban && !ctx.permissions.has('members:sensitive')) throw this.sensitiveDenied();
-      const { iban: ibanValue, ...rest } = body;
-      const f = await tx.family.create({ data: { ...rest, ibanEnc: encrypt(ibanValue?.replace(/\s+/g, '') ?? null), tenantId: ctx.tenantId } });
+      const f = await tx.family.create({ data: { ...body, tenantId: ctx.tenantId } });
       await this.audit.log(tx, ctx, 'family.created', 'family', f.id, changedFields(body));
       return serializeFamily(f, ctx);
     });
@@ -243,12 +240,7 @@ export class SchoolController {
   updateFamily(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(familyPatch)) body: z.infer<typeof familyPatch>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       found(await tx.family.findUnique({ where: { id } }), 'Familia');
-      if (body.iban !== undefined && !ctx.permissions.has('members:sensitive')) throw this.sensitiveDenied();
-      const { iban: ibanValue, ...rest } = body;
-      const f = await tx.family.update({
-        where: { id },
-        data: { ...rest, ...(ibanValue !== undefined && { ibanEnc: encrypt(ibanValue?.replace(/\s+/g, '') ?? null) }) },
-      });
+      const f = await tx.family.update({ where: { id }, data: body });
       await this.audit.log(tx, ctx, 'family.updated', 'family', id, changedFields(body));
       return serializeFamily(f, ctx);
     });

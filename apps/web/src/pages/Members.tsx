@@ -47,10 +47,7 @@ export function MemberFormModal({ open, onClose, member }: { open: boolean; onCl
       consentImages: fd.get('consentImages') === 'on',
     };
     if (fd.get('consentData') === 'on' && !member?.consentDataAt) body.consentDataAt = new Date().toISOString();
-    if (sensitive) {
-      if (v.nationalId !== undefined) body.nationalId = v.nationalId;
-      if (v.iban !== undefined) body.iban = v.iban.replace(/\s+/g, '');
-    }
+    if (sensitive && v.nationalId !== undefined) body.nationalId = v.nationalId;
     if (!member && v.joinedAt) body.joinedAt = v.joinedAt;
     save.mutate(body);
   }
@@ -82,10 +79,7 @@ export function MemberFormModal({ open, onClose, member }: { open: boolean; onCl
         </div>
         <TextField label="Dirección" name="address" defaultValue={member?.address ?? ''} />
         {sensitive && (
-          <div className="form-row">
-            <TextField label="DNI / NIE" name="nationalId" defaultValue={member?.nationalId ?? ''} hint="Se guarda cifrado." autoComplete="off" />
-            <TextField label="IBAN" name="iban" defaultValue={member?.iban ?? ''} hint="Para domiciliar cuotas. Se guarda cifrado." autoComplete="off" />
-          </div>
+          <TextField label="DNI / NIE" name="nationalId" defaultValue={member?.nationalId ?? ''} hint="Se guarda cifrado." autoComplete="off" />
         )}
         <TextAreaField label="Notas" name="notes" defaultValue={member?.notes ?? ''} />
         <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
