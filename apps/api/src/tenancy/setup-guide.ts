@@ -30,17 +30,17 @@ const STEPS: Array<{ id: string; title: string; detail: string; to: string; feat
   },
   {
     id: 'roster',
-    title: 'Da de alta el primer socio',
-    detail: 'La ficha de quien forma parte de la banda.',
+    title: 'Amplía el censo de socios',
+    detail: 'Tú ya cuentas como socio; da de alta al resto de la plantilla.',
     to: '/members',
     feature: 'members',
-    done: (s) => s.memberCount > 0,
+    done: (s) => s.memberCount > 1,
   },
   {
     id: 'access',
     title: 'Invita a quien comparte la gestión',
     detail: 'Secretaría, tesorería o dirección entran con su propio acceso.',
-    to: '/access',
+    to: '/members?access=users',
     done: (s) => s.extraAccess,
   },
   {

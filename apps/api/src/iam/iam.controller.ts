@@ -23,7 +23,20 @@ const roleCreate = z.object({
 });
 const rolePatch = z.object({ name: z.string().trim().min(2).max(60).optional(), permissions: permList.optional() });
 const userPatch = z.object({ roleId: z.string().uuid().optional(), status: z.enum(['ACTIVE', 'SUSPENDED']).optional() });
-const inviteSchema = z.object({ email: z.string().email().max(254), roleId: z.string().uuid(), memberId: z.string().uuid().optional() });
+const inviteSchema = z
+  .object({
+    email: z.string().email().max(254),
+    roleId: z.string().uuid(),
+    memberId: z.string().uuid().optional(),
+    /** Alta de socio + invitación en la misma operación (recomendado para músicos). */
+    createMember: z
+      .object({
+        firstName: z.string().trim().min(1).max(80),
+        lastName: z.string().trim().min(1).max(120),
+      })
+      .optional(),
+  })
+  .refine((b) => !(b.memberId && b.createMember), { message: 'Indica memberId o createMember, no ambos' });
 const auditQuery = pageQuery.extend({ entity: z.string().max(60).optional(), actorId: z.string().uuid().optional() });
 
 @ApiTags('iam')
@@ -189,6 +202,9 @@ export class IamController {
   @Perm('users:manage')
   @Post('invitations')
   async invite(@Ctx() ctx: RequestContext, @Body(zod(inviteSchema)) body: z.infer<typeof inviteSchema>) {
+    if (body.createMember && !ctx.permissions.has('members:write')) {
+      throw new ForbiddenException({ message: 'No puedes crear fichas de socio', code: 'FORBIDDEN' });
+    }
     const token = randomToken(32);
     const email = body.email.toLowerCase();
     const result = await this.db.tenant(ctx.tenantId, async (tx) => {
@@ -198,15 +214,38 @@ export class IamController {
         throw new BadRequestException({ message: 'Sólo un propietario puede invitar propietarios', code: 'FORBIDDEN' });
       }
       this.assertCeiling(ctx, role.permissions);
-      if (body.memberId) found(await tx.member.findUnique({ where: { id: body.memberId } }), 'Socio');
+      let memberId = body.memberId;
+      if (body.createMember) {
+        await this.limits.assertCanAddMember(tx, ctx.tenantId);
+        const last = await tx.member.aggregate({ _max: { memberNumber: true } });
+        const member = await tx.member.create({
+          data: {
+            tenantId: ctx.tenantId,
+            memberNumber: (last._max.memberNumber ?? 0) + 1,
+            firstName: body.createMember.firstName,
+            lastName: body.createMember.lastName,
+            email,
+            consentDataAt: new Date(),
+          },
+        });
+        memberId = member.id;
+        await this.audit.log(tx, ctx, 'member.created', 'member', member.id, { via: 'invitation', email });
+      } else if (memberId) {
+        found(await tx.member.findUnique({ where: { id: memberId } }), 'Socio');
+      }
       const inv = await tx.invitation.create({
         data: {
-          tenantId: ctx.tenantId, email, roleId: role.id, memberId: body.memberId, tokenHash: sha256(token),
-          invitedBy: ctx.userId, expiresAt: new Date(Date.now() + 7 * 86_400_000),
+          tenantId: ctx.tenantId,
+          email,
+          roleId: role.id,
+          memberId,
+          tokenHash: sha256(token),
+          invitedBy: ctx.userId,
+          expiresAt: new Date(Date.now() + 7 * 86_400_000),
         },
       });
-      await this.audit.log(tx, ctx, 'invitation.created', 'invitation', inv.id, { email, role: role.key });
-      return { id: inv.id, email, roleId: role.id, expiresAt: inv.expiresAt };
+      await this.audit.log(tx, ctx, 'invitation.created', 'invitation', inv.id, { email, role: role.key, memberId });
+      return { id: inv.id, email, roleId: role.id, memberId: memberId ?? null, expiresAt: inv.expiresAt };
     });
     const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
     await this.jobs.add('email.send', {

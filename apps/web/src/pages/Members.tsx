@@ -146,7 +146,84 @@ export function LeaveModal({ member, onClose }: { member: Member | null; onClose
   );
 }
 
-function OrphanUsersCard() {
+/** Invita a un usuario a la app; opcionalmente crea también la ficha de socio. */
+export function InviteUserModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { can } = useAuth();
+  const canWriteMembers = can('members:write');
+  const roles = useApi<Pick<Role, 'id' | 'key' | 'name'>[]>(open && can('users:manage') ? '/roles/assignable' : null);
+  const [withMember, setWithMember] = useState(canWriteMembers);
+  const invite = useApiMutation(
+    (body: { email: string; roleId: string; createMember?: { firstName: string; lastName: string } }) => post('/invitations', body),
+    {
+      success: 'Invitación enviada',
+      invalidate: ['/members', '/invitations', '/users', '/dashboard'],
+      onSuccess: onClose,
+    },
+  );
+  const roleOptions = (roles.data ?? []).filter((r) => r.key !== 'owner').map((r) => ({ value: r.id, label: r.name }));
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => {
+        setWithMember(canWriteMembers);
+        onClose();
+      }}
+      title="Invitar usuario"
+    >
+      <form
+        className="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const v = formValues(e.currentTarget);
+          const fd = new FormData(e.currentTarget);
+          const createMember = canWriteMembers && fd.get('withMember') === 'on';
+          invite.mutate({
+            email: (v.email ?? '').toLowerCase(),
+            roleId: v.roleId ?? '',
+            ...(createMember && v.firstName && v.lastName
+              ? { createMember: { firstName: v.firstName, lastName: v.lastName } }
+              : {}),
+          });
+        }}
+      >
+        <TextField label="Email" name="email" type="email" required autoComplete="email" />
+        <SelectField label="Rol" name="roleId" required options={roleOptions} />
+        {canWriteMembers && (
+          <Checkbox
+            name="withMember"
+            label="Crear también ficha de socio (recomendado)"
+            checked={withMember}
+            onChange={(e) => setWithMember(e.currentTarget.checked)}
+          />
+        )}
+        {withMember && canWriteMembers && (
+          <div className="form-row">
+            <TextField label="Nombre" name="firstName" required maxLength={80} />
+            <TextField label="Apellidos" name="lastName" required maxLength={120} />
+          </div>
+        )}
+        <p className="small muted">
+          Recibirá un enlace válido 7 días. Al aceptar, se crea su cuenta (si no existe) y entra en la banda con el rol elegido.
+          {withMember && canWriteMembers
+            ? ' Contará como socio y como usuario del plan.'
+            : ' Solo cuenta como usuario del plan hasta vincularlo a un socio.'}
+        </p>
+        <FormError error={invite.error} />
+        <div className="modal__footer">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={invite.isPending}>
+            Enviar invitación
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function OrphanUsersCard({ onInvite }: { onInvite: () => void }) {
   const { session } = useAuth();
   const users = useApi<TenantUser[] | Paginated<TenantUser>>('/users');
   const invites = useApi<Invitation[]>('/invitations');
@@ -156,9 +233,18 @@ function OrphanUsersCard() {
   const pending = (invites.data ?? []).filter((i) => !i.memberId && !i.acceptedAt);
   const update = useApiMutation((v: { id: string; body: unknown }) => patch(`/users/${v.id}`, v.body), { success: 'Usuario actualizado', invalidate: ['/users', '/members'] });
   const remove = useApiMutation((id: string) => del(`/users/${id}`), { success: 'Acceso retirado', invalidate: ['/users', '/members', '/dashboard'], onSuccess: () => setRemoving(null) });
+  const revoke = useApiMutation((id: string) => del(`/invitations/${id}`), { success: 'Invitación cancelada', invalidate: ['/invitations', '/users', '/dashboard'] });
   if (!rows.length && !pending.length) return null;
   return (
-    <Card title="Accesos sin ficha de socio" tone="cream">
+    <Card
+      title="Accesos sin ficha de socio"
+      tone="cream"
+      actions={
+        <Button size="sm" variant="ghost" onClick={onInvite}>
+          Invitar usuario
+        </Button>
+      }
+    >
       <p className="small muted" style={{ marginBottom: 12 }}>
         Cuentas con acceso a la app que no están vinculadas a un socio (p. ej. familias o personal externo). Cuentan como usuarios del plan.
       </p>
@@ -194,8 +280,13 @@ function OrphanUsersCard() {
       {pending.length > 0 && (
         <ul className="list-plain" style={{ marginTop: 12 }}>
           {pending.map((i) => (
-            <li key={i.id} className="small">
-              Invitación pendiente: {i.email} · {roles.data?.find((r) => r.id === i.roleId)?.name ?? '—'}
+            <li key={i.id} className="row" style={{ justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+              <span className="small">
+                Invitación pendiente: {i.email} · {roles.data?.find((r) => r.id === i.roleId)?.name ?? '—'}
+              </span>
+              <Button size="sm" variant="ghost" onClick={() => revoke.mutate(i.id)} loading={revoke.isPending}>
+                Cancelar
+              </Button>
             </li>
           ))}
         </ul>
@@ -224,6 +315,7 @@ export default function MembersPage() {
   const page = Number(params.get('page') ?? 1);
   const [editing, setEditing] = useState<Member | null>(null);
   const [creating, setCreating] = useState(params.get('new') === '1');
+  const [inviting, setInviting] = useState(params.get('invite') === '1');
   const [leaving, setLeaving] = useState<Member | null>(null);
   const sections = useSections();
   const canReadMembers = can('members:read');
@@ -238,6 +330,7 @@ export default function MembersPage() {
     else next.delete(k);
     if (k !== 'page') next.delete('page');
     next.delete('new');
+    next.delete('invite');
     setParams(next, { replace: true });
   };
 
@@ -247,8 +340,17 @@ export default function MembersPage() {
         <PageHeader
           eyebrow="Gestión"
           title="Socios"
-          description="Fichas de la banda y, si se invita, acceso a la app con un rol. Un usuario vinculado cuenta como socio y como usuario del plan."
-          actions={can('members:write') && <Button onClick={() => setCreating(true)}>Alta de socio</Button>}
+          description="Fichas de la banda y acceso a la app. El propietario es socio y usuario; al invitar a alguien puedes crear su ficha a la vez."
+          actions={
+            <div className="row" style={{ gap: 8 }}>
+              {can('users:manage') && (
+                <Button variant="ghost" onClick={() => setInviting(true)}>
+                  Invitar usuario
+                </Button>
+              )}
+              {can('members:write') && <Button onClick={() => setCreating(true)}>Alta de socio</Button>}
+            </div>
+          }
         />
       }
     >
@@ -353,9 +455,10 @@ export default function MembersPage() {
         </Card>
       )}
 
-      {can('users:manage') && <OrphanUsersCard />}
+      {can('users:manage') && <OrphanUsersCard onInvite={() => setInviting(true)} />}
 
       <MemberFormModal open={creating || !!editing} member={editing} onClose={() => { setCreating(false); setEditing(null); }} />
+      <InviteUserModal open={inviting} onClose={() => setInviting(false)} />
       <LeaveModal member={leaving} onClose={() => setLeaving(null)} />
     </Page>
   );

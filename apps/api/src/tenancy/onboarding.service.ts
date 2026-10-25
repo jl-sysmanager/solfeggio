@@ -47,15 +47,32 @@ export class OnboardingService {
       },
     });
 
+    const user = await this.db.system.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true, email: true } });
+    const nameParts = user.name.trim().split(/\s+/);
+    const firstName = nameParts[0] || 'Propietario';
+    const lastName = nameParts.slice(1).join(' ') || '-';
+
     await this.db.tenant(tenant.id, async (tx) => {
       await tx.role.createMany({
         data: SYSTEM_ROLES.map((r) => ({ tenantId: tenant.id, key: r.key, name: r.name, permissions: r.permissions, isSystem: true })),
       });
       const owner = await tx.role.findUniqueOrThrow({ where: { tenantId_key: { tenantId: tenant.id, key: 'owner' } } });
-      await tx.membership.create({ data: { tenantId: tenant.id, userId, roleId: owner.id } });
+      // El propietario es socio nº 1 y usuario: así tiene ficha, foto, convocatorias y autogestión de perfil.
+      const member = await tx.member.create({
+        data: {
+          tenantId: tenant.id,
+          memberNumber: 1,
+          firstName,
+          lastName,
+          email: user.email,
+          status: 'ACTIVE',
+          consentDataAt: new Date(),
+        },
+      });
+      await tx.membership.create({ data: { tenantId: tenant.id, userId, roleId: owner.id, memberId: member.id } });
       await tx.section.createMany({ data: DEFAULT_SECTIONS.map((name, position) => ({ tenantId: tenant.id, name, position })) });
       await tx.financeCategory.createMany({ data: DEFAULT_CATEGORIES.map((c) => ({ tenantId: tenant.id, ...c })) });
-      await this.audit.log(tx, { tenantId: tenant.id, userId }, 'tenant.created', 'tenant', tenant.id, { slug: tenant.slug });
+      await this.audit.log(tx, { tenantId: tenant.id, userId }, 'tenant.created', 'tenant', tenant.id, { slug: tenant.slug, memberId: member.id });
     });
 
     return this.auth.issue(userId, tenant.id);

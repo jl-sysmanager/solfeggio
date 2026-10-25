@@ -51,7 +51,7 @@ Base: `/api/v1` · JSON · OpenAPI generado en `/api/docs` (Swagger UI) y `/api/
 | POST | `/auth/password/change` | `{ currentPassword, newPassword }` | 204 |
 | POST | `/auth/invitations/accept` | `{ token, name?, password? }` | `{ accessToken, session }` |
 | GET | `/plans` | público | `Plan[]` |
-| POST | `/onboarding` | `{ bandName, slug, country?, timezone? }` | `{ accessToken, session }` |
+| POST | `/onboarding` | `{ bandName, slug, country?, timezone? }` | `{ accessToken, session }` · crea al propietario como socio nº 1 + usuario |
 
 ```ts
 type Membership = { tenantId; tenantName; slug; roleKey; roleName };
@@ -76,7 +76,7 @@ Cada ruta exige un permiso, indicado entre corchetes; algunas exigen además una
 - `GET /permissions` → catálogo `{ key, group, label }[]`
 - `GET|POST /roles`, `PATCH|DELETE /roles/:id` [roles:manage] (los roles de sistema no se pueden borrar)
 - `GET /users`, `PATCH /users/:membershipId { roleId?, status? }`, `DELETE /users/:membershipId` [users:manage]
-- `GET|POST /invitations { email, roleId, memberId? }` · `DELETE /invitations/:id` [users:manage]. El email lleva el enlace `${APP_URL}/invite/<token>`, válido 7 días; las invitaciones pendientes cuentan para el límite de usuarios.
+- `GET|POST /invitations { email, roleId, memberId?, createMember?: { firstName, lastName } }` · `DELETE /invitations/:id` [users:manage] (`createMember` exige también `members:write`). El email lleva el enlace `${APP_URL}/invite/<token>`, válido 7 días; las invitaciones pendientes cuentan para el límite de usuarios.
 - `GET /audit-logs?entity&actorId&page` [audit:read]
 
 ### Secretaría {members}

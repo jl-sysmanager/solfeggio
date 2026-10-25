@@ -66,6 +66,17 @@ async function seedDemo() {
   const sections = await db.section.findMany({ where: { tenantId: t } });
   const sec = (n: string) => sections.find((s) => s.name === n)!.id;
 
+  // Propietaria: socio nº 1 + usuario (como en el onboarding real).
+  await db.member.create({
+    data: {
+      tenantId: t,
+      memberNumber: 1,
+      firstName: 'Ana',
+      lastName: 'Propietaria',
+      email: 'propietario@demo.solfeggio.local',
+      consentDataAt: new Date(),
+    },
+  });
   const people = [
     ['Lucía', 'García Pérez', 'Clarinete', 'Clarinetes'],
     ['Javier', 'Martín Ruiz', 'Trompeta', 'Trompetas'],
@@ -77,15 +88,26 @@ async function seedDemo() {
     ['Andrés', 'Molina Castro', 'Tuba', 'Tubas'],
   ];
   for (const [i, [firstName, lastName, instrument, section]] of people.entries()) {
-    await db.member.create({ data: { tenantId: t, memberNumber: i + 1, firstName, lastName, instrument, sectionId: sec(section), email: `socio${i + 1}@demo.solfeggio.local`, consentDataAt: new Date() } });
+    await db.member.create({
+      data: {
+        tenantId: t,
+        memberNumber: i + 2,
+        firstName,
+        lastName,
+        instrument,
+        sectionId: sec(section),
+        email: `socio${i + 1}@demo.solfeggio.local`,
+        consentDataAt: new Date(),
+      },
+    });
   }
   const members = await db.member.findMany({ where: { tenantId: t }, orderBy: { memberNumber: 'asc' } });
 
   const accounts: [string, string, string, number | null][] = [
-    ['propietario@demo.solfeggio.local', 'Ana Propietaria', 'owner', null],
+    ['propietario@demo.solfeggio.local', 'Ana Propietaria', 'owner', 0],
     ['director@demo.solfeggio.local', 'Ramón Director', 'director', null],
     ['tesorero@demo.solfeggio.local', 'Teresa Tesorera', 'treasurer', null],
-    ['musico@demo.solfeggio.local', 'Lucía García', 'musician', 0],
+    ['musico@demo.solfeggio.local', 'Lucía García', 'musician', 1],
   ];
   for (const [email, name, role, memberIdx] of accounts) {
     const u = await user(email, name);

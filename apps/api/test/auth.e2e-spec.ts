@@ -99,6 +99,27 @@ describe('Autenticación', () => {
     await ctx.http().post('/api/v1/auth/invitations/accept').send({ token, name: 'Otra', password: PASSWORD }).expect(400);
   });
 
+  it('invitación con createMember deja socio vinculado al aceptar', async () => {
+    const band = await signupBand(ctx, 'inv-socio');
+    const roles = await ctx.http().get('/api/v1/roles').set(auth(band.token)).expect(200);
+    const musician = roles.body.find((r: { key: string }) => r.key === 'musician');
+    const inv = await ctx
+      .http()
+      .post('/api/v1/invitations')
+      .set(auth(band.token))
+      .send({ email: 'socio-nuevo@test.local', roleId: musician.id, createMember: { firstName: 'Sara', lastName: 'Nueva' } })
+      .expect(201);
+    expect(inv.body.memberId).toBeTruthy();
+    const mail = ctx.jobs.of('email.send').find((j) => j.data.to === 'socio-nuevo@test.local')!;
+    const token = /invite\/([\w-]+)/.exec(mail.data.text)![1];
+    const accepted = await ctx
+      .http()
+      .post('/api/v1/auth/invitations/accept')
+      .send({ token, name: 'Sara Nueva', password: PASSWORD })
+      .expect(200);
+    expect(accepted.body.session.memberId).toBe(inv.body.memberId);
+  });
+
   it('switch-tenant entre bandas del mismo usuario', async () => {
     const one = await signupBand(ctx, 'multi-uno');
     const two = await ctx.http().post('/api/v1/onboarding').set(auth(one.token)).send({ bandName: 'Multi Dos', slug: 'multi-dos' }).expect(201);

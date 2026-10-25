@@ -11,9 +11,12 @@ describe('guía de puesta en marcha', () => {
 
   it('el propietario ve los pasos pendientes y puede ocultar la guía al entrar', async () => {
     const band = await signupBand(ctx, 'guia', 'FREE');
+    const me = await ctx.http().get('/api/v1/auth/me').set(auth(band.token)).expect(200);
+    expect(me.body.memberId).toBeTruthy();
     const res = await ctx.http().get('/api/v1/setup-guide').set(auth(band.token)).expect(200);
     expect(res.body.dismissed).toBe(false);
     const byId = Object.fromEntries(res.body.steps.map((s: { id: string; done: boolean }) => [s.id, s.done]));
+    // roster: propietario ya es socio; el paso pide ampliar el censo (memberCount > 1).
     expect(byId).toMatchObject({ band: false, roster: false, access: false, rehearsal: false, security: false });
 
     await ctx.http().patch('/api/v1/tenant').set(auth(band.token)).send({ legalName: 'Asociación Musical Guía' }).expect(200);
