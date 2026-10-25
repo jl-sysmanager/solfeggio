@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import nodemailer, { Transporter } from 'nodemailer';
 import { sha256 } from '../common/crypto';
+import { renderBrandedEmail } from './email-layout';
 import { IntegrationsService } from './integrations.service';
 import { ResolvedIntegration } from './registry';
 
@@ -45,7 +46,14 @@ export class Mailer {
     const s = cfg.secrets;
     const from = { email: clean(c.fromAddress), name: clean(c.fromName || 'Solfeamos') };
     const fromHeader = `"${from.name.replace(/"/g, "'")}" <${from.email}>`;
-    const message = { to: clean(msg.to), subject: clean(msg.subject), text: msg.text, html: msg.html, replyTo: c.replyTo ? clean(c.replyTo) : undefined };
+    const subject = clean(msg.subject);
+    const message = {
+      to: clean(msg.to),
+      subject,
+      text: msg.text,
+      html: msg.html ?? renderBrandedEmail({ subject, text: msg.text, homeUrl: process.env.APP_URL }),
+      replyTo: c.replyTo ? clean(c.replyTo) : undefined,
+    };
 
     switch (cfg.provider) {
       case 'smtp': {

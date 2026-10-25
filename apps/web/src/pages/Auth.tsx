@@ -16,7 +16,7 @@ export function AuthLayout({ title, lead, children }: { title: string; lead?: st
         </Link>
         <div className="auth__copy">
           <p className="auth__headline">Toda tu banda, en un solo panel.</p>
-          <p className="auth__lead">Archivo, ensayos, socios, tesorería y escuela. Cada banda trabaja con sus datos, separados del resto.</p>
+          <p className="auth__lead">Archivo, ensayos, socios, tesorería y escuela.</p>
           <ul className="auth__points">
             <li>Convocatorias y asistencia en el mismo sitio</li>
             <li>Partituras, cuotas y actas listas para imprimir</li>
@@ -164,7 +164,7 @@ export function LoginPage() {
       {resetDone && choosing && path === 'enter' && <p className="small">Contraseña actualizada. Entra con la nueva.</p>}
       {choosing && path === 'create' ? (
         <div className="auth-next" id="band-path-create">
-          <p>Crearás tu cuenta y, en el paso siguiente, darás de alta la banda. Sus datos quedan separados de las demás.</p>
+          <p>Crearás tu cuenta y, en el paso siguiente, darás de alta la banda.</p>
           <ButtonLink to="/register">Crear la banda</ButtonLink>
           <p className="small muted">Si te han invitado a una banda que ya existe, elige «Entrar en mi banda».</p>
         </div>
