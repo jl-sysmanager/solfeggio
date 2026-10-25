@@ -29,14 +29,14 @@ describe('menú del panel global', () => {
 
   it('un administrador sin banda sólo tiene el menú del panel: nada de «Inicio» ni «Notificaciones»', async () => {
     stubApi();
-    renderWithProviders(<AppShell>contenido</AppShell>, { session: tenantless(), route: '/security' });
+    renderWithProviders(<AppShell>contenido</AppShell>, { session: tenantless(), route: '/account' });
     const labels = links().map((a) => a.textContent ?? '');
     expect(labels.some((l) => l.startsWith('Métricas'))).toBe(true);
-    expect(labels.some((l) => l.startsWith('Seguridad de la cuenta'))).toBe(true);
+    expect(labels.some((l) => l.startsWith('Mi cuenta'))).toBe(true);
     expect(labels.some((l) => l.startsWith('Inicio'))).toBe(false);
     expect(labels.some((l) => l.startsWith('Notificaciones'))).toBe(false);
     // Todos los enlaces del menú apuntan a rutas que existen para este usuario.
-    for (const a of links().filter((l) => !l.classList.contains('brand'))) expect(a.getAttribute('href')).toMatch(/^\/(admin\/[a-z]+|security)$/);
+    for (const a of links().filter((l) => !l.classList.contains('brand'))) expect(a.getAttribute('href')).toMatch(/^\/(admin\/[a-z]+|account)$/);
   });
 
   it('muestra los pendientes de soporte (fuera de plazo en rojo) y de moderación', async () => {

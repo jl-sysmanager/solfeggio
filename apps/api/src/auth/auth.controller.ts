@@ -1,8 +1,9 @@
-import { Body, Controller, Get, HttpCode, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, Patch, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { optionalText } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
 import { env } from '../config/env';
 import { AuthService } from './auth.service';
@@ -31,6 +32,29 @@ const changePasswordSchema = z
   .refine((b) => b.currentPassword !== b.newPassword, { message: 'La nueva contraseña debe ser distinta', path: ['newPassword'] });
 const forgotSchema = z.object({ email: z.string().email().max(254) });
 const resetSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
+const profileSchema = z.object({ name: z.string().trim().min(2).max(120) });
+const blankToNull = (v: unknown) =>
+  v && typeof v === 'object' && !Array.isArray(v)
+    ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, typeof x === 'string' && x.trim() === '' ? null : x]))
+    : v;
+const myMemberSchema = z.preprocess(
+  blankToNull,
+  z
+    .object({
+      firstName: z.string().trim().min(1).max(80).optional(),
+      lastName: z.string().trim().min(1).max(120).optional(),
+      phone: z.string().trim().max(30).nullable().optional(),
+      address: optionalText(300),
+      instrument: z.string().trim().max(60).nullable().optional(),
+      consentImages: z.boolean().optional(),
+    })
+    .refine((b) => Object.keys(b).length > 0, { message: 'Sin cambios' }),
+);
+const leaveSchema = z.object({ password: z.string().min(1).max(128), tenantId: z.string().uuid().optional() });
+const closeSchema = z.object({
+  password: z.string().min(1).max(128),
+  confirm: z.literal('ELIMINAR'),
+});
 
 @ApiTags('auth')
 @Controller('auth')
@@ -104,6 +128,66 @@ export class AuthController {
   @Get('me')
   me(@Ctx() ctx: RequestContext) {
     return this.sessions.build(ctx.userId, ctx.tenantId || null, ctx.impersonationId);
+  }
+
+  @ApiBearerAuth()
+  @NoTenant()
+  @Get('profile')
+  profile(@Ctx() ctx: RequestContext) {
+    return this.auth.getProfile(ctx.userId, ctx.tenantId || null);
+  }
+
+  @ApiBearerAuth()
+  @NoTenant()
+  @Patch('profile')
+  async updateProfile(@Ctx() ctx: RequestContext, @Body(zod(profileSchema)) body: z.infer<typeof profileSchema>) {
+    this.assertNotImpersonating(ctx);
+    return { user: await this.auth.updateProfile(ctx.userId, body) };
+  }
+
+  @ApiBearerAuth()
+  @Patch('profile/member')
+  async updateMyMember(@Ctx() ctx: RequestContext, @Body(zod(myMemberSchema)) body: z.infer<typeof myMemberSchema>) {
+    this.assertNotImpersonating(ctx);
+    if (!ctx.tenantId) throw new BadRequestException({ message: 'Selecciona una banda', code: 'TENANT_REQUIRED' });
+    return { member: await this.auth.updateMyMember(ctx.userId, ctx.tenantId, body) };
+  }
+
+  @ApiBearerAuth()
+  @NoTenant()
+  @HttpCode(200)
+  @Post('leave-tenant')
+  async leaveTenant(
+    @Ctx() ctx: RequestContext,
+    @Body(zod(leaveSchema)) body: z.infer<typeof leaveSchema>,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.assertNotImpersonating(ctx);
+    const tenantId = body.tenantId ?? ctx.tenantId;
+    if (!tenantId) throw new BadRequestException({ message: 'Indica la banda a abandonar', code: 'TENANT_REQUIRED' });
+    const { accessToken, refresh, session } = await this.auth.leaveTenant(ctx.userId, tenantId, body.password);
+    this.setCookie(res, refresh);
+    return { accessToken, session };
+  }
+
+  @ApiBearerAuth()
+  @NoTenant()
+  @HttpCode(204)
+  @Post('close-account')
+  async closeAccount(
+    @Ctx() ctx: RequestContext,
+    @Body(zod(closeSchema)) body: z.infer<typeof closeSchema>,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.assertNotImpersonating(ctx);
+    await this.auth.closeAccount(ctx.userId, body.password);
+    res.clearCookie(COOKIE, { path: COOKIE_PATH });
+  }
+
+  private assertNotImpersonating(ctx: RequestContext) {
+    if (ctx.impersonationId) {
+      throw new ForbiddenException({ message: 'No disponible en modo «ver como»', code: 'IMPERSONATION' });
+    }
   }
 
   @ApiBearerAuth()

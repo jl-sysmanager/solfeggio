@@ -55,7 +55,7 @@ const STEPS: Array<{ id: string; title: string; detail: string; to: string; feat
     id: 'security',
     title: 'Activa la verificación en dos pasos',
     detail: 'Protege la cuenta con la que se administra la banda.',
-    to: '/security',
+    to: '/account?tab=seguridad',
     done: (s) => s.mfaEnabled,
   },
 ];

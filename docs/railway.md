@@ -140,7 +140,7 @@ En **Settings → Networking → Generate Domain** crea el dominio público con 
 
 1. Despliega `api`. En los registros verás el paso de release: `[release] rol de aplicación «solfeggio_app» creado`, la aplicación de las migraciones, `planes cargados` y la creación del administrador. Después arranca la API y Railway comprueba `/api/v1/health`.
 2. Despliega `worker` (`Worker en marcha`) y `web`.
-3. Abre `https://<dominio>/login` e inicia sesión con `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD`. Activa la autenticación en dos pasos en **Seguridad de la cuenta**, cambia la contraseña y **elimina `PLATFORM_ADMIN_PASSWORD`** de las variables.
+3. Abre `https://<dominio>/login` e inicia sesión con `PLATFORM_ADMIN_EMAIL` y `PLATFORM_ADMIN_PASSWORD`. Activa la autenticación en dos pasos en **Mi cuenta → Seguridad**, cambia la contraseña y **elimina `PLATFORM_ADMIN_PASSWORD`** de las variables.
 4. Entra en **Panel global → Integraciones** y configura el correo (SMTP, Resend, SendGrid, Mailgun o Postmark) y los pagos (Stripe). Usa «Probar conexión».
 5. Prueba el flujo completo: registra una banda de prueba, crea un socio y sube un archivo al archivo musical (comprueba el bucket).
 

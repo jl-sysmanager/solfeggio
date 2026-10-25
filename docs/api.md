@@ -41,8 +41,14 @@ Base: `/api/v1` · JSON · OpenAPI generado en `/api/docs` (Swagger UI) y `/api/
 | POST | `/auth/logout` | — | 204 |
 | POST | `/auth/switch-tenant` | `{ tenantId }` | `{ accessToken, session }` |
 | GET | `/auth/me` | — | `session` |
+| GET | `/auth/profile` | — | `{ user, member? }` (ficha vinculada de la banda activa) |
+| PATCH | `/auth/profile` | `{ name }` | `{ user }` |
+| PATCH | `/auth/profile/member` | `{ firstName?, lastName?, phone?, address?, instrument?, consentImages? }` | `{ member }` · requiere banda activa y vínculo |
+| POST | `/auth/leave-tenant` | `{ password, tenantId? }` | `{ accessToken, session }` · 400 `LAST_OWNER` |
+| POST | `/auth/close-account` | `{ password, confirm: "ELIMINAR" }` | 204 · anonimiza usuario |
 | POST | `/auth/mfa/setup` | — | `{ otpauthUrl, qrDataUrl }` |
 | POST | `/auth/mfa/enable` · `/auth/mfa/disable` | `{ code }` | 204 |
+| POST | `/auth/password/change` | `{ currentPassword, newPassword }` | 204 |
 | POST | `/auth/invitations/accept` | `{ token, name?, password? }` | `{ accessToken, session }` |
 | GET | `/plans` | público | `Plan[]` |
 | POST | `/onboarding` | `{ bandName, slug, country?, timezone? }` | `{ accessToken, session }` |
@@ -303,7 +309,7 @@ Cada entrada del menú aparece sólo si el rol tiene el permiso del módulo y el
 | Ajustes | ✓ | ✓ | · | ✓ | · | · | · | · | · | · | · |
 | Plan y facturación | ✓ | · | · | · | · | · | · | · | · | · | · |
 | Soporte | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | · | · | ✓ | · | · |
-| Seguridad de la cuenta | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Mi cuenta | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 - **Inicio** muestra únicamente los indicadores de los módulos a los que el rol tiene acceso: socios (`members:read`), asistencia (`attendance:read`), cuotas pendientes (`finance:read` con tesorería en el plan) y almacenamiento y usuarios (`tenant:manage`, `billing:manage` o `users:manage`). Las familias de la escuela entran directamente en su portal.
 - **Escuela:** el profesorado (`school:teach`) ve alumnos, grupos y clases, pero no el listado de familias, las solicitudes de matrícula ni el email de los tutores; eso queda para quien tiene `school:write`.

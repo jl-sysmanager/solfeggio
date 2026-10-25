@@ -66,7 +66,7 @@ describe('gating de navegación', () => {
 
     it('una familia sólo ve su portal, las notificaciones y la seguridad de la cuenta', () => {
       const l = labels(['school:family']);
-      expect(l).toEqual(expect.arrayContaining(['Portal de familias', 'Notificaciones', 'Seguridad de la cuenta']));
+      expect(l).toEqual(expect.arrayContaining(['Portal de familias', 'Notificaciones', 'Mi cuenta']));
       expect(l).not.toContain('Bolsa de refuerzos');
       expect(l).not.toContain('Agenda');
       expect(l).not.toContain('Archivo musical');

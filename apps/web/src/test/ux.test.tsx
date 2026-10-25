@@ -89,7 +89,7 @@ describe('Shell', () => {
     renderWithProviders(<AppShell>x</AppShell>);
     await user.click(screen.getByRole('button', { name: /^Menú de / }));
     const items = screen.getAllByRole('menuitem').map((i) => i.textContent);
-    expect(items[0]).toBe('Seguridad de la cuenta');
+    expect(items[0]).toBe('Mi cuenta');
     expect(items.at(-1)).toBe('Cerrar sesión');
     expect(items.some((t) => t?.startsWith('Tema'))).toBe(true);
   });

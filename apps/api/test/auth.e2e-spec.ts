@@ -156,4 +156,42 @@ describe('Autenticación', () => {
     await ctx.http().post('/api/v1/onboarding').set(auth(band.token)).send({ bandName: 'Banda X', slug: 'admin' }).expect(409);
     await ctx.http().post('/api/v1/onboarding').set(auth(band.token)).send({ bandName: 'Banda X', slug: 'Mal Slug!' }).expect(400);
   });
+
+  it('actualiza el perfil y bloquea salir/cerrar si eres el único propietario', async () => {
+    const band = await signupBand(ctx, 'perfil-band');
+    const me = await ctx.http().get('/api/v1/auth/profile').set(auth(band.token)).expect(200);
+    expect(me.body.user.email).toBe(band.email);
+    const renamed = await ctx.http().patch('/api/v1/auth/profile').set(auth(band.token)).send({ name: 'Nombre Nuevo' }).expect(200);
+    expect(renamed.body.user.name).toBe('Nombre Nuevo');
+
+    const leave = await ctx.http().post('/api/v1/auth/leave-tenant').set(auth(band.token)).send({ password: PASSWORD }).expect(400);
+    expect(leave.body.code).toBe('LAST_OWNER');
+    const close = await ctx
+      .http()
+      .post('/api/v1/auth/close-account')
+      .set(auth(band.token))
+      .send({ password: PASSWORD, confirm: 'ELIMINAR' })
+      .expect(400);
+    expect(close.body.code).toBe('LAST_OWNER');
+  });
+
+  it('permite salir de una banda cuando hay otra y cerrar una cuenta sin bandas', async () => {
+    const one = await signupBand(ctx, 'leave-a');
+    const two = await ctx.http().post('/api/v1/onboarding').set(auth(one.token)).send({ bandName: 'Leave B', slug: 'leave-b' }).expect(201);
+    const left = await ctx
+      .http()
+      .post('/api/v1/auth/leave-tenant')
+      .set(auth(two.body.accessToken))
+      .send({ password: PASSWORD, tenantId: two.body.session.tenant.id })
+      .expect(200);
+    expect(left.body.session.memberships).toHaveLength(1);
+    expect(left.body.session.memberships[0].slug).toBe('leave-a');
+
+    const email = 'cerrar@test.local';
+    await ctx.http().post('/api/v1/auth/register').send({ email, password: PASSWORD, name: 'Cerrar' }).expect(201);
+    const login = await ctx.http().post('/api/v1/auth/login').send({ email, password: PASSWORD }).expect(200);
+    await ctx.http().post('/api/v1/auth/close-account').set(auth(login.body.accessToken)).send({ password: PASSWORD, confirm: 'BORRAR' }).expect(400);
+    await ctx.http().post('/api/v1/auth/close-account').set(auth(login.body.accessToken)).send({ password: PASSWORD, confirm: 'ELIMINAR' }).expect(204);
+    await ctx.http().post('/api/v1/auth/login').send({ email, password: PASSWORD }).expect(401);
+  });
 });

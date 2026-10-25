@@ -7,6 +7,7 @@ import { env } from '../config/env';
 import { Db } from '../db/db.service';
 import { Jobs } from '../jobs/jobs.service';
 import { Audit } from '../audit/audit.service';
+import { Storage } from '../storage/storage.service';
 import { SessionService } from './session.service';
 import { TokensService } from './tokens.service';
 
@@ -28,6 +29,7 @@ export class AuthService {
     private readonly sessions: SessionService,
     private readonly audit: Audit,
     private readonly jobs: Jobs,
+    private readonly storage: Storage,
   ) {}
 
   async register(email: string, password: string, name: string) {
@@ -179,6 +181,191 @@ export class AuthService {
     });
     await this.invalidateResets(userId);
     await this.tokens.revokeAllForUser(userId);
+  }
+
+  /** Perfil editable: datos de cuenta y, si hay vínculo, ficha de socio de la banda activa. */
+  async getProfile(userId: string, tenantId: string | null) {
+    const user = await this.db.system.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, mfaEnabled: true, createdAt: true },
+    });
+    if (!tenantId) return { user, member: null };
+    const membership = await this.db.system.membership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      select: { memberId: true },
+    });
+    if (!membership?.memberId) return { user, member: null };
+    const member = await this.db.tenant(tenantId, (tx) =>
+      tx.member.findUnique({
+        where: { id: membership.memberId! },
+        select: {
+          id: true,
+          memberNumber: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          address: true,
+          instrument: true,
+          consentImages: true,
+          photoKey: true,
+          section: { select: { id: true, name: true } },
+        },
+      }),
+    );
+    if (!member) return { user, member: null };
+    const { photoKey, ...rest } = member;
+    return {
+      user,
+      member: {
+        ...rest,
+        hasPhoto: !!photoKey,
+        photoUrl: photoKey ? await this.storage.viewUrl(photoKey) : null,
+      },
+    };
+  }
+
+  async updateProfile(userId: string, data: { name: string }) {
+    const user = await this.db.system.user.update({
+      where: { id: userId },
+      data: { name: data.name.trim() },
+      select: { id: true, email: true, name: true, mfaEnabled: true },
+    });
+    return user;
+  }
+
+  /** Autogestión de la ficha vinculada (sin permiso members:write). */
+  async updateMyMember(
+    userId: string,
+    tenantId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      phone?: string | null;
+      address?: string | null;
+      instrument?: string | null;
+      consentImages?: boolean;
+    },
+  ) {
+    if (!tenantId) throw new BadRequestException({ message: 'Selecciona una banda', code: 'TENANT_REQUIRED' });
+    return this.db.tenant(tenantId, async (tx) => {
+      const membership = await tx.membership.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
+      if (!membership?.memberId) {
+        throw new BadRequestException({ message: 'Tu cuenta no está vinculada a una ficha de socio', code: 'NO_MEMBER_LINK' });
+      }
+      const current = await tx.member.findUniqueOrThrow({ where: { id: membership.memberId } });
+      if (current.anonymizedAt) throw new BadRequestException({ message: 'La ficha está anonimizada', code: 'ANONYMIZED' });
+      const updated = await tx.member.update({
+        where: { id: membership.memberId },
+        data: {
+          ...(data.firstName !== undefined && { firstName: data.firstName.trim() }),
+          ...(data.lastName !== undefined && { lastName: data.lastName.trim() }),
+          ...(data.phone !== undefined && { phone: data.phone }),
+          ...(data.address !== undefined && { address: data.address }),
+          ...(data.instrument !== undefined && { instrument: data.instrument }),
+          ...(data.consentImages !== undefined && { consentImages: data.consentImages }),
+        },
+        select: {
+          id: true,
+          memberNumber: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          address: true,
+          instrument: true,
+          consentImages: true,
+          photoKey: true,
+          section: { select: { id: true, name: true } },
+        },
+      });
+      await this.audit.log(tx, { tenantId, userId }, 'member.self_updated', 'member', updated.id, data);
+      const { photoKey, ...rest } = updated;
+      return {
+        ...rest,
+        hasPhoto: !!photoKey,
+        photoUrl: photoKey ? await this.storage.viewUrl(photoKey) : null,
+      };
+    });
+  }
+
+  private async assertPassword(userId: string, password: string) {
+    const user = await this.db.system.user.findUniqueOrThrow({ where: { id: userId } });
+    const ok = await argon2.verify(user.passwordHash, password).catch(() => false);
+    if (!ok) throw new BadRequestException({ message: 'La contraseña no es correcta', code: 'INVALID_CREDENTIALS' });
+    return user;
+  }
+
+  private async assertCanLeaveOwnership(tenantId: string, roleKey: string) {
+    if (roleKey !== 'owner') return;
+    const owners = await this.db.system.membership.count({
+      where: { tenantId, status: 'ACTIVE', role: { key: 'owner' } },
+    });
+    if (owners <= 1) {
+      throw new BadRequestException({
+        message: 'Eres el único propietario de esta banda. Transfiere la propiedad antes de salir o de cerrar la cuenta.',
+        code: 'LAST_OWNER',
+      });
+    }
+  }
+
+  /** Abandona una banda (borra la membresía). No elimina la ficha de socio. */
+  async leaveTenant(userId: string, tenantId: string, password: string) {
+    await this.assertPassword(userId, password);
+    const membership = await this.db.system.membership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      include: { role: true, tenant: { select: { name: true } } },
+    });
+    if (!membership) throw new BadRequestException({ message: 'No perteneces a esa banda', code: 'NOT_A_MEMBER' });
+    await this.assertCanLeaveOwnership(tenantId, membership.role.key);
+    await this.db.tenant(tenantId, async (tx) => {
+      await tx.membership.delete({ where: { id: membership.id } });
+      await this.audit.log(tx, { tenantId, userId }, 'membership.self_left', 'membership', membership.id, {
+        tenantName: membership.tenant.name,
+      });
+    });
+    await this.tokens.revokeAllForUser(userId);
+    const session = await this.sessions.build(userId);
+    const nextTenant = session.memberships.length === 1 ? session.memberships[0].tenantId : null;
+    return this.issue(userId, nextTenant);
+  }
+
+  /**
+   * Cierra la cuenta: sale de todas las bandas, revoca sesiones y anonimiza el usuario.
+   * Falla si es el único propietario de alguna banda.
+   */
+  async closeAccount(userId: string, password: string) {
+    await this.assertPassword(userId, password);
+    const memberships = await this.db.system.membership.findMany({
+      where: { userId },
+      include: { role: true, tenant: { select: { id: true, name: true } } },
+    });
+    for (const m of memberships) {
+      await this.assertCanLeaveOwnership(m.tenantId, m.role.key);
+    }
+    for (const m of memberships) {
+      await this.db.tenant(m.tenantId, async (tx) => {
+        await tx.membership.delete({ where: { id: m.id } });
+        await this.audit.log(tx, { tenantId: m.tenantId, userId }, 'membership.self_left', 'membership', m.id, {
+          reason: 'account_closed',
+          tenantName: m.tenant.name,
+        });
+      });
+    }
+    await this.tokens.revokeAllForUser(userId);
+    await this.invalidateResets(userId);
+    await this.db.system.user.update({
+      where: { id: userId },
+      data: {
+        email: `deleted-${userId}@closed.local`,
+        name: 'Cuenta cerrada',
+        passwordHash: await hashPassword(randomToken(32)),
+        mfaEnabled: false,
+        mfaSecretEnc: null,
+        failedLogins: 0,
+        lockedUntil: null,
+      },
+    });
   }
 
   /**

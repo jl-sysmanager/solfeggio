@@ -146,7 +146,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const userName = session?.user.name ?? '';
   const userItems: MenuItem[] = [
-    { label: 'Seguridad de la cuenta', onSelect: () => navigate('/security') },
+    { label: 'Mi cuenta', onSelect: () => navigate('/account') },
     ...(session && session.memberships.length > 1 ? [{ label: 'Cambiar de banda', onSelect: () => navigate('/select-band') }] : []),
     { label: `${THEME_LABEL[theme.next]} (ahora: ${THEME_LABEL[theme.theme].toLowerCase()})`, onSelect: theme.cycle },
     { label: 'Cerrar sesión', onSelect: signOut, danger: true },

@@ -66,7 +66,7 @@ export const NAV: NavGroup[] = [
       { to: '/settings', icon: 'settings', label: 'Ajustes', perm: ['tenant:manage', 'roles:manage', 'audit:read'] },
       { to: '/billing', icon: 'card', label: 'Plan y facturación', perm: ['billing:manage'] },
       { to: '/incidents', icon: 'lifebuoy', label: 'Soporte', perm: ['incidents:write'] },
-      { to: '/security', icon: 'shield', label: 'Seguridad de la cuenta' },
+      { to: '/account', icon: 'shield', label: 'Mi cuenta' },
       { to: '/admin', icon: 'globe', label: 'Panel global', platformAdmin: true },
     ],
   },
@@ -132,7 +132,7 @@ export const ADMIN_NAV: NavGroup[] = [
 
 /**
  * Menú de la barra lateral dentro del panel global: las secciones del panel, más el acceso a la propia
- * banda (si el administrador pertenece a alguna) y la seguridad de la cuenta.
+ * banda (si el administrador pertenece a alguna) y Mi cuenta.
  */
 export function adminMenu(opts: { hasTenant: boolean; hasMemberships: boolean }): NavGroup[] {
   const back: NavItem[] = [];
@@ -142,7 +142,7 @@ export function adminMenu(opts: { hasTenant: boolean; hasMemberships: boolean })
     ...ADMIN_NAV,
     {
       label: 'Cuenta',
-      items: [...back, { to: '/security', icon: 'shield', label: 'Seguridad de la cuenta' }],
+      items: [...back, { to: '/account', icon: 'shield', label: 'Mi cuenta' }],
     },
   ];
 }
