@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Patch, Post, Req, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, Patch, Post, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
@@ -44,6 +44,10 @@ const tenantPatch = z.object({
   timezone: z.string().max(64).optional(),
   locale: z.string().max(10).optional(),
   region: z.enum(REGIONS).nullable().optional(),
+});
+const tenantDeleteSchema = z.object({
+  password: z.string().min(1).max(128),
+  confirm: z.literal('ELIMINAR'),
 });
 
 @ApiTags('tenancy')
@@ -145,6 +149,25 @@ export class TenancyController {
       return row;
     });
     return presentTenant(t);
+  }
+
+  /** Elimina (baja lógica) la banda activa. Sólo el propietario. */
+  @HttpCode(200)
+  @Post('tenant/delete')
+  async deleteTenant(
+    @Ctx() ctx: RequestContext,
+    @Body(zod(tenantDeleteSchema)) body: z.infer<typeof tenantDeleteSchema>,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (ctx.impersonationId) throw new ForbiddenException({ message: 'No disponible en modo «ver como»', code: 'IMPERSONATION_READ_ONLY' });
+    if (ctx.roleKey !== 'owner') throw new ForbiddenException({ message: 'Sólo el propietario puede eliminar la banda', code: 'OWNER_ONLY' });
+    if (!ctx.tenantId) throw new BadRequestException({ message: 'Selecciona una banda', code: 'TENANT_REQUIRED' });
+    const { accessToken, refresh, session } = await this.onboarding.deleteBandAsOwner(ctx.userId, ctx.tenantId, body.password);
+    res.cookie('sf_rt', refresh, {
+      httpOnly: true, secure: env().NODE_ENV === 'production', sameSite: 'strict', path: '/api/v1/auth',
+      maxAge: env().JWT_REFRESH_TTL_DAYS * 86_400_000,
+    });
+    return { accessToken, session };
   }
 
   @Get('dashboard')

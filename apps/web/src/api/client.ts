@@ -136,7 +136,7 @@ export const get = <T>(path: string, query?: Query) => api<T>(path, { query });
 export const post = <T>(path: string, body?: unknown) => api<T>(path, { method: 'POST', body: body ?? {} });
 export const patch = <T>(path: string, body: unknown) => api<T>(path, { method: 'PATCH', body });
 export const put = <T>(path: string, body: unknown) => api<T>(path, { method: 'PUT', body });
-export const del = <T>(path: string) => api<T>(path, { method: 'DELETE' });
+export const del = <T>(path: string, body?: unknown) => api<T>(path, { method: 'DELETE', body });
 
 /** Sube un fichero a una URL prefirmada (S3/MinIO). El Content-Type debe coincidir con el firmado. */
 export async function uploadToPresigned(url: string, file: File, mimeType?: string) {

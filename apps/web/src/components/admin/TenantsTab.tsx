@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { patch } from '../../api/client';
+import { del, patch } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
 import type { AdminTenant, Paginated, PlanCode } from '../../api/types';
 import { Person } from '../Avatar';
@@ -10,7 +10,7 @@ import { StatusChip } from '../Chip';
 import { DataTable, Pagination } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { Checkbox, FormError, SelectField, TextField, formValues } from '../Field';
-import { Drawer } from '../Modal';
+import { ConfirmModal, Drawer } from '../Modal';
 import { bytes, date } from '../../lib/format';
 import { featureLabels, tenantStatus } from '../../lib/labels';
 
@@ -99,12 +99,21 @@ export function TenantsTab() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<AdminTenant | null>(null);
+  const [removing, setRemoving] = useState<AdminTenant | null>(null);
   const list = useApi<Paginated<AdminTenant>>('/admin/tenants', { q, status, page, pageSize: 25 });
   const detail = useApi<TenantDetail>(editing ? `/admin/tenants/${editing.id}` : null);
   const update = useApiMutation((v: { id: string; body: unknown }) => patch(`/admin/tenants/${v.id}`, v.body), {
     success: 'Banda actualizada',
     invalidate: ['/admin'],
     onSuccess: () => setEditing(null),
+  });
+  const remove = useApiMutation((id: string) => del(`/admin/tenants/${id}`, { confirm: 'ELIMINAR' }), {
+    success: 'Banda eliminada',
+    invalidate: ['/admin'],
+    onSuccess: () => {
+      setRemoving(null);
+      setEditing(null);
+    },
   });
   return (
     <div className="stack" style={{ gap: 24 }}>
@@ -186,9 +195,27 @@ export function TenantsTab() {
             <Button type="submit" loading={update.isPending}>
               Guardar
             </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => {
+                if (editing) setRemoving(editing);
+              }}
+            >
+              Eliminar banda
+            </Button>
           </div>
         </form>
       </Drawer>
+      <ConfirmModal
+        open={!!removing}
+        title="Eliminar banda"
+        message={`¿Eliminar «${removing?.name}» (${removing?.slug})? Se cierra el acceso de todos los usuarios, se libera el identificador y se cancela la suscripción de Stripe si la hay.`}
+        confirmLabel="Eliminar"
+        loading={remove.isPending}
+        onConfirm={() => removing && remove.mutate(removing.id)}
+        onClose={() => setRemoving(null)}
+      />
     </div>
   );
 }

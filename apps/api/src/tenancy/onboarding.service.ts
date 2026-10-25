@@ -1,9 +1,10 @@
-import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { Db } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { SYSTEM_ROLES } from '../iam/permissions';
 import { AuthService } from '../auth/auth.service';
 import type { RequestContext } from '../auth/context';
+import { StripeClient } from '../billing/stripe.provider';
 import { DEFAULT_INSTRUMENTS } from './instrument-catalog';
 import { buildSetupGuide } from './setup-guide';
 
@@ -23,10 +24,13 @@ const DEFAULT_CATEGORIES: { name: string; kind: 'INCOME' | 'EXPENSE' }[] = [
 
 @Injectable()
 export class OnboardingService {
+  private readonly log = new Logger(OnboardingService.name);
+
   constructor(
     private readonly db: Db,
     private readonly audit: Audit,
     private readonly auth: AuthService,
+    private readonly stripe: StripeClient,
   ) {}
 
   async createBand(userId: string, input: { bandName: string; slug: string; country?: string; timezone?: string }) {
@@ -120,5 +124,55 @@ export class OnboardingService {
     if (ctx.roleKey !== 'owner') {
       throw new ForbiddenException({ message: 'La guía de puesta en marcha es del propietario', code: 'OWNER_ONLY' });
     }
+  }
+
+  /**
+   * Baja lógica de la banda: deja de ser accesible, libera el slug y cancela Stripe si hay suscripción.
+   * Sólo el propietario (con contraseña) o el panel global.
+   */
+  async softDeleteTenant(tenantId: string, actorUserId: string, meta?: { via?: string }) {
+    const tenant = await this.db.system.tenant.findFirst({
+      where: { id: tenantId, deletedAt: null },
+      include: { subscription: true },
+    });
+    if (!tenant) throw new BadRequestException({ message: 'La banda no existe o ya está eliminada', code: 'TENANT_NOT_FOUND' });
+
+    const subId = tenant.subscription?.stripeSubscriptionId;
+    if (subId) {
+      try {
+        const stripe = await this.stripe.api();
+        await stripe.subscriptions.cancel(subId);
+      } catch (err) {
+        this.log.warn(`No se pudo cancelar la suscripción Stripe de ${tenantId}: ${(err as Error).message}`);
+      }
+    }
+
+    // Liberar el identificador para poder crear otra banda con el mismo slug.
+    const freeSlug = `${tenant.slug.slice(0, 28)}-x-${tenant.id.replace(/-/g, '').slice(0, 8)}`.slice(0, 40);
+    await this.db.system.tenant.update({
+      where: { id: tenantId },
+      data: { deletedAt: new Date(), status: 'CANCELLED', slug: freeSlug },
+    });
+    await this.db.tenant(tenantId, async (tx) => {
+      await this.audit.log(tx, { tenantId, userId: actorUserId }, 'tenant.deleted', 'tenant', tenantId, {
+        previousSlug: tenant.slug,
+        via: meta?.via ?? 'owner',
+      });
+    });
+  }
+
+  /** Propietario elimina la banda activa (o la indicada) tras confirmar con contraseña. */
+  async deleteBandAsOwner(userId: string, tenantId: string, password: string) {
+    await this.auth.verifyPassword(userId, password);
+    const membership = await this.db.system.membership.findUnique({
+      where: { tenantId_userId: { tenantId, userId } },
+      include: { role: true },
+    });
+    if (!membership) throw new BadRequestException({ message: 'No perteneces a esa banda', code: 'NOT_A_MEMBER' });
+    if (membership.role.key !== 'owner') {
+      throw new ForbiddenException({ message: 'Sólo el propietario puede eliminar la banda', code: 'OWNER_ONLY' });
+    }
+    await this.softDeleteTenant(tenantId, userId, { via: 'owner' });
+    return this.auth.reissueWithoutTenant(userId);
   }
 }

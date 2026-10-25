@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ import { resetEntitlementsCache } from '../billing/entitlements';
 import { FEATURE_MODULES, withDependencies } from '../billing/feature-catalog';
 import { Db } from '../db/db.service';
 import { FEATURES } from '../iam/permissions';
+import { OnboardingService } from '../tenancy/onboarding.service';
 
 const tenantsQuery = pageQuery.extend({
   q: z.string().trim().max(100).optional(),
@@ -58,6 +59,7 @@ export class AdminController {
     private readonly db: Db,
     private readonly billingOps: BillingOpsService,
     private readonly planSync: PlanSync,
+    private readonly onboarding: OnboardingService,
   ) {}
 
   private auditFor(tenantId: string, ctx: RequestContext, action: string, entity: string, entityId: string, metadata?: object) {
@@ -179,6 +181,18 @@ export class AdminController {
     // Retira ítems legacy de escuela en Stripe si aún quedan; nunca falla la petición.
     if (body.addons !== undefined || body.studentSeats !== undefined) await this.billingOps.syncAddons(id, { userId: ctx.userId, ip: ctx.ip });
     return { ...t, storageUsedBytes: Number(t.storageUsedBytes) };
+  }
+
+  /** Baja lógica de una banda (libera el slug; cancela Stripe si hay suscripción). */
+  @HttpCode(200)
+  @Delete('tenants/:id')
+  async deleteTenant(
+    @Ctx() ctx: RequestContext,
+    @Param('id', zod(idParam)) id: string,
+    @Body(zod(z.object({ confirm: z.literal('ELIMINAR') }))) _body: { confirm: 'ELIMINAR' },
+  ) {
+    await this.onboarding.softDeleteTenant(id, ctx.userId, { via: 'platform' });
+    return { ok: true };
   }
 
   /** Catálogo de funcionalidades implementadas, agrupadas por módulo (configuración de planes). */

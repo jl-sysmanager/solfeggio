@@ -109,6 +109,19 @@ export class AuthService {
     return this.issue(userId, tenantId);
   }
 
+  /** Tras salir o borrar una banda: revoca refresh y elige la banda restante si sólo queda una. */
+  async reissueWithoutTenant(userId: string, preferredTenantId?: string | null) {
+    await this.tokens.revokeAllForUser(userId);
+    const session = await this.sessions.build(userId);
+    const next =
+      preferredTenantId && session.memberships.some((m) => m.tenantId === preferredTenantId)
+        ? preferredTenantId
+        : session.memberships.length === 1
+          ? session.memberships[0].tenantId
+          : null;
+    return this.issue(userId, next);
+  }
+
   async mfaSetup(userId: string) {
     const user = await this.db.system.user.findUniqueOrThrow({ where: { id: userId } });
     if (user.mfaEnabled) throw new BadRequestException({ message: 'MFA ya está activado', code: 'MFA_ALREADY_ENABLED' });
@@ -292,6 +305,11 @@ export class AuthService {
     return user;
   }
 
+  /** Comprueba la contraseña (p. ej. antes de borrar la banda). */
+  async verifyPassword(userId: string, password: string) {
+    await this.assertPassword(userId, password);
+  }
+
   private async assertCanLeaveOwnership(tenantId: string, roleKey: string) {
     if (roleKey !== 'owner') return;
     const owners = await this.db.system.membership.count({
@@ -299,7 +317,8 @@ export class AuthService {
     });
     if (owners <= 1) {
       throw new BadRequestException({
-        message: 'Eres el único propietario de esta banda. Transfiere la propiedad antes de salir o de cerrar la cuenta.',
+        message:
+          'Eres el único propietario de esta banda. Transfiere la propiedad, o elimina la banda desde Configuración, antes de salir o de cerrar la cuenta.',
         code: 'LAST_OWNER',
       });
     }
@@ -320,10 +339,7 @@ export class AuthService {
         tenantName: membership.tenant.name,
       });
     });
-    await this.tokens.revokeAllForUser(userId);
-    const session = await this.sessions.build(userId);
-    const nextTenant = session.memberships.length === 1 ? session.memberships[0].tenantId : null;
-    return this.issue(userId, nextTenant);
+    return this.reissueWithoutTenant(userId);
   }
 
   /**

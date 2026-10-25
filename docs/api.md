@@ -72,6 +72,7 @@ Cada ruta exige un permiso, indicado entre corchetes; algunas exigen además una
 
 ### Tenant, usuarios, roles y auditoría
 - `GET /tenant` · `PATCH /tenant` [tenant:manage]
+- `POST /tenant/delete { password, confirm: "ELIMINAR" }` → `{ accessToken, session }` · sólo propietario · baja lógica (libera slug; cancela Stripe si hay)
 - `GET /dashboard` → `{ members: { active, total }, nextEvents: Event[], pendingCharges: { count, amountCents }, attendanceRate30d (fracción 0–1), storage: { usedBytes, limitBytes }, users: { used, limit } }`
 - `GET /permissions` → catálogo `{ key, group, label }[]`
 - `GET|POST /roles`, `PATCH|DELETE /roles/:id` [roles:manage] (los roles de sistema no se pueden borrar; `POST` acepta `{ name, permissions, key? }` — si falta `key` se genera del nombre; la lista incluye `membershipCount`)
@@ -226,7 +227,7 @@ Lectura [finance:read], escritura [finance:write].
 ## Panel global (`isPlatformAdmin`, sin tenant)
 - `GET /admin/summary` → `{ support: { open, overdue }, moderation: { pending } }`: pendientes para los avisos del menú lateral (incidencias abiertas y fuera de plazo; anuncios por revisar y denuncias sin resolver)
 - `GET /admin/metrics` → `{ tenants: { total, byStatus }, mrrCents, openIncidents, pendingListings }`
-- `GET /admin/tenants?q&status&page` · `GET /admin/tenants/:id` · `PATCH /admin/tenants/:id { status?, planCode?, addons?, studentSeats? }` (add-ons y plazas de alumno del add-on Escuela)
+- `GET /admin/tenants?q&status&page` · `GET /admin/tenants/:id` · `PATCH /admin/tenants/:id { status?, planCode?, addons?, studentSeats? }` (add-ons y plazas de alumno del add-on Escuela) · `DELETE /admin/tenants/:id { confirm: "ELIMINAR" }` (baja lógica)
 - `GET /admin/plans` · `PATCH /admin/plans/:id`
 - `GET /admin/market/pending` (con `waitingHours` y `slaBreached` frente a las 24 h) · `POST /admin/market/listings/:id/moderate { approve, note? }`
 - `GET /admin/integrations` → categorías (`payments`, `email`) con sus proveedores, la definición de sus campos y el estado actual `{ source: database|env|none, provider, enabled, config, secrets: { clave: { set, hint } }, updatedAt, updatedBy }`. Los secretos nunca se devuelven: sólo si existen y sus 4 últimos caracteres (si miden 12 o más).

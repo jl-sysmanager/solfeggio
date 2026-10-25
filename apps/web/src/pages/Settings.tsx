@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { del, patch, post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { AuditEntry, InstrumentCatalogItem, Paginated, PermissionDef, Role, Section, Tenant } from '../api/types';
+import type { AuditEntry, InstrumentCatalogItem, Paginated, PermissionDef, Role, Section, Session, Tenant } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Person } from '../components/Avatar';
 import { Button } from '../components/Button';
@@ -25,12 +26,25 @@ function roleSummary(perms: string[], catalog: PermissionDef[]) {
 }
 
 function TenantTab() {
-  const { reload, can } = useAuth();
+  const { reload, can, session, applyTokenSession } = useAuth();
+  const navigate = useNavigate();
   const q = useApi<Tenant & { region?: string | null }>('/tenant');
   const save = useApiMutation((body: unknown) => patch('/tenant', body), { success: 'Datos de la banda guardados', invalidate: ['/tenant'], onSuccess: () => reload() });
+  const [deleting, setDeleting] = useState(false);
+  const remove = useApiMutation(
+    (body: { password: string; confirm: 'ELIMINAR' }) => post<{ accessToken: string; session: Session }>('/tenant/delete', body),
+    {
+      success: 'Banda eliminada',
+      onSuccess: (res) => {
+        applyTokenSession(res);
+        navigate(res.session.memberships.length ? '/select-band' : '/onboarding', { replace: true });
+      },
+    },
+  );
   if (q.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
   const t = q.data;
+  const isOwner = session?.role?.key === 'owner';
   const preview = t.hasLogo ? `/api/v1/bands/${encodeURIComponent(t.slug)}/logo?v=${encodeURIComponent(t.logoVersion ?? '')}` : null;
   return (
     <div className="stack" style={{ gap: 24 }}>
@@ -77,6 +91,45 @@ function TenantTab() {
         </div>
       </form>
     </Card>
+    {isOwner && (
+      <Card title="Eliminar banda">
+        {!deleting ? (
+          <div className="stack">
+            <p className="small">
+              Se cierra el acceso de todos los usuarios y se cancela la suscripción si la hay. El identificador <code>{t.slug}</code> queda
+              libre. Los datos dejan de estar disponibles en la aplicación (baja lógica). Esta acción no se puede deshacer desde aquí.
+            </p>
+            <div>
+              <Button variant="danger" onClick={() => setDeleting(true)}>
+                Eliminar esta banda
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form
+            className="form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              const v = formValues(e.currentTarget);
+              if (v.confirm !== 'ELIMINAR') return;
+              remove.mutate({ password: v.password ?? '', confirm: 'ELIMINAR' });
+            }}
+          >
+            <TextField label="Contraseña" name="password" type="password" autoComplete="current-password" required />
+            <TextField label='Escribe ELIMINAR para confirmar' name="confirm" required autoComplete="off" hint="Mayúsculas, sin espacios." />
+            <FormError error={remove.error} />
+            <div className="row">
+              <Button type="submit" variant="danger" loading={remove.isPending}>
+                Confirmar eliminación
+              </Button>
+              <Button variant="ghost" type="button" onClick={() => setDeleting(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </form>
+        )}
+      </Card>
+    )}
     </div>
   );
 }
