@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { patch, post } from '../../api/client';
+import { del, patch, post } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
+import { useAuth } from '../../auth/AuthProvider';
 import type { Paginated } from '../../api/types';
 import type { AdminUser, AdminUserDetail } from '../../api/types-admin-users';
 import { date, dateTime } from '../../lib/format';
@@ -11,7 +12,7 @@ import { Chip } from '../Chip';
 import { DataTable, Pagination } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { FormError, SelectField, TextAreaField, TextField, formValues } from '../Field';
-import { Drawer } from '../Modal';
+import { ConfirmModal, Drawer } from '../Modal';
 
 function statusChip(u: AdminUser) {
   if (u.blockedAt) return <Chip tone="danger">Bloqueado</Chip>;
@@ -19,13 +20,15 @@ function statusChip(u: AdminUser) {
   return <Chip tone="success">Activo</Chip>;
 }
 
-/** Directorio global de cuentas: búsqueda, bloqueo, equipo de plataforma y cierre de sesiones. */
+/** Cuentas de plataforma: el equipo tiene el rol básico; una cuenta sin banda se puede eliminar. */
 export function UsersTab() {
+  const { session } = useAuth();
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<AdminUser | null>(null);
   const [blocking, setBlocking] = useState<AdminUser | null>(null);
+  const [removing, setRemoving] = useState<AdminUser | null>(null);
 
   const list = useApi<Paginated<AdminUser>>('/admin/users', { q: q.trim() || undefined, status, page, pageSize: 25 });
   const detail = useApi<AdminUserDetail>(selected ? `/admin/users/${selected.id}` : null);
@@ -44,6 +47,14 @@ export function UsersTab() {
   const revoke = useApiMutation((id: string) => post(`/admin/users/${id}/revoke-sessions`), {
     success: 'Sesiones cerradas',
     ...inv,
+  });
+  const remove = useApiMutation((id: string) => del(`/admin/users/${id}`), {
+    success: 'Cuenta eliminada',
+    ...inv,
+    onSuccess: () => {
+      setRemoving(null);
+      setSelected(null);
+    },
   });
 
   const u = detail.data ?? selected;
@@ -74,6 +85,7 @@ export function UsersTab() {
               { value: 'active', label: 'Activos' },
               { value: 'blocked', label: 'Bloqueados' },
               { value: 'platform', label: 'Equipo de plataforma' },
+              { value: 'unassigned', label: 'Sin banda' },
             ]}
           />
         </div>
@@ -176,12 +188,27 @@ export function UsersTab() {
                 <Button variant="ghost" loading={revoke.isPending} onClick={() => revoke.mutate(u.id)}>
                   Cerrar sesiones
                 </Button>
+                {u.memberships.length === 0 && u.id !== session?.user.id && (
+                  <Button variant="danger" onClick={() => setRemoving(u)}>
+                    Eliminar cuenta
+                  </Button>
+                )}
               </div>
-              <FormError error={block.error ?? unblock.error ?? patchUser.error ?? revoke.error} />
+              <FormError error={block.error ?? unblock.error ?? patchUser.error ?? revoke.error ?? remove.error} />
             </fieldset>
           </div>
         )}
       </Drawer>
+
+      <ConfirmModal
+        open={!!removing}
+        title="Eliminar cuenta"
+        message={`¿Eliminar la cuenta de ${removing?.name ?? ''} (${removing?.email ?? ''})? No pertenece a ninguna banda y no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        loading={remove.isPending}
+        onConfirm={() => removing && remove.mutate(removing.id)}
+        onClose={() => setRemoving(null)}
+      />
 
       <Drawer open={!!blocking} onClose={() => setBlocking(null)} title={`Bloquear a ${blocking?.name ?? ''}`}>
         <form
