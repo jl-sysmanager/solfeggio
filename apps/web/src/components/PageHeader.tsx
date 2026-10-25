@@ -1,6 +1,9 @@
-import { useEffect, type ReactNode } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { resolveHelpTopic } from '../help/catalog';
 import { ALL_NAV_ITEMS } from '../nav';
+import { Button } from './Button';
+import { HelpDrawer } from './HelpDrawer';
 import { Icon, type IconName } from './Icon';
 
 /** Icono de la sección según la ruta (entrada de navegación con el prefijo más largo). */
@@ -26,13 +29,29 @@ export function PageHeader({
   tone?: 'cool' | 'cream' | 'warm';
 }) {
   const icon = useSectionIcon();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  const article = resolveHelpTopic(pathname);
+  const [helpOpen, setHelpOpen] = useState(false);
+
   // Dentro del panel global la miga raíz es el propio panel, no el inicio de una banda.
   const root = pathname.startsWith('/admin') ? { to: '/admin/metrics', label: 'Panel global' } : { to: '/', label: 'Inicio' };
+
   // Título de la pestaña por pantalla (WCAG 2.4.2).
   useEffect(() => {
     document.title = `${title} · Solfeamos`;
   }, [title]);
+
+  // ?ayuda=1 abre el drawer (p. ej. desde la paleta de comandos) y limpia la query.
+  useEffect(() => {
+    const params = new URLSearchParams(search);
+    if (params.get('ayuda') !== '1' || !article) return;
+    setHelpOpen(true);
+    params.delete('ayuda');
+    const q = params.toString();
+    navigate({ pathname, search: q ? `?${q}` : '' }, { replace: true });
+  }, [search, article, pathname, navigate]);
+
   return (
     <header className={`band band--${tone}`}>
       <div className="container band__inner">
@@ -59,8 +78,18 @@ export function PageHeader({
             </div>
           </div>
         </div>
-        {actions && <div className="band__actions">{actions}</div>}
+        {(actions || article) && (
+          <div className="band__actions">
+            {actions}
+            {article && (
+              <Button type="button" variant="ghost" size="sm" onClick={() => setHelpOpen(true)} aria-haspopup="dialog">
+                <Icon name="lifebuoy" size={16} /> Cómo funciona
+              </Button>
+            )}
+          </div>
+        )}
       </div>
+      {article && <HelpDrawer article={article} open={helpOpen} onClose={() => setHelpOpen(false)} />}
     </header>
   );
 }

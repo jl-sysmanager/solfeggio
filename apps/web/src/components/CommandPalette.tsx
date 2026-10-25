@@ -1,7 +1,8 @@
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
+import { resolveHelpTopic } from '../help/catalog';
 import { ADMIN_NAV, visibleItems } from '../nav';
 import { Icon, type IconName } from './Icon';
 
@@ -38,6 +39,7 @@ export function useCommandPaletteShortcut(open: () => void) {
 export function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { session, can, hasFeature } = useAuth();
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
   const input = useRef<HTMLInputElement>(null);
@@ -54,8 +56,21 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const actions: Command[] = [];
     if (can(['members:write']) && hasFeature('members')) actions.push({ id: 'new-member', label: 'Dar de alta a un socio', group: 'Acciones', icon: 'plus', to: '/members?new=1', keywords: 'nuevo socio alta' });
     if (can(['events:write']) && hasFeature('events')) actions.push({ id: 'new-event', label: 'Planificar ensayo o actuación', group: 'Acciones', icon: 'plus', to: '/events?new=1', keywords: 'nuevo ensayo concierto' });
+    const help = resolveHelpTopic(pathname);
+    if (help) {
+      const params = new URLSearchParams(search);
+      params.set('ayuda', '1');
+      actions.push({
+        id: 'help-screen',
+        label: 'Ayuda de esta pantalla',
+        group: 'Acciones',
+        icon: 'lifebuoy',
+        to: `${pathname}?${params.toString()}`,
+        keywords: 'ayuda cómo funciona guía',
+      });
+    }
     return [...actions, ...nav, ...panel];
-  }, [can, hasFeature, session?.user.isPlatformAdmin]);
+  }, [can, hasFeature, session?.user.isPlatformAdmin, pathname, search]);
 
   const results = useMemo<Command[]>(() => {
     const q = norm(query.trim());
