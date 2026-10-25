@@ -5,6 +5,7 @@ import type { Asset, Work } from '../../api/types';
 import type { DetectPartsResult, PartRange } from '../../api/types-archive';
 import { Button } from '../Button';
 import { FormError, SelectField, TextField } from '../Field';
+import { InstrumentField } from '../InstrumentField';
 import { Modal } from '../Modal';
 
 interface Row extends PartRange {
@@ -81,7 +82,7 @@ export function PartSplitModal({ work, asset, open, onClose }: { work: Work; ass
             {rows.map((r, i) => (
               <fieldset key={r.key} className="form-row" style={{ border: 0, padding: 0, margin: 0, alignItems: 'flex-end' }}>
                 <legend className="sr-only">Particella {i + 1}</legend>
-                <TextField label="Instrumento" value={r.instrument} maxLength={60} required onChange={(e) => edit(r.key, { instrument: e.target.value })} />
+                <InstrumentField label="Instrumento" value={r.instrument} required onChange={(e) => edit(r.key, { instrument: e.target.value })} />
                 <TextField label="Desde pág." type="number" min={1} max={result.pages} value={r.fromPage} onChange={(e) => edit(r.key, { fromPage: Number(e.target.value) })} />
                 <TextField label="Hasta pág." type="number" min={1} max={result.pages} value={r.toPage} onChange={(e) => edit(r.key, { toPage: Number(e.target.value) })} />
                 {r.confidence !== undefined && r.confidence < 0.6 && <span className="small muted">Revisar</span>}

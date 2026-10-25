@@ -14,6 +14,7 @@ import { StatusChip, Tag } from '../Chip';
 import { DataTable, Pagination } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { Checkbox, FormError, SelectField, TextAreaField, TextField, formValues } from '../Field';
+import { InstrumentField } from '../InstrumentField';
 import { Menu } from '../Menu';
 import { Modal } from '../Modal';
 
@@ -77,7 +78,7 @@ export function StudentFormModal({ open, onClose, student }: { open: boolean; on
           {choice === NEW_FAMILY && <TextField label="Nombre de la familia" name="newFamily" required placeholder="Familia García López" />}
         </div>
         <div className="form-row">
-          <TextField label="Instrumento" name="instrument" defaultValue={student?.instrument ?? ''} />
+          <InstrumentField name="instrument" defaultValue={student?.instrument ?? ''} />
           <TextField label="Email" name="email" type="email" defaultValue={student?.email ?? ''} />
           <TextField label="Teléfono" name="phone" type="tel" defaultValue={student?.phone ?? ''} />
         </div>

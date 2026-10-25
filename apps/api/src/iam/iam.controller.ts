@@ -8,7 +8,7 @@ import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
-import { env } from '../config/env';
+import { appUrl } from '../config/env';
 import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { Jobs } from '../jobs/jobs.service';
@@ -251,7 +251,7 @@ export class IamController {
     await this.jobs.add('email.send', {
       to: email,
       subject: `Invitación a ${tenant.name} en Solfeamos`,
-      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${env().APP_URL}/invite/${token}`,
+      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${appUrl(`/invite/${token}`)}`,
     });
     return result;
   }

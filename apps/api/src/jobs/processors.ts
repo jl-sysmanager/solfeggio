@@ -3,7 +3,7 @@ import { Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import { BillingOpsService } from '../billing/billing-ops.service';
 import { BillingService } from '../billing/billing.service';
-import { env } from '../config/env';
+import { appUrl } from '../config/env';
 import { Db } from '../db/db.service';
 import { TYPE_LABEL } from '../events/events.controller';
 import { Mailer } from '../integrations/mailer.service';
@@ -123,7 +123,7 @@ export class Processors {
     if (data.email) {
       const users = await this.db.system.user.findMany({ where: { id: { in: [...userIds] } }, select: { email: true } });
       users.forEach((u) => emails.add(u.email));
-      const link = data.link ? `\n\n${env().APP_URL}${data.link}` : '';
+      const link = data.link ? `\n\n${appUrl(data.link)}` : '';
       for (const to of emails) await this.jobs.add('email.send', { to, subject: data.title, text: `${data.body}${link}`, tenantId: data.tenantId });
     }
     return { users: userIds.size, emails: data.email ? emails.size : 0 };

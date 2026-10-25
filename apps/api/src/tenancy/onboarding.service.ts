@@ -4,11 +4,13 @@ import { Audit } from '../audit/audit.service';
 import { SYSTEM_ROLES } from '../iam/permissions';
 import { AuthService } from '../auth/auth.service';
 import type { RequestContext } from '../auth/context';
+import { DEFAULT_INSTRUMENTS } from './instrument-catalog';
 import { buildSetupGuide } from './setup-guide';
 
 const RESERVED_SLUGS = new Set(['admin', 'api', 'app', 'www', 'solfeggio', 'solfeamos', 'market', 'billing', 'help', 'status']);
 
 export const DEFAULT_SECTIONS = ['Flautas', 'Oboes', 'Clarinetes', 'Saxofones', 'Fagotes', 'Trompas', 'Trompetas', 'Trombones', 'Bombardinos', 'Tubas', 'Percusión'];
+export { DEFAULT_INSTRUMENTS };
 const DEFAULT_CATEGORIES: { name: string; kind: 'INCOME' | 'EXPENSE' }[] = [
   { name: 'Cuotas de socios', kind: 'INCOME' },
   { name: 'Actuaciones', kind: 'INCOME' },
@@ -71,6 +73,9 @@ export class OnboardingService {
       });
       await tx.membership.create({ data: { tenantId: tenant.id, userId, roleId: owner.id, memberId: member.id } });
       await tx.section.createMany({ data: DEFAULT_SECTIONS.map((name, position) => ({ tenantId: tenant.id, name, position })) });
+      await tx.instrumentCatalogItem.createMany({
+        data: DEFAULT_INSTRUMENTS.map((name, position) => ({ tenantId: tenant.id, name, position })),
+      });
       await tx.financeCategory.createMany({ data: DEFAULT_CATEGORIES.map((c) => ({ tenantId: tenant.id, ...c })) });
       await this.audit.log(tx, { tenantId: tenant.id, userId }, 'tenant.created', 'tenant', tenant.id, { slug: tenant.slug, memberId: member.id });
     });

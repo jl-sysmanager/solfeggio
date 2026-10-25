@@ -43,9 +43,17 @@ export async function uploadFile(uploadUrlPath: string, file: File): Promise<Upl
     await uploadToPresigned(uploadUrl, file, meta.mimeType);
   } catch (e) {
     if (e instanceof TypeError) {
+      let host = '';
+      try {
+        host = new URL(uploadUrl).origin;
+      } catch {
+        /* ignore */
+      }
       throw new ApiError(
         0,
-        'No se pudo subir el fichero (failed to fetch). Suele ser CORS del bucket o CSP: en web S3_ORIGIN debe incluir el host del bucket; en api, APP_URL/CORS_ORIGINS el dominio de la web.',
+        host
+          ? `No se pudo subir el fichero (failed to fetch) hacia ${host}. En web, S3_ORIGIN debe incluir ese origen (p. ej. https://*.t3.storageapi.dev https://t3.storageapi.dev). En api, APP_URL/CORS_ORIGINS = dominio de la web y redespliega api.`
+          : 'No se pudo subir el fichero (failed to fetch). Suele ser CORS del bucket o CSP (S3_ORIGIN en web; APP_URL/CORS_ORIGINS en api).',
       );
     }
     throw e;

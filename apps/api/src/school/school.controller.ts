@@ -9,7 +9,7 @@ import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam, isoDate, isoDateTime, optionalText, text, toDate } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
-import { env } from '../config/env';
+import { appUrl } from '../config/env';
 import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { Jobs } from '../jobs/jobs.service';
@@ -391,7 +391,7 @@ export class SchoolController {
     await this.jobs.add('email.send', {
       to: result.email,
       subject: `Invitación a ${tenant.name} en Solfeamos`,
-      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${env().APP_URL}/invite/${result.token}`,
+      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${appUrl(`/invite/${result.token}`)}`,
     });
     const { token: _t, ...publicResult } = result;
     return publicResult;

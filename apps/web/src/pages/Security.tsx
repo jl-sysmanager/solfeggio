@@ -9,6 +9,7 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { Checkbox, FormError, TextField, formValues } from '../components/Field';
+import { InstrumentField } from '../components/InstrumentField';
 import { Page, PageHeader } from '../components/PageHeader';
 import { PhotoEditor } from '../components/PhotoEditor';
 import { UrlTabs, type TabDef } from '../components/Tabs';
@@ -35,91 +36,89 @@ interface ProfileResponse {
 
 function ProfileTab({ profile, onChanged }: { profile: ProfileResponse; onChanged: () => void }) {
   const { reload } = useAuth();
-  const saveName = useApiMutation((body: { name: string }) => patch<{ user: Session['user'] }>('/auth/profile', body), {
-    success: 'Nombre actualizado',
+  const save = useApiMutation((body: Record<string, unknown>) => patch<ProfileResponse>('/auth/profile', body), {
+    success: 'Perfil actualizado',
     onSuccess: () => {
       void reload();
       onChanged();
     },
   });
-  const saveMember = useApiMutation(
-    (body: Record<string, unknown>) => patch<{ member: ProfileMember }>('/auth/profile/member', body),
-    { success: 'Ficha actualizada', onSuccess: onChanged },
-  );
   const m = profile.member;
+  const nameParts = profile.user.name.trim().split(/\s+/);
+  const fallbackFirst = nameParts[0] ?? '';
+  const fallbackLast = nameParts.slice(1).join(' ') || '';
 
   return (
     <div className="stack" style={{ gap: 24 }}>
-      <Card title="Datos de la cuenta">
+      <Card title="Tu perfil">
+        {m && (
+          <p className="small muted" style={{ marginBottom: 12 }}>
+            Nº {m.memberNumber}
+            {m.section ? ` · ${m.section.name}` : ''}
+            {' · '}
+            Cuenta y ficha de la banda en un solo lugar.
+          </p>
+        )}
         <form
           className="form"
+          key={m?.id ?? profile.user.id}
           onSubmit={(e) => {
             e.preventDefault();
+            const fd = new FormData(e.currentTarget);
             const v = formValues(e.currentTarget);
-            if (v.name) saveName.mutate({ name: v.name });
+            if (m) {
+              save.mutate({
+                firstName: String(fd.get('firstName') ?? '').trim(),
+                lastName: String(fd.get('lastName') ?? '').trim(),
+                phone: String(fd.get('phone') ?? '').trim() || null,
+                instrument: String(fd.get('instrument') ?? '').trim() || null,
+                address: String(fd.get('address') ?? '').trim() || null,
+                consentImages: fd.get('consentImages') === 'on',
+              });
+            } else if (v.name) {
+              save.mutate({ name: v.name });
+            }
           }}
         >
-          <TextField label="Nombre" name="name" defaultValue={profile.user.name} required maxLength={120} autoComplete="name" />
-          <TextField label="Email" name="email" defaultValue={profile.user.email} readOnly hint="El email no se puede cambiar desde aquí. Contacta con soporte si lo necesitas." />
-          <FormError error={saveName.error} />
+          {m ? (
+            <>
+              <div className="grid grid--2">
+                <TextField label="Nombre" name="firstName" defaultValue={m.firstName || fallbackFirst} required maxLength={80} autoComplete="given-name" />
+                <TextField label="Apellidos" name="lastName" defaultValue={m.lastName || fallbackLast} required maxLength={120} autoComplete="family-name" />
+              </div>
+              <TextField label="Email" name="email" defaultValue={profile.user.email} readOnly hint="El email de la cuenta no se puede cambiar desde aquí." />
+              <TextField label="Teléfono" name="phone" defaultValue={m.phone ?? ''} maxLength={30} autoComplete="tel" />
+              <InstrumentField name="instrument" defaultValue={m.instrument ?? ''} />
+              <TextField label="Dirección" name="address" defaultValue={m.address ?? ''} maxLength={300} autoComplete="street-address" />
+              <Checkbox name="consentImages" label="Autorizo el uso de mi imagen en publicaciones de la banda" defaultChecked={m.consentImages} />
+            </>
+          ) : (
+            <>
+              <TextField label="Nombre" name="name" defaultValue={profile.user.name} required maxLength={120} autoComplete="name" />
+              <TextField label="Email" name="email" defaultValue={profile.user.email} readOnly hint="El email no se puede cambiar desde aquí. Contacta con soporte si lo necesitas." />
+            </>
+          )}
+          <FormError error={save.error} />
           <div>
-            <Button type="submit" loading={saveName.isPending}>
-              Guardar nombre
+            <Button type="submit" loading={save.isPending}>
+              Guardar perfil
             </Button>
           </div>
         </form>
       </Card>
 
       {m && (
-        <>
-          <Card title="Ficha de socio">
-            <p className="small muted" style={{ marginBottom: 12 }}>
-              Nº {m.memberNumber}
-              {m.section ? ` · ${m.section.name}` : ''}
-            </p>
-            <form
-              className="form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                saveMember.mutate({
-                  firstName: String(fd.get('firstName') ?? '').trim(),
-                  lastName: String(fd.get('lastName') ?? '').trim(),
-                  phone: String(fd.get('phone') ?? '').trim() || null,
-                  instrument: String(fd.get('instrument') ?? '').trim() || null,
-                  address: String(fd.get('address') ?? '').trim() || null,
-                  consentImages: fd.get('consentImages') === 'on',
-                });
-              }}
-            >
-              <div className="grid grid--2">
-                <TextField label="Nombre" name="firstName" defaultValue={m.firstName} required maxLength={80} />
-                <TextField label="Apellidos" name="lastName" defaultValue={m.lastName} required maxLength={120} />
-              </div>
-              <TextField label="Teléfono" name="phone" defaultValue={m.phone ?? ''} maxLength={30} autoComplete="tel" />
-              <TextField label="Instrumento" name="instrument" defaultValue={m.instrument ?? ''} maxLength={60} />
-              <TextField label="Dirección" name="address" defaultValue={m.address ?? ''} maxLength={300} autoComplete="street-address" />
-              <Checkbox name="consentImages" label="Autorizo el uso de mi imagen en publicaciones de la banda" defaultChecked={m.consentImages} />
-              <FormError error={saveMember.error} />
-              <div>
-                <Button type="submit" loading={saveMember.isPending}>
-                  Guardar ficha
-                </Button>
-              </div>
-            </form>
-          </Card>
-          <Card title="Foto de perfil">
-            <p className="small muted" style={{ marginBottom: 12 }}>
-              Se muestra en tu ficha de socio y en los listados de la banda.
-            </p>
-            <PhotoEditor
-              previewUrl={m.photoUrl ?? null}
-              confirmPath={`/members/${m.id}/photo`}
-              deletePath={`/members/${m.id}/photo`}
-              onChanged={onChanged}
-            />
-          </Card>
-        </>
+        <Card title="Foto de perfil">
+          <p className="small muted" style={{ marginBottom: 12 }}>
+            Se muestra en tu ficha y en los listados de la banda.
+          </p>
+          <PhotoEditor
+            previewUrl={m.photoUrl ?? null}
+            confirmPath={`/members/${m.id}/photo`}
+            deletePath={`/members/${m.id}/photo`}
+            onChanged={onChanged}
+          />
+        </Card>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ import { Tag } from '../components/Chip';
 import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { FormError, SelectField, TextAreaField, TextField, formValues } from '../components/Field';
+import { InstrumentField } from '../components/InstrumentField';
 import { canPreviewFile, FilePreviewModal, previewActionLabel } from '../components/FilePreviewModal';
 import { Menu } from '../components/Menu';
 import { ConfirmModal, Modal } from '../components/Modal';
@@ -45,7 +46,7 @@ function AssetUploadModal({ work, open, onClose }: { work: Work; open: boolean; 
       <form className="form" onSubmit={submit}>
         <div className="form-row">
           <SelectField label="Tipo" name="kind" options={Object.entries(assetKind).map(([value, label]) => ({ value, label }))} />
-          <TextField label="Instrumento / papel" name="instrument" placeholder="Clarinete 1º en Si♭" hint="Para particellas." />
+          <InstrumentField label="Instrumento / papel" name="instrument" hint="Para particellas. Déjalo en blanco si no aplica." />
         </div>
         {work.versions && work.versions.length > 0 && (
           <SelectField label="Versión" name="versionId" placeholder="Original" options={work.versions.map((v) => ({ value: v.id, label: v.name }))} />

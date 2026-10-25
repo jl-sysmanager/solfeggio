@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { BillingInterval, PlanCode, Prisma, TenantStatus } from '@prisma/client';
 import Stripe from 'stripe';
-import { env } from '../config/env';
+import { appUrl, env } from '../config/env';
 import { Db } from '../db/db.service';
 import { IntegrationsService } from '../integrations/integrations.service';
 import { Jobs } from '../jobs/jobs.service';
@@ -100,8 +100,8 @@ export class BillingService {
         customer_update: { address: 'auto', name: 'auto' },
         billing_address_collection: 'required',
         locale: 'es',
-        success_url: `${env().APP_URL}/billing?checkout=success`,
-        cancel_url: `${env().APP_URL}/billing?checkout=cancel`,
+        success_url: appUrl('/billing?checkout=success'),
+        cancel_url: appUrl('/billing?checkout=cancel'),
       },
       // Evita sesiones duplicadas por doble clic durante un minuto.
       { idempotencyKey: `checkout:${tenantId}:${planCode}:${interval}:${Math.floor(Date.now() / 60_000)}` },
@@ -129,7 +129,7 @@ export class BillingService {
 
   async portal(tenantId: string, email: string) {
     const { customerId } = await this.ensureCustomer(tenantId, email);
-    const session = await (await this.stripe.api()).billingPortal.sessions.create({ customer: customerId, return_url: `${env().APP_URL}/billing`, locale: 'es' });
+    const session = await (await this.stripe.api()).billingPortal.sessions.create({ customer: customerId, return_url: appUrl('/billing'), locale: 'es' });
     return { url: session.url };
   }
 

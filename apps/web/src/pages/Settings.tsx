@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { del, patch, post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { AuditEntry, Paginated, PermissionDef, Role, Section, Tenant } from '../api/types';
+import type { AuditEntry, InstrumentCatalogItem, Paginated, PermissionDef, Role, Section, Tenant } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Person } from '../components/Avatar';
 import { Button } from '../components/Button';
@@ -255,6 +255,50 @@ function SectionsTab() {
   );
 }
 
+function InstrumentsCatalogTab() {
+  const q = useApi<InstrumentCatalogItem[]>('/instrument-catalog');
+  const create = useApiMutation((body: unknown) => post('/instrument-catalog', body), {
+    success: 'Instrumento añadido',
+    invalidate: ['/instrument-catalog'],
+  });
+  const remove = useApiMutation((id: string) => del(`/instrument-catalog/${id}`), {
+    success: 'Instrumento eliminado',
+    invalidate: ['/instrument-catalog'],
+  });
+  return (
+    <Card title="Instrumentos">
+      <p className="small muted" style={{ marginBottom: 12 }}>
+        Lista usada en fichas de socios, alumnos y demás formularios. Se puede dejar el campo en blanco.
+      </p>
+      <form
+        className="toolbar"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const form = e.currentTarget;
+          const v = formValues(form);
+          if (v.name) create.mutate({ name: v.name, position: (q.data?.length ?? 0) + 1 }, { onSuccess: () => form.reset() });
+        }}
+      >
+        <TextField label="Nuevo instrumento" name="name" placeholder="Clarinete en Si♭" maxLength={60} />
+        <Button type="submit" loading={create.isPending}>
+          Añadir
+        </Button>
+      </form>
+      {q.isLoading && <Loading />}
+      <ul className="list-plain list-divided" style={{ marginTop: 16 }}>
+        {(q.data ?? []).map((s) => (
+          <li key={s.id} className="row between">
+            <span>{s.name}</span>
+            <Button size="sm" variant="danger" onClick={() => remove.mutate(s.id)} aria-label={`Eliminar instrumento ${s.name}`}>
+              Eliminar
+            </Button>
+          </li>
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
 function AuditTab() {
   const [entity, setEntity] = useState('');
   const [page, setPage] = useState(1);
@@ -295,7 +339,10 @@ export default function SettingsPage() {
   const { can } = useAuth();
   const tabs: TabDef[] = [];
   if (can('tenant:manage')) tabs.push({ id: 'tenant', label: 'Banda', content: <TenantTab /> });
-  if (can('tenant:manage') || can('members:write')) tabs.push({ id: 'sections', label: 'Secciones', content: <SectionsTab /> });
+  if (can('tenant:manage') || can('members:write')) {
+    tabs.push({ id: 'sections', label: 'Secciones', content: <SectionsTab /> });
+    tabs.push({ id: 'instruments', label: 'Instrumentos', content: <InstrumentsCatalogTab /> });
+  }
   if (can('roles:manage')) tabs.push({ id: 'roles', label: 'Roles y permisos', content: <RolesTab /> });
   if (can('audit:read')) tabs.push({ id: 'audit', label: 'Auditoría', content: <AuditTab /> });
   return (

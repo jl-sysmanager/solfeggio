@@ -32,15 +32,16 @@ const changePasswordSchema = z
   .refine((b) => b.currentPassword !== b.newPassword, { message: 'La nueva contraseña debe ser distinta', path: ['newPassword'] });
 const forgotSchema = z.object({ email: z.string().email().max(254) });
 const resetSchema = z.object({ token: z.string().min(20).max(200), password: passwordSchema });
-const profileSchema = z.object({ name: z.string().trim().min(2).max(120) });
 const blankToNull = (v: unknown) =>
   v && typeof v === 'object' && !Array.isArray(v)
     ? Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, typeof x === 'string' && x.trim() === '' ? null : x]))
     : v;
-const myMemberSchema = z.preprocess(
+/** Perfil unificado: nombre de cuenta y, si hay ficha vinculada, datos de socio. */
+const profileSchema = z.preprocess(
   blankToNull,
   z
     .object({
+      name: z.string().trim().min(2).max(120).optional(),
       firstName: z.string().trim().min(1).max(80).optional(),
       lastName: z.string().trim().min(1).max(120).optional(),
       phone: z.string().trim().max(30).nullable().optional(),
@@ -48,7 +49,11 @@ const myMemberSchema = z.preprocess(
       instrument: z.string().trim().max(60).nullable().optional(),
       consentImages: z.boolean().optional(),
     })
-    .refine((b) => Object.keys(b).length > 0, { message: 'Sin cambios' }),
+    .refine((b) => Object.keys(b).length > 0, { message: 'Sin cambios' })
+    .refine((b) => !(b.firstName && !b.lastName) && !(b.lastName && !b.firstName), {
+      message: 'Nombre y apellidos van juntos',
+      path: ['lastName'],
+    }),
 );
 const leaveSchema = z.object({ password: z.string().min(1).max(128), tenantId: z.string().uuid().optional() });
 const closeSchema = z.object({
@@ -142,15 +147,7 @@ export class AuthController {
   @Patch('profile')
   async updateProfile(@Ctx() ctx: RequestContext, @Body(zod(profileSchema)) body: z.infer<typeof profileSchema>) {
     this.assertNotImpersonating(ctx);
-    return { user: await this.auth.updateProfile(ctx.userId, body) };
-  }
-
-  @ApiBearerAuth()
-  @Patch('profile/member')
-  async updateMyMember(@Ctx() ctx: RequestContext, @Body(zod(myMemberSchema)) body: z.infer<typeof myMemberSchema>) {
-    this.assertNotImpersonating(ctx);
-    if (!ctx.tenantId) throw new BadRequestException({ message: 'Selecciona una banda', code: 'TENANT_REQUIRED' });
-    return { member: await this.auth.updateMyMember(ctx.userId, ctx.tenantId, body) };
+    return this.auth.updateProfile(ctx.userId, ctx.tenantId || null, body);
   }
 
   @ApiBearerAuth()

@@ -9,7 +9,7 @@ import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam, isoDate, isoDateTime, optionalText, toDate } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
-import { env } from '../config/env';
+import { appUrl } from '../config/env';
 import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { Jobs } from '../jobs/jobs.service';
@@ -335,7 +335,7 @@ export class ReinforcementsController {
       await this.jobs.add('email.send', {
         to: email,
         subject: `Candidatura aceptada: ${request.title}`,
-        text: `${band} ha aceptado tu candidatura como refuerzo (${request.instrument}) para «${request.title}» el ${day(request.date)}${request.location ? ` en ${request.location}` : ''}. La banda se pondrá en contacto contigo para concretar los detalles.\n\n${env().APP_URL}/reinforcements`,
+        text: `${band} ha aceptado tu candidatura como refuerzo (${request.instrument}) para «${request.title}» el ${day(request.date)}${request.location ? ` en ${request.location}` : ''}. La banda se pondrá en contacto contigo para concretar los detalles.\n\n${appUrl('/reinforcements')}`,
       });
     }
     return result;
@@ -373,7 +373,7 @@ export class ReinforcementsController {
       await this.jobs.add('email.send', {
         to: email,
         subject: `Candidatura no seleccionada: ${request.title}`,
-        text: `Gracias por presentarte como refuerzo para «${request.title}». En esta ocasión la banda ha seleccionado a otros músicos.\n\n${env().APP_URL}/reinforcements`,
+        text: `Gracias por presentarte como refuerzo para «${request.title}». En esta ocasión la banda ha seleccionado a otros músicos.\n\n${appUrl('/reinforcements')}`,
       });
     }
     return { id, status: 'REJECTED' };
@@ -442,7 +442,7 @@ export class ReinforcementsController {
       text:
         `Hola, ${profile.displayName}:\n\n${band} busca ${request.instrument.toLowerCase()} para «${request.title}» el ${day(request.date)} ` +
         `(${[request.location, request.province].filter(Boolean).join(', ')}).${request.feeCents ? ` Caché: ${eur(request.feeCents)} €.` : ''}\n\n` +
-        `Mensaje de la banda:\n${body.message}\n\nSi te interesa, preséntate desde la bolsa de refuerzos: ${env().APP_URL}/reinforcements\n\n` +
+        `Mensaje de la banda:\n${body.message}\n\nSi te interesa, preséntate desde la bolsa de refuerzos: ${appUrl('/reinforcements')}\n\n` +
         `Recibes este mensaje porque tu perfil de músico figura como disponible. Puedes desactivarlo en cualquier momento.`,
     });
     return { sent: true };

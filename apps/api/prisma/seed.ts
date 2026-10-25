@@ -10,7 +10,7 @@
 import { PrismaClient } from '@prisma/client';
 import * as argon2 from 'argon2';
 import { SYSTEM_ROLES } from '../src/iam/permissions';
-import { DEFAULT_SECTIONS } from '../src/tenancy/onboarding.service';
+import { DEFAULT_INSTRUMENTS, DEFAULT_SECTIONS } from '../src/tenancy/onboarding.service';
 import { seedPlans } from './plans';
 
 const db = new PrismaClient({ datasourceUrl: process.env.SYSTEM_DATABASE_URL ?? process.env.DATABASE_MIGRATION_URL ?? process.env.DATABASE_URL });
@@ -63,6 +63,7 @@ async function seedDemo() {
   await db.role.createMany({ data: SYSTEM_ROLES.map((r) => ({ tenantId: t, key: r.key, name: r.name, permissions: r.permissions, isSystem: true })) });
   const roles = Object.fromEntries((await db.role.findMany({ where: { tenantId: t } })).map((r) => [r.key, r.id]));
   await db.section.createMany({ data: DEFAULT_SECTIONS.map((name, position) => ({ tenantId: t, name, position })) });
+  await db.instrumentCatalogItem.createMany({ data: DEFAULT_INSTRUMENTS.map((name, position) => ({ tenantId: t, name, position })) });
   const sections = await db.section.findMany({ where: { tenantId: t } });
   const sec = (n: string) => sections.find((s) => s.name === n)!.id;
 

@@ -370,4 +370,40 @@ export class MembersController {
       await tx.section.delete({ where: { id } });
     });
   }
+
+  @Get('instrument-catalog')
+  instrumentCatalog(@Ctx() ctx: RequestContext) {
+    return this.db.tenant(ctx.tenantId, (tx) =>
+      tx.instrumentCatalogItem.findMany({ orderBy: [{ position: 'asc' }, { name: 'asc' }] }),
+    );
+  }
+
+  @Perm('members:write')
+  @Post('instrument-catalog')
+  createInstrumentCatalogItem(@Ctx() ctx: RequestContext, @Body(zod(sectionSchema)) body: z.infer<typeof sectionSchema>) {
+    return this.db.tenant(ctx.tenantId, (tx) => tx.instrumentCatalogItem.create({ data: { ...body, tenantId: ctx.tenantId } }));
+  }
+
+  @Perm('members:write')
+  @Patch('instrument-catalog/:id')
+  updateInstrumentCatalogItem(
+    @Ctx() ctx: RequestContext,
+    @Param('id', zod(idParam)) id: string,
+    @Body(zod(sectionSchema.partial())) body: Partial<z.infer<typeof sectionSchema>>,
+  ) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      found(await tx.instrumentCatalogItem.findUnique({ where: { id } }), 'Instrumento');
+      return tx.instrumentCatalogItem.update({ where: { id }, data: body });
+    });
+  }
+
+  @Perm('members:write')
+  @HttpCode(204)
+  @Delete('instrument-catalog/:id')
+  async deleteInstrumentCatalogItem(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    await this.db.tenant(ctx.tenantId, async (tx: Tx) => {
+      found(await tx.instrumentCatalogItem.findUnique({ where: { id } }), 'Instrumento');
+      await tx.instrumentCatalogItem.delete({ where: { id } });
+    });
+  }
 }

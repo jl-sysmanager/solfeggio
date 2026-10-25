@@ -4,6 +4,34 @@ const bool = z
   .union([z.boolean(), z.string()])
   .transform((v) => v === true || v === 'true' || v === '1');
 
+const isLoopbackUrl = (u: string) => /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:|\/|$)/i.test(u);
+
+/** Origen público de la SPA (enlaces de correo, Stripe, CORS). Nunca localhost en producción. */
+function resolvePublicAppUrl(raw: NodeJS.ProcessEnv): string {
+  const candidates = [raw.APP_URL, raw.PUBLIC_APP_URL, raw.RAILWAY_PUBLIC_DOMAIN ? `https://${raw.RAILWAY_PUBLIC_DOMAIN}` : undefined]
+    .map((v) => v?.trim())
+    .filter((v): v is string => !!v);
+  const production = (raw.NODE_ENV ?? 'development') === 'production';
+  const picked = candidates.find((u) => {
+    try {
+      // RAILWAY_PUBLIC_DOMAIN llega sin esquema; ya lo prefijamos arriba.
+      new URL(u.includes('://') ? u : `https://${u}`);
+      return !production || !isLoopbackUrl(u);
+    } catch {
+      return false;
+    }
+  });
+  if (picked) return picked.includes('://') ? picked.replace(/\/$/, '') : `https://${picked.replace(/\/$/, '')}`;
+  if (production) {
+    throw new Error(
+      'APP_URL debe ser la URL pública de producción (p. ej. https://tu-dominio.up.railway.app). ' +
+        'En Railway: Variable de api/worker → APP_URL=https://${{web.RAILWAY_PUBLIC_DOMAIN}} (o tu dominio custom). ' +
+        'No uses localhost: los correos de invitación y recuperación saldrían mal.',
+    );
+  }
+  return 'http://localhost:5173';
+}
+
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3000),
@@ -11,7 +39,7 @@ const schema = z.object({
   HOST: z.string().default('0.0.0.0'),
   /** Proxies de confianza delante de la API (nginx = 1; Railway + nginx = 2) para obtener la IP real. */
   TRUST_PROXY: z.coerce.number().int().min(0).max(5).default(1),
-  APP_URL: z.string().url().default('http://localhost:5173'),
+  APP_URL: z.string().url(),
   API_URL: z.string().url().default('http://localhost:3000'),
   CORS_ORIGINS: z.string().default('http://localhost:5173'),
 
@@ -67,14 +95,29 @@ let cached: Env | undefined;
 
 export function env(): Env {
   if (!cached) {
-    const parsed = schema.safeParse(process.env);
+    const withApp = { ...process.env, APP_URL: resolvePublicAppUrl(process.env) };
+    const parsed = schema.safeParse(withApp);
     if (!parsed.success) {
       const issues = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
       throw new Error(`Configuración inválida: ${issues}`);
     }
+    if (parsed.data.NODE_ENV === 'production' && isLoopbackUrl(parsed.data.APP_URL)) {
+      throw new Error('APP_URL no puede ser localhost en producción (rompe los enlaces de los correos).');
+    }
     cached = parsed.data;
+    // En producción, si CORS_ORIGINS sigue el default local, alinear con APP_URL.
+    if (cached.NODE_ENV === 'production' && isLoopbackUrl(cached.CORS_ORIGINS)) {
+      cached = { ...cached, CORS_ORIGINS: cached.APP_URL };
+    }
   }
   return cached;
+}
+
+/** URL absoluta de la SPA (correos, Stripe, redirecciones). */
+export function appUrl(path = '/') {
+  const base = env().APP_URL.replace(/\/$/, '');
+  if (!path || path === '/') return base;
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
 }
 
 /** Sólo para tests. */

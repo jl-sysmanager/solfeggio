@@ -44,7 +44,7 @@ export const NAV: NavGroup[] = [
   {
     label: 'Gestión',
     items: [
-      { to: '/members', icon: 'users', label: 'Socios', perm: ['members:read'], feature: 'members' },
+      { to: '/members', icon: 'users', label: 'Miembros', perm: ['members:read'], feature: 'members' },
       { to: '/communications', icon: 'megaphone', label: 'Comunicaciones', perm: ['communications:send'], feature: 'communications' },
       { to: '/documents', icon: 'file', label: 'Documentos', perm: ['documents:read'], feature: 'members' },
       { to: '/treasury', icon: 'wallet', label: 'Tesorería', perm: ['finance:read'], feature: 'treasury' },

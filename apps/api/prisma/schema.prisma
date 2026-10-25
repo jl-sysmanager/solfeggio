@@ -396,6 +396,17 @@ model Section {
   @@map("sections")
 }
 
+/// Nombres de instrumento configurables por banda (selectores de ficha, escuela, etc.).
+model InstrumentCatalogItem {
+  id       String @id @default(uuid()) @db.Uuid
+  tenantId String @map("tenant_id") @db.Uuid
+  name     String
+  position Int    @default(0)
+
+  @@unique([tenantId, name])
+  @@map("instrument_catalog")
+}
+
 model Member {
   id            String       @id @default(uuid()) @db.Uuid
   tenantId      String       @map("tenant_id") @db.Uuid

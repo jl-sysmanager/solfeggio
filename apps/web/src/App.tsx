@@ -77,7 +77,7 @@ export function App() {
       <Route path="/account" element={<Shell tenant={false}><Security /></Shell>} />
       <Route path="/security" element={<Navigate to="/account?tab=seguridad" replace />} />
 
-      <Route path="/members" element={<Mod perm={['members:read']} feature="members" title="Socios"><Members /></Mod>} />
+      <Route path="/members" element={<Mod perm={['members:read']} feature="members" title="Miembros"><Members /></Mod>} />
       <Route path="/access" element={<Navigate to="/members?access=users" replace />} />
       <Route path="/members/:id" element={<Mod perm={['members:read']} feature="members" title="Socio"><MemberDetail /></Mod>} />
       <Route path="/communications" element={<Mod perm={['communications:send']} feature="communications" title="Comunicaciones"><Communications /></Mod>} />

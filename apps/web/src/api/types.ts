@@ -74,6 +74,13 @@ export interface Section {
   position: number;
 }
 
+/** Entrada del catálogo de instrumentos de la banda (`GET /instrument-catalog`). */
+export interface InstrumentCatalogItem {
+  id: string;
+  name: string;
+  position: number;
+}
+
 export type MemberStatus = 'ACTIVE' | 'INACTIVE' | 'LEFT';
 export type MemberAccess =
   | { kind: 'member_only' }

@@ -22,7 +22,7 @@ describe('gating de navegación', () => {
     expect(links).toContain('Archivo musical');
     expect(links).toContain('Ensayos y actuaciones');
     expect(links).not.toContain('Tesorería');
-    expect(links).not.toContain('Socios');
+    expect(links).not.toContain('Miembros');
     expect(links).not.toContain('Ajustes');
     expect(links).not.toContain('Plan y facturación');
     expect(links).not.toContain('Panel global');
@@ -41,7 +41,7 @@ describe('gating de navegación', () => {
       plan: { code: 'BASIC', name: 'Basic', features: ['members', 'archive', 'events', 'attendance', 'treasury'], maxUsers: 20, maxMembers: 150, storageMb: 10 * 1024 },
     });
     renderWithProviders(<AppShell>x</AppShell>, { session });
-    expect(navLinks()).toEqual(expect.arrayContaining(['Tesorería', 'Socios']));
+    expect(navLinks()).toEqual(expect.arrayContaining(['Tesorería', 'Miembros']));
   });
 
   it('con Escuela activa en el plan, el propietario ve la entrada Escuela de música', () => {
@@ -57,7 +57,7 @@ describe('gating de navegación', () => {
       },
     });
     renderWithProviders(<AppShell>x</AppShell>, { session });
-    expect(navLinks()).toEqual(expect.arrayContaining(['Escuela de música', 'Socios', 'Archivo musical']));
+    expect(navLinks()).toEqual(expect.arrayContaining(['Escuela de música', 'Miembros', 'Archivo musical']));
   });
 
   describe('menú por rol', () => {
@@ -75,21 +75,21 @@ describe('gating de navegación', () => {
     it('el profesorado ve la escuela pero no la secretaría ni la tesorería', () => {
       const l = labels(['archive:read', 'events:read', 'school:read', 'school:teach']);
       expect(l).toEqual(expect.arrayContaining(['Escuela de música', 'Bolsa de refuerzos']));
-      expect(l).not.toContain('Socios');
+      expect(l).not.toContain('Miembros');
       expect(l).not.toContain('Tesorería');
       expect(l).not.toContain('Portal de familias');
     });
 
-    it('quien gestiona socios ve Socios en Gestión (el acceso a la app se gestiona ahí)', () => {
+    it('quien gestiona miembros ve Miembros en Gestión (el acceso a la app se gestiona ahí)', () => {
       const l = labels(['members:read']);
-      expect(l).toContain('Socios');
-      expect(l).not.toContain('Miembros');
+      expect(l).toContain('Miembros');
+      expect(l).not.toContain('Socios');
     });
 
     it('un archivero ve el archivo y los ensayos, no la gestión', () => {
       const l = labels(['archive:read', 'archive:write', 'events:read', 'attendance:self', 'governance:read']);
       expect(l).toEqual(expect.arrayContaining(['Archivo musical', 'Ensayos y actuaciones', 'Gobierno']));
-      expect(l).not.toContain('Socios');
+      expect(l).not.toContain('Miembros');
       expect(l).not.toContain('Ajustes');
     });
   });

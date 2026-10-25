@@ -11,6 +11,7 @@ import { StatusChip } from '../components/Chip';
 import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { FormError, SelectField, TextAreaField, TextField, formValues } from '../components/Field';
+import { InstrumentField } from '../components/InstrumentField';
 import { Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
 import { fullName, money, parseMoney } from '../lib/format';
@@ -52,7 +53,7 @@ export function InstrumentModal({ open, onClose, instrument }: { open: boolean; 
       >
         <div className="form-row">
           <TextField label="Código de inventario" name="inventoryCode" required defaultValue={instrument?.inventoryCode} placeholder="TUB-003" />
-          <TextField label="Tipo" name="type" required defaultValue={instrument?.type} placeholder="Tuba en Si♭" />
+          <InstrumentField label="Tipo" name="type" required defaultValue={instrument?.type ?? ''} placeholder="Elige tipo" />
         </div>
         <div className="form-row">
           <TextField label="Marca" name="brand" defaultValue={instrument?.brand ?? ''} />

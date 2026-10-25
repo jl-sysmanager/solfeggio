@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import nodemailer, { Transporter } from 'nodemailer';
 import { sha256 } from '../common/crypto';
+import { appUrl } from '../config/env';
 import { renderBrandedEmail } from './email-layout';
 import { IntegrationsService } from './integrations.service';
 import { ResolvedIntegration } from './registry';
@@ -51,7 +52,7 @@ export class Mailer {
       to: clean(msg.to),
       subject,
       text: msg.text,
-      html: msg.html ?? renderBrandedEmail({ subject, text: msg.text, homeUrl: process.env.APP_URL }),
+      html: msg.html ?? renderBrandedEmail({ subject, text: msg.text, homeUrl: appUrl() }),
       replyTo: c.replyTo ? clean(c.replyTo) : undefined,
     };
 

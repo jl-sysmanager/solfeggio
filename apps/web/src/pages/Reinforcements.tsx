@@ -20,6 +20,7 @@ import { Chip, StatusChip, Tag } from '../components/Chip';
 import { DataTable, Pagination } from '../components/DataTable';
 import { EmptyState, ErrorNote, Loading } from '../components/EmptyState';
 import { Checkbox, FormError, SelectField, TextAreaField, TextField, formValues } from '../components/Field';
+import { InstrumentField } from '../components/InstrumentField';
 import { Menu } from '../components/Menu';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
@@ -282,7 +283,7 @@ function RequestModal({ open, onClose, request }: { open: boolean; onClose: () =
         )}
         <TextField label="Título" required minLength={3} maxLength={160} {...bind('title')} />
         <div className="form-row">
-          <TextField label="Instrumento" required maxLength={60} {...bind('instrument')} />
+          <InstrumentField label="Instrumento" name="instrument" required {...bind('instrument')} />
           <TextField label="Plazas" type="number" min={1} max={50} required {...bind('quantity')} />
         </div>
         <div className="form-row">
@@ -527,7 +528,7 @@ function ExternalModal({ musician, onClose }: { musician: ExternalMusician | nul
           <TextField label="Apellidos" name="lastName" maxLength={120} defaultValue={m?.lastName} />
         </div>
         <div className="form-row">
-          <TextField label="Instrumento" name="instrument" maxLength={60} defaultValue={m?.instrument ?? ''} />
+          <InstrumentField name="instrument" defaultValue={m?.instrument ?? ''} />
           <TextField label="Teléfono" name="phone" maxLength={30} defaultValue={m?.phone ?? ''} />
         </div>
         <TextField label="Email" name="email" type="email" defaultValue={m?.email ?? ''} />

@@ -8,6 +8,7 @@ import { Card } from '../Card';
 import { Chip } from '../Chip';
 import { ErrorNote, Loading } from '../EmptyState';
 import { Checkbox, FormError } from '../Field';
+import { InstrumentField } from '../InstrumentField';
 import { Modal } from '../Modal';
 
 interface Row {
@@ -45,7 +46,12 @@ function RequirementsModal({ eventId, staffing, open, onClose }: { eventId: stri
         <ul className="list-plain stack">
           {rows.map((r, i) => (
             <li key={i} className="row">
-              <input className="input" aria-label={`Instrumento ${i + 1}`} placeholder="Trompeta" value={r.instrument} maxLength={60} onChange={(e) => set(i, { instrument: e.target.value })} />
+              <InstrumentField
+                label={`Instrumento ${i + 1}`}
+                value={r.instrument}
+                onChange={(e) => set(i, { instrument: e.target.value })}
+                placeholder="Elige instrumento"
+              />
               <input
                 className="input"
                 style={{ maxWidth: 90 }}

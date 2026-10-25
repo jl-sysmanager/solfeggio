@@ -15,7 +15,7 @@ FROM nginx:1.27-alpine AS runtime
 ENV PORT=80 \
     API_UPSTREAM=http://api:3000 \
     API_HOST='$host' \
-    S3_ORIGIN=http://localhost:9000 \
+    S3_ORIGIN="http://localhost:9000 https://*.t3.storageapi.dev https://t3.storageapi.dev https://*.storage.railway.app https://storage.railway.app" \
     NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
 COPY apps/web/nginx.conf /etc/nginx/templates/default.conf.template
 COPY --from=build /repo/apps/web/dist /usr/share/nginx/html

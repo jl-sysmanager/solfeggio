@@ -3,7 +3,7 @@ import * as argon2 from 'argon2';
 import { authenticator } from 'otplib';
 import * as QRCode from 'qrcode';
 import { decrypt, encrypt, randomToken, sha256 } from '../common/crypto';
-import { env } from '../config/env';
+import { appUrl } from '../config/env';
 import { Db } from '../db/db.service';
 import { Jobs } from '../jobs/jobs.service';
 import { Audit } from '../audit/audit.service';
@@ -225,20 +225,15 @@ export class AuthService {
     };
   }
 
-  async updateProfile(userId: string, data: { name: string }) {
-    const user = await this.db.system.user.update({
-      where: { id: userId },
-      data: { name: data.name.trim() },
-      select: { id: true, email: true, name: true, mfaEnabled: true },
-    });
-    return user;
-  }
-
-  /** Autogestión de la ficha vinculada (sin permiso members:write). */
-  async updateMyMember(
+  /**
+   * Actualiza el perfil unificado: nombre de cuenta y, si hay ficha de socio en la banda activa,
+   * los mismos datos personales (sin duplicar nombre/apellidos).
+   */
+  async updateProfile(
     userId: string,
-    tenantId: string,
+    tenantId: string | null,
     data: {
+      name?: string;
       firstName?: string;
       lastName?: string;
       phone?: string | null;
@@ -247,46 +242,47 @@ export class AuthService {
       consentImages?: boolean;
     },
   ) {
-    if (!tenantId) throw new BadRequestException({ message: 'Selecciona una banda', code: 'TENANT_REQUIRED' });
-    return this.db.tenant(tenantId, async (tx) => {
-      const membership = await tx.membership.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
-      if (!membership?.memberId) {
-        throw new BadRequestException({ message: 'Tu cuenta no está vinculada a una ficha de socio', code: 'NO_MEMBER_LINK' });
-      }
-      const current = await tx.member.findUniqueOrThrow({ where: { id: membership.memberId } });
-      if (current.anonymizedAt) throw new BadRequestException({ message: 'La ficha está anonimizada', code: 'ANONYMIZED' });
-      const updated = await tx.member.update({
-        where: { id: membership.memberId },
-        data: {
-          ...(data.firstName !== undefined && { firstName: data.firstName.trim() }),
-          ...(data.lastName !== undefined && { lastName: data.lastName.trim() }),
-          ...(data.phone !== undefined && { phone: data.phone }),
-          ...(data.address !== undefined && { address: data.address }),
-          ...(data.instrument !== undefined && { instrument: data.instrument }),
-          ...(data.consentImages !== undefined && { consentImages: data.consentImages }),
-        },
-        select: {
-          id: true,
-          memberNumber: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          phone: true,
-          address: true,
-          instrument: true,
-          consentImages: true,
-          photoKey: true,
-          section: { select: { id: true, name: true } },
-        },
+    const displayName =
+      data.firstName !== undefined && data.lastName !== undefined
+        ? `${data.firstName.trim()} ${data.lastName.trim()}`.trim()
+        : data.name?.trim();
+    if (displayName) {
+      await this.db.system.user.update({ where: { id: userId }, data: { name: displayName } });
+    }
+
+    const memberFields =
+      data.firstName !== undefined ||
+      data.lastName !== undefined ||
+      data.phone !== undefined ||
+      data.address !== undefined ||
+      data.instrument !== undefined ||
+      data.consentImages !== undefined;
+
+    if (memberFields) {
+      if (!tenantId) throw new BadRequestException({ message: 'Selecciona una banda', code: 'TENANT_REQUIRED' });
+      await this.db.tenant(tenantId, async (tx) => {
+        const membership = await tx.membership.findUnique({ where: { tenantId_userId: { tenantId, userId } } });
+        if (!membership?.memberId) {
+          throw new BadRequestException({ message: 'Tu cuenta no está vinculada a una ficha de socio', code: 'NO_MEMBER_LINK' });
+        }
+        const current = await tx.member.findUniqueOrThrow({ where: { id: membership.memberId } });
+        if (current.anonymizedAt) throw new BadRequestException({ message: 'La ficha está anonimizada', code: 'ANONYMIZED' });
+        await tx.member.update({
+          where: { id: membership.memberId },
+          data: {
+            ...(data.firstName !== undefined && { firstName: data.firstName.trim() }),
+            ...(data.lastName !== undefined && { lastName: data.lastName.trim() }),
+            ...(data.phone !== undefined && { phone: data.phone }),
+            ...(data.address !== undefined && { address: data.address }),
+            ...(data.instrument !== undefined && { instrument: data.instrument }),
+            ...(data.consentImages !== undefined && { consentImages: data.consentImages }),
+          },
+        });
+        await this.audit.log(tx, { tenantId, userId }, 'member.self_updated', 'member', membership.memberId, data);
       });
-      await this.audit.log(tx, { tenantId, userId }, 'member.self_updated', 'member', updated.id, data);
-      const { photoKey, ...rest } = updated;
-      return {
-        ...rest,
-        hasPhoto: !!photoKey,
-        photoUrl: photoKey ? await this.storage.viewUrl(photoKey) : null,
-      };
-    });
+    }
+
+    return this.getProfile(userId, tenantId);
   }
 
   private async assertPassword(userId: string, password: string) {
@@ -385,7 +381,7 @@ export class AuthService {
       subject: 'Recupera tu contraseña de Solfeamos',
       text:
         `Hemos recibido una solicitud para cambiar la contraseña de tu cuenta.\n\n` +
-        `Elige una nueva aquí (el enlace caduca en 1 hora y sólo puede usarse una vez):\n${env().APP_URL}/reset-password/${token}\n\n` +
+        `Elige una nueva aquí (el enlace caduca en 1 hora y sólo puede usarse una vez):\n${appUrl(`/reset-password/${token}`)}\n\n` +
         `Si no has sido tú, ignora este mensaje. Tu contraseña no cambia.`,
     });
   }

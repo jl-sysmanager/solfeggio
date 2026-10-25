@@ -11,6 +11,7 @@ import { Chip, StatusChip } from '../components/Chip';
 import { DataTable, Pagination } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { Checkbox, FormError, SelectField, TextAreaField, TextField, formValues } from '../components/Field';
+import { InstrumentField } from '../components/InstrumentField';
 import { Menu } from '../components/Menu';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
@@ -74,7 +75,7 @@ export function MemberFormModal({ open, onClose, member }: { open: boolean; onCl
           <TextField label="Teléfono" name="phone" type="tel" defaultValue={member?.phone ?? ''} />
         </div>
         <div className="form-row">
-          <TextField label="Instrumento" name="instrument" defaultValue={member?.instrument ?? ''} />
+          <InstrumentField name="instrument" defaultValue={member?.instrument ?? ''} />
           <SelectField
             label="Sección"
             name="sectionId"
@@ -339,7 +340,7 @@ export default function MembersPage() {
       header={
         <PageHeader
           eyebrow="Gestión"
-          title="Socios"
+          title="Miembros"
           description="Fichas de la banda y acceso a la app. El propietario es socio y usuario; al invitar a alguien puedes crear su ficha a la vez."
           actions={
             <div className="row" style={{ gap: 8 }}>

@@ -8,7 +8,7 @@ import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
-import { env } from '../config/env';
+import { appUrl } from '../config/env';
 import { Db } from '../db/db.service';
 import { Jobs } from '../jobs/jobs.service';
 import { blockUser, moderationKpis, unblockUser } from './moderation.util';
@@ -164,7 +164,7 @@ export class AdminSupportController {
       const agent = await this.db.system.user.findUniqueOrThrow({ where: { id: body.assigneeId }, select: { email: true } });
       await this.jobs.add('email.send', {
         to: agent.email, subject: `[Asignada] P${updated.priority} ${inc.subject}`,
-        text: `Se te ha asignado la incidencia «${inc.subject}».\n\n${env().APP_URL}/admin`,
+        text: `Se te ha asignado la incidencia «${inc.subject}».\n\n${appUrl('/admin')}`,
       });
     }
     if (inc.openedById && body.status && body.status !== inc.status && (body.status === 'RESOLVED' || body.status === 'CLOSED')) {

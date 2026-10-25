@@ -24,6 +24,19 @@ export const MIME_GROUPS = {
 const URL_TTL_SECONDS = 300;
 const log = new Logger('Storage');
 
+/** Origen CORS canónico (sin path ni barra final). El navegador envía Origin exacto. */
+function corsOrigin(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return null;
+  try {
+    const u = new URL(t.includes('://') ? t : `https://${t}`);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Almacenamiento S3-compatible. Las claves siempre empiezan por `tenants/{tenantId}/` y se generan
  * en servidor; la confirmación de una subida valida que la clave pertenece al tenant.
@@ -64,18 +77,21 @@ export class Storage implements OnApplicationBootstrap {
       }
     }
     const origins = [...new Set(
-      [...e.CORS_ORIGINS.split(','), e.APP_URL].map((o) => o.trim()).filter(Boolean),
+      [...e.CORS_ORIGINS.split(','), e.APP_URL]
+        .map((o) => corsOrigin(o))
+        .filter((o): o is string => !!o),
     )];
     if (!origins.length) return;
-    await this.client
-      .send(
+    try {
+      await this.client.send(
         new PutBucketCorsCommand({
           Bucket: bucket,
           CORSConfiguration: {
             CORSRules: [
               {
                 AllowedOrigins: origins,
-                AllowedMethods: ['GET', 'PUT', 'HEAD'],
+                // POST: Railway documenta PUT+POST; GET/HEAD para lecturas prefirmadas.
+                AllowedMethods: ['GET', 'PUT', 'POST', 'HEAD'],
                 // * : el navegador puede enviar cabeceras extra; listar sólo Content-Type rompe algunos S3-compatibles.
                 AllowedHeaders: ['*'],
                 ExposeHeaders: ['ETag'],
@@ -84,8 +100,11 @@ export class Storage implements OnApplicationBootstrap {
             ],
           },
         }),
-      )
-      .catch((err) => log.warn(`No se pudo configurar CORS del bucket: ${err.message}`));
+      );
+      log.log(`CORS del bucket aplicado para: ${origins.join(', ')}`);
+    } catch (err) {
+      log.warn(`No se pudo configurar CORS del bucket: ${(err as Error).message}`);
+    }
   }
 
   validate(mimeType: string, sizeBytes: number, allowed: readonly string[]) {

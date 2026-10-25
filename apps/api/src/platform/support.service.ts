@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { env } from '../config/env';
+import { appUrl } from '../config/env';
 import { Db } from '../db/db.service';
 import { Jobs } from '../jobs/jobs.service';
 import { median, pct, SLA_AT_RISK_MS } from './support.util';
@@ -43,7 +43,7 @@ export class SupportService {
           subject: `[SLA ${overdue ? 'vencido' : 'en riesgo'}] P${inc.priority} ${inc.subject}`,
           text:
             `La incidencia de ${band} «${inc.subject}» ${overdue ? 'ha superado' : 'está a punto de superar'} el plazo de primera respuesta ` +
-            `(${inc.slaDueAt!.toISOString().slice(0, 16).replace('T', ' ')} UTC).\n\n${env().APP_URL}/admin (Soporte)`,
+            `(${inc.slaDueAt!.toISOString().slice(0, 16).replace('T', ' ')} UTC).\n\n${appUrl('/admin')} (Soporte)`,
         });
       }
     }

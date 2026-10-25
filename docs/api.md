@@ -42,8 +42,7 @@ Base: `/api/v1` · JSON · OpenAPI generado en `/api/docs` (Swagger UI) y `/api/
 | POST | `/auth/switch-tenant` | `{ tenantId }` | `{ accessToken, session }` |
 | GET | `/auth/me` | — | `session` |
 | GET | `/auth/profile` | — | `{ user, member? }` (ficha vinculada de la banda activa) |
-| PATCH | `/auth/profile` | `{ name }` | `{ user }` |
-| PATCH | `/auth/profile/member` | `{ firstName?, lastName?, phone?, address?, instrument?, consentImages? }` | `{ member }` · requiere banda activa y vínculo |
+| PATCH | `/auth/profile` | `{ name? }` o `{ firstName, lastName, phone?, address?, instrument?, consentImages? }` | `{ user, member }` · con ficha vinculada, nombre de cuenta = nombre + apellidos |
 | POST | `/auth/leave-tenant` | `{ password, tenantId? }` | `{ accessToken, session }` · 400 `LAST_OWNER` |
 | POST | `/auth/close-account` | `{ password, confirm: "ELIMINAR" }` | 204 · anonimiza usuario |
 | POST | `/auth/mfa/setup` | — | `{ otpauthUrl, qrDataUrl }` |
@@ -88,6 +87,7 @@ Cada ruta exige un permiso, indicado entre corchetes; algunas exigen además una
 - `GET /members/:id/export` (RGPD: acceso y portabilidad) · `POST /members/:id/anonymize` (RGPD: supresión) [members:write + members:sensitive]
 - La búsqueda `q` ignora tildes y mayúsculas (nombre, apellidos, email, instrumento o número de socio). Los campos de texto vacíos (`''`) se tratan como `null`; el consentimiento se puede enviar como `consentData: boolean` o `consentDataAt: ISO`.
 - `GET|POST /sections`, `PATCH|DELETE /sections/:id`
+- `GET|POST /instrument-catalog`, `PATCH|DELETE /instrument-catalog/:id` — nombres de instrumento de la banda (selectores; se puede dejar en blanco)
 - `GET /communications` · `POST /communications { subject, body, channel: EMAIL|IN_APP, audience: { all } | { sectionIds } | { memberIds } }` [communications:send] {communications}
 - `GET /documents?category` [documents:read] · `POST /documents/upload-url { fileName, mimeType, sizeBytes }` → `{ uploadUrl, fileKey }` · `POST /documents { title, category, fileKey, fileName, mimeType, sizeBytes, memberId? }` · `GET /documents/:id/download` → `{ url }` · `DELETE /documents/:id` [documents:write]
 
