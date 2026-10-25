@@ -127,12 +127,14 @@ export class Storage implements OnApplicationBootstrap {
     return getSignedUrl(this.signer, cmd, { expiresIn: URL_TTL_SECONDS, signableHeaders: new Set(['content-type']) });
   }
 
-  /** URL prefirmada de lectura. `inline` sirve para previsualizar en el navegador (PDF/imagen). */
-  async downloadUrl(key: string, fileName: string, inline = false) {
+  /** URL prefirmada de lectura. `inline` + `mimeType` sirven para abrir/previsualizar en el navegador. */
+  async downloadUrl(key: string, fileName: string, inline = false, mimeType?: string) {
     const disposition = `${inline ? 'inline' : 'attachment'}; filename*=UTF-8''${encodeURIComponent(fileName)}`;
     const cmd = new GetObjectCommand({
-      Bucket: env().S3_BUCKET, Key: key,
+      Bucket: env().S3_BUCKET,
+      Key: key,
       ResponseContentDisposition: disposition,
+      ...(mimeType ? { ResponseContentType: mimeType } : {}),
     });
     return getSignedUrl(this.signer, cmd, { expiresIn: URL_TTL_SECONDS });
   }

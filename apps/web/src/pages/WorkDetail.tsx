@@ -12,6 +12,7 @@ import { Tag } from '../components/Chip';
 import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { FormError, SelectField, TextAreaField, TextField, formValues } from '../components/Field';
+import { canPreviewFile, FilePreviewModal, previewActionLabel } from '../components/FilePreviewModal';
 import { Menu } from '../components/Menu';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
@@ -20,6 +21,8 @@ import { bytes, date, duration } from '../lib/format';
 import { assetKind } from '../lib/labels';
 import { uploadFile } from '../lib/upload';
 import { WorkFormModal } from './Archive';
+
+const assetDownloadPath = (id: string) => `/assets/${id}/download`;
 
 function AssetUploadModal({ work, open, onClose }: { work: Work; open: boolean; onClose: () => void }) {
   const upload = useApiMutation(
@@ -107,7 +110,7 @@ export default function WorkDetailPage() {
   const [removing, setRemoving] = useState<Asset | null>(null);
   const [deletingWork, setDeletingWork] = useState(false);
   const [splitting, setSplitting] = useState<Asset | null>(null);
-  const [audio, setAudio] = useState<{ id: string; url: string } | null>(null);
+  const [preview, setPreview] = useState<Asset | null>(null);
 
   const removeAsset = useApiMutation((assetId: string) => del(`/assets/${assetId}`), {
     success: 'Fichero eliminado',
@@ -123,11 +126,15 @@ export default function WorkDetailPage() {
   async function download(a: Asset) {
     try {
       const { url } = await get<{ url: string }>(`/assets/${a.id}/download`);
-      if (a.kind === 'AUDIO') setAudio({ id: a.id, url });
-      else window.open(url, '_blank', 'noopener');
+      window.open(url, '_blank', 'noopener');
     } catch (e) {
       toast.error(e);
     }
+  }
+
+  function openAsset(a: Asset) {
+    if (canPreviewFile(a.mimeType)) setPreview(a);
+    else void download(a);
   }
 
   if (q.isLoading) return <Loading />;
@@ -207,20 +214,12 @@ export default function WorkDetailPage() {
       </div>
 
       <Card title="Partituras, particellas y audios">
-        {audio && (
-          <div className="stack" style={{ marginBottom: 16 }}>
-            {/* Grabaciones de ensayo/referencia: no existen subtítulos para música instrumental. */}
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio controls src={audio.url} autoPlay style={{ width: '100%' }}>
-              Tu navegador no reproduce audio.
-            </audio>
-          </div>
-        )}
         <DataTable
           caption="Ficheros de la obra"
           rows={w.assets ?? []}
           rowKey={(a) => a.id}
           empty="Aún no hay ficheros. Sube la partitura general y las particellas."
+          onRowClick={(a) => openAsset(a)}
           columns={[
             { key: 'k', header: 'Tipo', render: (a) => assetKind[a.kind] },
             { key: 'i', header: 'Instrumento', render: (a) => a.instrument ?? '—' },
@@ -231,21 +230,24 @@ export default function WorkDetailPage() {
             {
               key: 'a',
               header: 'Acciones',
-              render: (a) =>
-                write ? (
+              render: (a) => {
+                const viewLabel = previewActionLabel(a.mimeType);
+                return write ? (
                   <Menu
                     label={`Acciones de ${a.fileName}`}
                     items={[
-                      { label: a.kind === 'AUDIO' ? 'Escuchar' : 'Abrir', onSelect: () => download(a) },
+                      { label: viewLabel, onSelect: () => openAsset(a) },
+                      { label: 'Descargar', onSelect: () => void download(a) },
                       ...(canSplit && splittable(a) ? [{ label: 'Dividir en particellas', onSelect: () => setSplitting(a) }] : []),
                       { label: 'Eliminar archivo', onSelect: () => setRemoving(a), danger: true },
                     ]}
                   />
                 ) : (
-                  <Button size="sm" variant="ghost" onClick={() => download(a)} aria-label={`${a.kind === 'AUDIO' ? 'Escuchar' : 'Abrir'} ${a.fileName}`}>
-                    {a.kind === 'AUDIO' ? 'Escuchar' : 'Abrir'}
+                  <Button size="sm" variant="ghost" onClick={() => openAsset(a)} aria-label={`${viewLabel} ${a.fileName}`}>
+                    {viewLabel}
                   </Button>
-                ),
+                );
+              },
             },
           ]}
         />
@@ -267,6 +269,20 @@ export default function WorkDetailPage() {
       <AssetUploadModal work={w} open={uploading} onClose={() => setUploading(false)} />
       <PartSplitModal key={splitting?.id ?? 'none'} work={w} asset={splitting} open={!!splitting} onClose={() => setSplitting(null)} />
       <VersionModal work={w} open={versioning} onClose={() => setVersioning(false)} />
+      <FilePreviewModal
+        file={
+          preview
+            ? {
+                id: preview.id,
+                title: preview.instrument ? `${assetKind[preview.kind]} · ${preview.instrument}` : assetKind[preview.kind],
+                fileName: preview.fileName,
+                mimeType: preview.mimeType,
+              }
+            : null
+        }
+        downloadPath={assetDownloadPath}
+        onClose={() => setPreview(null)}
+      />
       <ConfirmModal
         open={!!removing}
         title="Eliminar fichero"

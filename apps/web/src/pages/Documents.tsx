@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { del, get, post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
 import type { DocumentItem, Paginated } from '../api/types';
@@ -9,6 +9,7 @@ import { Tag } from '../components/Chip';
 import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { FormError, SelectField, TextField, formValues } from '../components/Field';
+import { FilePreviewModal } from '../components/FilePreviewModal';
 import { Menu } from '../components/Menu';
 import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
@@ -18,73 +19,11 @@ import { uploadFile } from '../lib/upload';
 
 const CATEGORIES = ['Actas', 'Estatutos', 'Contratos', 'Subvenciones', 'Seguros', 'Socios', 'Otros'];
 
-const PREVIEWABLE = /^(application\/pdf|image\/(png|jpeg|jpg|webp|gif))$/i;
+const documentDownloadPath = (id: string) => `/documents/${id}/download`;
 
 export async function openDownload(path: string) {
   const { url } = await get<{ url: string }>(path);
   window.open(url, '_blank', 'noopener');
-}
-
-function DocumentPreviewModal({ doc, onClose }: { doc: DocumentItem | null; onClose: () => void }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<unknown>(null);
-  const canPreview = !!doc && PREVIEWABLE.test(doc.mimeType);
-
-  useEffect(() => {
-    if (!doc) {
-      setUrl(null);
-      setError(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    setUrl(null);
-    setError(null);
-    get<{ url: string }>(`/documents/${doc.id}/download`, { inline: canPreview ? '1' : undefined })
-      .then((r) => {
-        if (!cancelled) setUrl(r.url);
-      })
-      .catch((e) => {
-        if (!cancelled) setError(e);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [doc, canPreview]);
-
-  const isImage = !!doc && /^image\//i.test(doc.mimeType);
-
-  return (
-    <Modal open={!!doc} onClose={onClose} title={doc?.title ?? 'Documento'} size="lg">
-      {loading && <Loading />}
-      {error ? <ErrorNote error={error} /> : null}
-      {!loading && url && canPreview && (
-        <div className="doc-preview">
-          {isImage ? <img src={url} alt={doc?.title ?? ''} /> : <iframe title={doc?.title ?? 'Vista previa'} src={url} />}
-        </div>
-      )}
-      {!loading && url && !canPreview && (
-        <div className="doc-preview__fallback">
-          <p className="muted">Este tipo de fichero no se puede previsualizar en el navegador.</p>
-          <Button onClick={() => window.open(url, '_blank', 'noopener')}>Descargar {doc?.fileName}</Button>
-        </div>
-      )}
-      <div className="modal__footer">
-        <Button variant="ghost" onClick={onClose}>
-          Cerrar
-        </Button>
-        {url && (
-          <Button variant="ghost" onClick={() => window.open(url, '_blank', 'noopener')}>
-            Abrir / descargar
-          </Button>
-        )}
-      </div>
-    </Modal>
-  );
 }
 
 export default function DocumentsPage() {
@@ -188,7 +127,11 @@ export default function DocumentsPage() {
           </div>
         </form>
       </Modal>
-      <DocumentPreviewModal doc={preview} onClose={() => setPreview(null)} />
+      <FilePreviewModal
+        file={preview ? { id: preview.id, title: preview.title, fileName: preview.fileName, mimeType: preview.mimeType } : null}
+        downloadPath={documentDownloadPath}
+        onClose={() => setPreview(null)}
+      />
       <ConfirmModal
         open={!!removing}
         title="Eliminar documento"

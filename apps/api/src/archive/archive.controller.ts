@@ -221,10 +221,19 @@ export class ArchiveController {
 
   @Perm('archive:read')
   @Get('assets/:id/download')
-  downloadAsset(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+  downloadAsset(
+    @Ctx() ctx: RequestContext,
+    @Param('id', zod(idParam)) id: string,
+    @Query('inline') inline?: string,
+  ) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const asset = found(await tx.asset.findUnique({ where: { id } }), 'Archivo');
-      return { url: await this.storage.downloadUrl(asset.fileKey, asset.fileName) };
+      const asInline = inline === '1' || inline === 'true';
+      return {
+        url: await this.storage.downloadUrl(asset.fileKey, asset.fileName, asInline, asset.mimeType),
+        mimeType: asset.mimeType,
+        fileName: asset.fileName,
+      };
     });
   }
 

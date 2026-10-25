@@ -97,7 +97,7 @@ Cada ruta exige un permiso, indicado entre corchetes; algunas exigen además una
 - `POST /works/:id/versions { name, arranger?, notes? }`
 - `POST /works/:id/assets/upload-url { fileName, mimeType, sizeBytes }` → `{ uploadUrl, fileKey }`
 - `POST /works/:id/assets { kind: SCORE|PART|AUDIO|OTHER, instrument?, versionId?, fileKey, fileName, mimeType, sizeBytes }`
-- `GET /assets/:id/download` → `{ url }` (URL prefirmada, válida 5 min) · `DELETE /assets/:id`
+- `GET /assets/:id/download?inline=1` → `{ url, mimeType, fileName }` (URL prefirmada, válida 5 min; `inline` para previsualizar) · `DELETE /assets/:id`
 - `GET /tags` → `{ tag, count }[]`
 
 ### Ensayos, actuaciones y agenda {events}

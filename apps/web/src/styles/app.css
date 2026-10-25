@@ -761,6 +761,7 @@ input[type='file'].input { padding: 6px 12px; line-height: 22px; }
 }
 .modal--lg { width: min(960px, 100%); }
 .doc-preview { min-height: 60vh; display: grid; place-items: center; background: var(--surface-alt, var(--muted)); border-radius: var(--radius-md); overflow: hidden; }
+.doc-preview--audio { min-height: auto; padding: var(--space-6); }
 .doc-preview iframe, .doc-preview img { width: 100%; height: min(70vh, 800px); border: 0; object-fit: contain; }
 .doc-preview__fallback { padding: var(--space-6); text-align: center; }
 .modal__header { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }

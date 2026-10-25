@@ -123,7 +123,11 @@ export class SecretaryController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const doc = found(await tx.document.findUnique({ where: { id } }), 'Documento');
       const asInline = inline === '1' || inline === 'true';
-      return { url: await this.storage.downloadUrl(doc.fileKey, doc.fileName, asInline), mimeType: doc.mimeType, fileName: doc.fileName };
+      return {
+        url: await this.storage.downloadUrl(doc.fileKey, doc.fileName, asInline, doc.mimeType),
+        mimeType: doc.mimeType,
+        fileName: doc.fileName,
+      };
     });
   }
 
