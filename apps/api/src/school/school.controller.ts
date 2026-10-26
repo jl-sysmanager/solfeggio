@@ -5,7 +5,7 @@ import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, RequireFeature } from '../auth/decorators';
 import { encrypt, randomToken, sha256 } from '../common/crypto';
-import { found } from '../common/errors';
+import { found, PlanLimitException } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam, isoDate, isoDateTime, optionalText, text, toDate } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
@@ -36,6 +36,7 @@ const settingsSchema = z.object({
   autoIssueDay: z.number().int().min(1).max(28).nullable().optional(),
   autoIssueDueDay: z.number().int().min(1).max(28).optional(),
   notifyFamilies: z.boolean().optional(),
+  inviteOnAccept: z.boolean().optional(),
 });
 const tariffFields = z.object({ name: name80, monthlyCents: cents, active: z.boolean().optional() });
 const tariffPatch = tariffFields.partial();
@@ -176,6 +177,8 @@ const noticeSchema = z.object({ groupId: z.string().uuid().nullable().optional()
 const noticesQuery = z.object({ groupId: z.string().uuid().optional() });
 const reportQuery = z.object({ yearId: z.string().uuid().optional() });
 const overviewQuery = z.object({ yearId: z.string().uuid().optional() });
+const justificationsQuery = z.object({ yearId: z.string().uuid().optional(), status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING') });
+const reviewSchema = z.object({ approved: z.boolean() });
 
 const changedFields = (body: object) => ({ fields: Object.keys(body) });
 const groupInclude = {
@@ -212,7 +215,7 @@ export class SchoolController {
       const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { slug: true } });
       return {
         feeMode: 'PERCENT' as const, siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, familyDiscountCents: 0, publicIntro: null,
-        autoIssueDay: null, autoIssueDueDay: 5, notifyFamilies: true, ...s, slug: tenant?.slug, configured: !!s,
+        autoIssueDay: null, autoIssueDueDay: 5, notifyFamilies: true, inviteOnAccept: true, ...s, slug: tenant?.slug, configured: !!s,
       };
     });
   }
@@ -258,6 +261,13 @@ export class SchoolController {
           orderBy: { startMin: 'asc' },
         }),
       ]);
+      const write = ctx.permissions.has('school:write');
+      const [portal, pendingJustifications] = await Promise.all([
+        write ? this.guardiansWithoutPortal(tx) : Promise.resolve(null),
+        tx.classAttendance.count({
+          where: { justificationStatus: 'PENDING', session: { group: { ...groupWhere, ...(!write && { teacher: { userId: ctx.userId } }) } } },
+        }),
+      ]);
       const withoutSlots = groups.filter((g) => g._count.slots === 0).length;
       const withoutTeacher = groups.filter((g) => !g.teacherId).length;
       const capacity = groups.reduce((s, g) => s + (g.capacity ?? 0), 0);
@@ -265,8 +275,8 @@ export class SchoolController {
       const counts = {
         students, families, subjects, teachers, groups: groups.length, withoutSlots, withoutTeacher, waitlist, pendingApplications,
         conflicts: conflicts.length, occupied: groups.reduce((s, g) => s + g._count.enrollments, 0), capacity: unlimited ? null : capacity,
+        pendingJustifications, guardiansWithoutPortal: portal?.ready.length ?? 0, guardiansWithoutContact: portal?.withoutContact ?? 0,
       };
-      const write = ctx.permissions.has('school:write');
       const checklist = write
         ? [
             { id: 'year', title: 'Crea el curso escolar', detail: 'Fechas de inicio y fin y días sin clase.', to: '?tab=settings&section=cursos', done: years.length > 0 },
@@ -483,74 +493,138 @@ export class SchoolController {
   @Perm('school:write')
   @Post('guardians/:id/invite')
   async inviteGuardian(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
-    const token = randomToken(32);
-    const result = await this.db.tenant(ctx.tenantId, async (tx) => {
-      const g = found(await tx.guardian.findUnique({ where: { id } }), 'Tutor');
-      if (await tx.membership.findFirst({ where: { guardianId: id } })) {
-        throw new ConflictException({ message: 'El tutor ya tiene acceso al portal', code: 'ALREADY_LINKED' });
-      }
-
-      // Socio con cuenta en la app: se vincula sin cambiar su rol.
-      if (g.memberId) {
-        const byMember = await tx.membership.findFirst({ where: { memberId: g.memberId, status: 'ACTIVE' } });
-        if (byMember) {
-          if (byMember.guardianId) {
-            throw new ConflictException({ message: 'Ese socio ya está vinculado a otro tutor', code: 'MEMBER_ALREADY_GUARDIAN' });
-          }
-          await tx.membership.update({ where: { id: byMember.id }, data: { guardianId: id } });
-          await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
-          await this.audit.log(tx, ctx, 'guardian.linked', 'guardian', id, { membershipId: byMember.id, via: 'member' });
-          return { linked: true as const, guardianId: id, membershipId: byMember.id };
-        }
-      }
-
-      if (!g.email) throw new BadRequestException({ message: 'El tutor no tiene email', code: 'GUARDIAN_NO_EMAIL' });
-      const email = g.email.toLowerCase();
-
-      // Usuario ya en la banda con el mismo email.
-      const existingUser = await this.db.system.user.findUnique({ where: { email }, select: { id: true } });
-      if (existingUser) {
-        const byUser = await tx.membership.findUnique({ where: { tenantId_userId: { tenantId: ctx.tenantId, userId: existingUser.id } } });
-        if (byUser?.status === 'ACTIVE') {
-          if (byUser.guardianId) {
-            throw new ConflictException({ message: 'Ese usuario ya está vinculado a otro tutor', code: 'USER_ALREADY_GUARDIAN' });
-          }
-          await tx.membership.update({ where: { id: byUser.id }, data: { guardianId: id } });
-          await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
-          await this.audit.log(tx, ctx, 'guardian.linked', 'guardian', id, { membershipId: byUser.id, via: 'email' });
-          return { linked: true as const, guardianId: id, membershipId: byUser.id };
-        }
-      }
-
-      await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
-      await this.limits.assertCanAddUser(tx, ctx.tenantId);
-      const role = await tx.role.findUnique({ where: { tenantId_key: { tenantId: ctx.tenantId, key: 'family' } } });
-      if (!role) throw new BadRequestException({ message: 'No existe el rol Familia', code: 'ROLE_MISSING' });
-      // Sólo asociar memberId si nadie más lo tiene ya en una membresía.
-      const memberTaken = g.memberId ? await tx.membership.findFirst({ where: { memberId: g.memberId } }) : null;
-      const inv = await tx.invitation.create({
-        data: {
-          tenantId: ctx.tenantId,
-          email,
-          roleId: role.id,
-          guardianId: id,
-          memberId: g.memberId && !memberTaken ? g.memberId : undefined,
-          tokenHash: sha256(token),
-          invitedBy: ctx.userId,
-          expiresAt: new Date(Date.now() + 7 * 86_400_000),
-        },
-      });
-      await this.audit.log(tx, ctx, 'invitation.created', 'invitation', inv.id, { guardianId: id, role: role.key });
-      return { linked: false as const, id: inv.id, email, roleId: role.id, guardianId: id, expiresAt: inv.expiresAt, token };
-    });
-
+    const result = await this.db.tenant(ctx.tenantId, (tx) => this.grantPortal(tx, ctx, id));
     if (result.linked) return { linked: true, guardianId: result.guardianId, membershipId: result.membershipId };
-
-    const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
-    const existing = await this.db.system.user.findUnique({ where: { email: result.email }, select: { id: true } });
-    await this.jobs.add('email.send', { to: result.email, ...invitationEmail(tenant.name, result.token, !!existing) });
+    await this.sendInvitations(ctx, [result]);
     const { token: _t, ...publicResult } = result;
     return publicResult;
+  }
+
+  /**
+   * Da acceso al portal a todos los tutores que aún no lo tienen (con email o socio vinculado y sin
+   * invitación vigente). Se para si el plan no admite más usuarios y lo indica.
+   */
+  @Perm('school:write')
+  @HttpCode(200)
+  @Post('guardians/invite-all')
+  async inviteAllGuardians(@Ctx() ctx: RequestContext) {
+    const { results, skipped, limitReached } = await this.db.tenant(ctx.tenantId, async (tx) => {
+      const pending = await this.guardiansWithoutPortal(tx);
+      const results: Awaited<ReturnType<SchoolController['grantPortal']>>[] = [];
+      let limitReached = false;
+      let unreachable = 0;
+      for (const g of pending.ready) {
+        try {
+          results.push(await this.grantPortal(tx, ctx, g.id));
+        } catch (e) {
+          if (e instanceof PlanLimitException) {
+            limitReached = true;
+            break;
+          }
+          // Ya vinculado o socio sin email: se cuenta como no invitable y se sigue.
+          if (e instanceof ConflictException || e instanceof BadRequestException) {
+            unreachable++;
+            continue;
+          }
+          throw e;
+        }
+      }
+      await this.audit.log(tx, ctx, 'guardian.invited_all', 'guardian', null, { granted: results.length, limitReached });
+      return { results, skipped: pending.withoutContact + unreachable, limitReached };
+    });
+    await this.sendInvitations(ctx, results.filter((r): r is Extract<typeof r, { linked: false }> => !r.linked));
+    return {
+      linked: results.filter((r) => r.linked).length,
+      invited: results.filter((r) => !r.linked).length,
+      withoutEmail: skipped,
+      limitReached,
+    };
+  }
+
+  /** Tutores sin acceso al portal ni invitación vigente; los que no tienen email ni socio no se pueden invitar. */
+  private async guardiansWithoutPortal(tx: Tx) {
+    const [guardians, linked, invited] = await Promise.all([
+      tx.guardian.findMany({ where: { family: { students: { some: { status: { not: 'LEFT' } } } } }, select: { id: true, email: true, memberId: true } }),
+      tx.membership.findMany({ where: { guardianId: { not: null } }, select: { guardianId: true } }),
+      tx.invitation.findMany({ where: { guardianId: { not: null }, acceptedAt: null, expiresAt: { gt: new Date() } }, select: { guardianId: true } }),
+    ]);
+    const done = new Set([...linked, ...invited].map((x) => x.guardianId));
+    const open = guardians.filter((g) => !done.has(g.id));
+    return { ready: open.filter((g) => g.email || g.memberId), withoutContact: open.filter((g) => !g.email && !g.memberId).length, total: open.length };
+  }
+
+  private async sendInvitations(ctx: RequestContext, invitations: { email: string; token: string }[]) {
+    if (!invitations.length) return;
+    const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
+    for (const inv of invitations) {
+      const existing = await this.db.system.user.findUnique({ where: { email: inv.email }, select: { id: true } });
+      await this.jobs.add('email.send', { to: inv.email, ...invitationEmail(tenant.name, inv.token, !!existing) });
+    }
+  }
+
+  /**
+   * Vincula al tutor con un usuario de la banda (mismo socio o mismo email) o crea la invitación con
+   * rol Familia. Devuelve el token en claro para enviarlo fuera de la transacción.
+   */
+  private async grantPortal(tx: Tx, ctx: RequestContext, id: string) {
+    const token = randomToken(32);
+    const g = found(await tx.guardian.findUnique({ where: { id } }), 'Tutor');
+    if (await tx.membership.findFirst({ where: { guardianId: id } })) {
+      throw new ConflictException({ message: 'El tutor ya tiene acceso al portal', code: 'ALREADY_LINKED' });
+    }
+
+    // Socio con cuenta en la app: se vincula sin cambiar su rol.
+    if (g.memberId) {
+      const byMember = await tx.membership.findFirst({ where: { memberId: g.memberId, status: 'ACTIVE' } });
+      if (byMember) {
+        if (byMember.guardianId) {
+          throw new ConflictException({ message: 'Ese socio ya está vinculado a otro tutor', code: 'MEMBER_ALREADY_GUARDIAN' });
+        }
+        await tx.membership.update({ where: { id: byMember.id }, data: { guardianId: id } });
+        await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
+        await this.audit.log(tx, ctx, 'guardian.linked', 'guardian', id, { membershipId: byMember.id, via: 'member' });
+        return { linked: true as const, guardianId: id, membershipId: byMember.id };
+      }
+    }
+
+    if (!g.email) throw new BadRequestException({ message: 'El tutor no tiene email', code: 'GUARDIAN_NO_EMAIL' });
+    const email = g.email.toLowerCase();
+
+    // Usuario ya en la banda con el mismo email.
+    const existingUser = await this.db.system.user.findUnique({ where: { email }, select: { id: true } });
+    if (existingUser) {
+      const byUser = await tx.membership.findUnique({ where: { tenantId_userId: { tenantId: ctx.tenantId, userId: existingUser.id } } });
+      if (byUser?.status === 'ACTIVE') {
+        if (byUser.guardianId) {
+          throw new ConflictException({ message: 'Ese usuario ya está vinculado a otro tutor', code: 'USER_ALREADY_GUARDIAN' });
+        }
+        await tx.membership.update({ where: { id: byUser.id }, data: { guardianId: id } });
+        await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
+        await this.audit.log(tx, ctx, 'guardian.linked', 'guardian', id, { membershipId: byUser.id, via: 'email' });
+        return { linked: true as const, guardianId: id, membershipId: byUser.id };
+      }
+    }
+
+    await tx.invitation.deleteMany({ where: { guardianId: id, acceptedAt: null } });
+    await this.limits.assertCanAddUser(tx, ctx.tenantId);
+    const role = await tx.role.findUnique({ where: { tenantId_key: { tenantId: ctx.tenantId, key: 'family' } } });
+    if (!role) throw new BadRequestException({ message: 'No existe el rol Familia', code: 'ROLE_MISSING' });
+    // Sólo asociar memberId si nadie más lo tiene ya en una membresía.
+    const memberTaken = g.memberId ? await tx.membership.findFirst({ where: { memberId: g.memberId } }) : null;
+    const inv = await tx.invitation.create({
+      data: {
+        tenantId: ctx.tenantId,
+        email,
+        roleId: role.id,
+        guardianId: id,
+        memberId: g.memberId && !memberTaken ? g.memberId : undefined,
+        tokenHash: sha256(token),
+        invitedBy: ctx.userId,
+        expiresAt: new Date(Date.now() + 7 * 86_400_000),
+      },
+    });
+    await this.audit.log(tx, ctx, 'invitation.created', 'invitation', inv.id, { guardianId: id, role: role.key });
+    return { linked: false as const, id: inv.id, email, roleId: role.id, guardianId: id, expiresAt: inv.expiresAt, token };
   }
 
   /** Vincula un usuario ya activo de la banda como tutor del portal (sin cambiar su rol). */
@@ -1282,7 +1356,7 @@ export class SchoolController {
   @HttpCode(200)
   @Post('applications/:id/accept')
   async accept(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(acceptSchema)) body: z.infer<typeof acceptSchema>) {
-    const { result, email } = await this.db.tenant(ctx.tenantId, async (tx) => {
+    const { result, email, invitation } = await this.db.tenant(ctx.tenantId, async (tx) => {
       const app = found(await tx.enrollmentApplication.findUnique({ where: { id } }), 'Solicitud');
       if (app.status === 'ACCEPTED' || app.status === 'REJECTED') throw new BadRequestException({ message: 'La solicitud ya está resuelta', code: 'APPLICATION_CLOSED' });
       const groups = await tx.classGroup.findMany({ where: { id: { in: body.groupIds } } });
@@ -1313,20 +1387,54 @@ export class SchoolController {
         const g = groups.find((x) => x.id === e.groupId)!;
         return `- ${g.name}: ${e.status === 'ACTIVE' ? 'plaza confirmada' : 'en lista de espera'}`;
       });
-      return { result: { application: updated, student, enrollments }, email: await this.applicantEmail(tx, ctx, app, 'ACCEPTED', lines) };
+      const portal = await this.portalOnAccept(tx, ctx, student.familyId, app.guardianEmail);
+      return {
+        result: { application: updated, student, enrollments, portal: portal?.linked ? 'linked' : portal ? 'invited' : 'none' },
+        email: await this.applicantEmail(tx, ctx, app, 'ACCEPTED', lines, portal ? (portal.linked ? 'linked' : 'invited') : 'none'),
+        invitation: portal && !portal.linked ? portal : null,
+      };
     });
     // Se encola tras confirmar la transacción para no avisar de algo que no se ha guardado.
     if (email) await this.jobs.add('email.send', email);
+    if (invitation) await this.sendInvitations(ctx, [invitation]);
     return result;
   }
 
+  /**
+   * Acceso al portal para el tutor de la solicitud aceptada (si la escuela lo tiene activado). No
+   * bloquea la aceptación: si ya tiene acceso, no tiene email o el plan no admite más usuarios, sigue.
+   */
+  private async portalOnAccept(tx: Tx, ctx: RequestContext, familyId: string | null, guardianEmail: string) {
+    const settings = await tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId }, select: { inviteOnAccept: true } });
+    if (settings?.inviteOnAccept === false || !familyId) return null;
+    const guardian = await tx.guardian.findFirst({ where: { familyId, email: guardianEmail.toLowerCase() } });
+    if (!guardian) return null;
+    const pending = await tx.invitation.findFirst({ where: { guardianId: guardian.id, acceptedAt: null, expiresAt: { gt: new Date() } } });
+    if (pending) return null;
+    try {
+      return await this.grantPortal(tx, ctx, guardian.id);
+    } catch (e) {
+      if (e instanceof ConflictException || e instanceof BadRequestException || e instanceof PlanLimitException) return null;
+      throw e;
+    }
+  }
+
   /** Email al tutor que hizo la solicitud cuando se resuelve (si la escuela avisa a las familias). */
-  private async applicantEmail(tx: Tx, ctx: RequestContext, app: { studentFirstName: string; guardianEmail: string }, status: 'ACCEPTED' | 'WAITLISTED' | 'REJECTED', lines: string[] = []) {
+  private async applicantEmail(
+    tx: Tx,
+    ctx: RequestContext,
+    app: { studentFirstName: string; guardianEmail: string },
+    status: 'ACCEPTED' | 'WAITLISTED' | 'REJECTED',
+    lines: string[] = [],
+    portal: 'linked' | 'invited' | 'none' = 'none',
+  ) {
     const settings = await tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId }, select: { notifyFamilies: true } });
     if (settings?.notifyFamilies === false) return null;
     const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { name: true } });
     const text = {
-      ACCEPTED: `Hola:\n\nLa solicitud de matrícula de ${app.studentFirstName} en la escuela de ${tenant.name} ha sido aceptada.${lines.length ? `\n\n${lines.join('\n')}` : ''}\n\nEn breve recibiréis el acceso al portal de familias con el horario.`,
+      ACCEPTED: `Hola:\n\nLa solicitud de matrícula de ${app.studentFirstName} en la escuela de ${tenant.name} ha sido aceptada.${lines.length ? `\n\n${lines.join('\n')}` : ''}${
+        { linked: '\n\nYa podéis ver el horario y las clases en el portal de familias.', invited: '\n\nOs llegará otro email con el enlace para entrar en el portal de familias, donde veréis el horario y las clases.', none: '' }[portal]
+      }`,
       WAITLISTED: `Hola:\n\nLa solicitud de matrícula de ${app.studentFirstName} en la escuela de ${tenant.name} queda en lista de espera. Os avisaremos en cuanto haya plaza.`,
       REJECTED: `Hola:\n\nSentimos comunicaros que la solicitud de matrícula de ${app.studentFirstName} en la escuela de ${tenant.name} no ha podido aceptarse este curso. Para cualquier duda, responded a este correo o contactad con la escuela.`,
     }[status];
@@ -1422,8 +1530,28 @@ export class SchoolController {
       await assertCanTeachGroup(tx, ctx, s.groupId);
       const updated = await tx.classSession.update({ where: { id }, data: { status: 'CANCELLED', notes: body.notes ?? s.notes } });
       await this.audit.log(tx, ctx, 'class_session.cancelled', 'class_session', id);
+      return { updated, notice: await this.sessionNotice(tx, s.groupId, 'cancelled', updated) };
+    }).then(async ({ updated, notice }) => {
+      if (notice) await this.jobs.add('notify.fanout', { tenantId: ctx.tenantId, ...notice });
       return updated;
     });
+  }
+
+  /** Aviso a las familias del grupo (portal y email) cuando se cancela o se recupera una clase. */
+  private async sessionNotice(tx: Tx, groupId: string, kind: 'cancelled' | 'makeUp', s: { date: Date; startMin: number; notes: string | null }) {
+    const [userIds, group, settings] = await Promise.all([
+      familyUserIds(tx, groupId),
+      tx.classGroup.findUniqueOrThrow({ where: { id: groupId }, select: { name: true, subject: { select: { name: true } } } }),
+      tx.schoolSettings.findFirst({ select: { notifyFamilies: true } }),
+    ]);
+    if (!userIds.length) return null;
+    const when = `${dayKey(s.date).split('-').reverse().join('/')} a las ${String(Math.floor(s.startMin / 60)).padStart(2, '0')}:${String(s.startMin % 60).padStart(2, '0')}`;
+    const label = `${group.subject.name} · ${group.name}`;
+    return {
+      userIds, type: kind === 'cancelled' ? 'school.class_cancelled' : 'school.class_make_up', link: '/family', email: settings?.notifyFamilies !== false,
+      title: kind === 'cancelled' ? `Clase cancelada: ${label}` : `Clase de recuperación: ${label}`,
+      body: kind === 'cancelled' ? `Se cancela la clase del ${when}.${s.notes ? ` ${s.notes}` : ''}` : `Se recupera la clase el ${when}.${s.notes ? ` ${s.notes}` : ''}`,
+    };
   }
 
   /** Clase de recuperación de una sesión cancelada. */
@@ -1438,6 +1566,9 @@ export class SchoolController {
         data: { tenantId: ctx.tenantId, groupId: s.groupId, date: toDate(body.date), startMin: body.startMin, endMin: body.endMin, notes: body.notes, makeUpForId: id },
       });
       await this.audit.log(tx, ctx, 'class_session.make_up', 'class_session', created.id, { makeUpForId: id });
+      return { created, notice: await this.sessionNotice(tx, s.groupId, 'makeUp', created) };
+    }).then(async ({ created, notice }) => {
+      if (notice) await this.jobs.add('notify.fanout', { tenantId: ctx.tenantId, ...notice });
       return created;
     });
   }
@@ -1462,6 +1593,44 @@ export class SchoolController {
       }
       if (s.status === 'SCHEDULED') await tx.classSession.update({ where: { id }, data: { status: 'DONE' } });
       return tx.classAttendance.findMany({ where: { sessionId: id } });
+    });
+  }
+
+  /** Justificaciones de faltas enviadas desde el portal, pendientes de revisar (las de sus grupos para el profesorado). */
+  @Perm('school:teach')
+  @Get('justifications')
+  justifications(@Ctx() ctx: RequestContext, @Query(zod(justificationsQuery)) q: z.infer<typeof justificationsQuery>) {
+    return this.db.tenant(ctx.tenantId, (tx) =>
+      tx.classAttendance.findMany({
+        where: {
+          justificationStatus: q.status,
+          session: { group: { yearId: q.yearId, ...(!ctx.permissions.has('school:write') && { teacher: { userId: ctx.userId } }) } },
+        },
+        include: {
+          student: { select: { id: true, firstName: true, lastName: true } },
+          session: { select: { id: true, date: true, startMin: true, endMin: true, group: { select: { id: true, name: true, subject: { select: { name: true } } } } } },
+        },
+        orderBy: { session: { date: 'desc' } },
+        take: 200,
+      }),
+    );
+  }
+
+  /** Acepta o rechaza la justificación. Aceptada, una falta pasa a «Justificada». */
+  @Perm('school:teach')
+  @HttpCode(200)
+  @Post('attendance/:id/review')
+  reviewJustification(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(reviewSchema)) body: z.infer<typeof reviewSchema>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const a = found(await tx.classAttendance.findUnique({ where: { id }, include: { session: { select: { groupId: true } } } }), 'Asistencia');
+      await assertCanTeachGroup(tx, ctx, a.session.groupId);
+      if (a.justificationStatus !== 'PENDING') throw new BadRequestException({ message: 'No hay justificación pendiente', code: 'NO_PENDING_JUSTIFICATION' });
+      const updated = await tx.classAttendance.update({
+        where: { id },
+        data: { justificationStatus: body.approved ? 'APPROVED' : 'REJECTED', ...(body.approved && a.status === 'ABSENT' ? { status: 'EXCUSED' } : {}) },
+      });
+      await this.audit.log(tx, ctx, 'class_attendance.reviewed', 'class_attendance', id, { approved: body.approved });
+      return updated;
     });
   }
 

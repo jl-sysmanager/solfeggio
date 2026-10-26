@@ -73,10 +73,14 @@ function AuditionModal({ app, onClose }: { app: Application | null; onClose: () 
 
 function AcceptModal({ app, groups, onClose }: { app: Application | null; groups: ClassGroup[]; onClose: () => void }) {
   const families = useApi<Family[]>(app ? '/school/families' : null);
-  const accept = useApiMutation((body: unknown) => post<{ enrollments: { status: string }[] }>(`/school/applications/${app!.id}/accept`, body), {
-    success: 'Solicitud aceptada: alumno matriculado',
+  const toast = useToast();
+  const accept = useApiMutation((body: unknown) => post<{ enrollments: { status: string }[]; portal?: 'linked' | 'invited' | 'none' }>(`/school/applications/${app!.id}/accept`, body), {
     invalidate: ['/school'],
-    onSuccess: onClose,
+    onSuccess: (r) => {
+      const portal = { linked: ' y tutor con acceso al portal', invited: ' e invitación al portal enviada', none: '' }[r.portal ?? 'none'];
+      toast.notify(`Solicitud aceptada: alumno matriculado${portal}`);
+      onClose();
+    },
   });
   const yearGroups = groups.filter((g) => g.yearId === app?.yearId);
   return (
@@ -112,7 +116,11 @@ function AcceptModal({ app, groups, onClose }: { app: Application | null; groups
             />
           ))}
         </fieldset>
-        {app && <p className="small muted">Si la escuela avisa a las familias, {app.guardianEmail} recibirá un email con los grupos asignados.</p>}
+        {app && (
+          <p className="small muted">
+            Si la escuela avisa a las familias, {app.guardianEmail} recibirá un email con los grupos asignados y, si está activado en Configuración, la invitación al portal de familias.
+          </p>
+        )}
         <FormError error={accept.error} />
         <div className="modal__footer">
           <Button variant="ghost" onClick={onClose}>

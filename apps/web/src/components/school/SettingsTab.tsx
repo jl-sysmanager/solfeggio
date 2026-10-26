@@ -615,7 +615,7 @@ function EnrollmentCard({ write }: { write: boolean }) {
             onSubmit={(e) => {
               e.preventDefault();
               const v = formValues(e.currentTarget);
-              save.mutate({ publicIntro: v.publicIntro ?? null, notifyFamilies: checked(e.currentTarget, 'notifyFamilies') });
+              save.mutate({ publicIntro: v.publicIntro ?? null, notifyFamilies: checked(e.currentTarget, 'notifyFamilies'), inviteOnAccept: checked(e.currentTarget, 'inviteOnAccept') });
             }}
           >
             <TextAreaField label="Presentación del formulario público" name="publicIntro" rows={4} defaultValue={settings.publicIntro ?? ''} disabled={!write} hint="Horarios de atención, documentación que hay que traer, plazos…" />
@@ -623,6 +623,12 @@ function EnrollmentCard({ write }: { write: boolean }) {
               label="Avisar por email a las familias: matrícula aceptada, en lista de espera o rechazada, y cada recibo emitido"
               name="notifyFamilies"
               defaultChecked={settings.notifyFamilies}
+              disabled={!write}
+            />
+            <Checkbox
+              label="Al aceptar una matrícula, dar acceso al portal de familias al tutor que la pidió"
+              name="inviteOnAccept"
+              defaultChecked={settings.inviteOnAccept}
               disabled={!write}
             />
             <FormError error={save.error} />

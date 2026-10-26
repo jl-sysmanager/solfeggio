@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { del, post, put } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
-import type { ClassAttendanceStatus, ClassGroup, ClassSession, GradeRow, Notice, SessionDetail } from '../../api/types-school';
+import type { ClassAttendanceStatus, ClassGroup, ClassSession, GradeRow, Justification, Notice, SessionDetail } from '../../api/types-school';
 import { useAuth } from '../../auth/AuthProvider';
 import { date, dateTime, today } from '../../lib/format';
 import { attendanceStatus } from '../../lib/labels';
@@ -288,6 +288,42 @@ function Notices({ group }: { group: ClassGroup }) {
   );
 }
 
+/** Faltas que las familias han justificado desde el portal: se aceptan o se rechazan aquí. */
+function JustificationsCard({ yearId }: { yearId: string }) {
+  const q = useApi<Justification[]>('/school/justifications', { yearId });
+  const review = useApiMutation((v: { id: string; approved: boolean }) => post(`/school/attendance/${v.id}/review`, { approved: v.approved }), {
+    invalidate: ['/school/justifications', '/school/overview', '/school/groups'],
+    success: 'Justificación revisada',
+  });
+  if (!q.data?.length) return null;
+  return (
+    <Card title={`Justificaciones de las familias (${q.data.length})`} tone="cream">
+      <ul className="list-plain list-divided">
+        {q.data.map((j) => (
+          <li key={j.id} className="row between" style={{ gap: 12, flexWrap: 'wrap' }}>
+            <span>
+              <strong>
+                {j.student.firstName} {j.student.lastName}
+              </strong>{' '}
+              · {j.session.group.subject.name} · {j.session.group.name} · {date(j.session.date)} <StatusChip value={j.status} map={attendanceStatus} />
+              <div className="small">«{j.justification}»</div>
+            </span>
+            <span className="row" style={{ gap: 8 }}>
+              <Button size="sm" variant="ghost" loading={review.isPending && review.variables?.id === j.id && !review.variables.approved} onClick={() => review.mutate({ id: j.id, approved: false })}>
+                Rechazar
+              </Button>
+              <Button size="sm" loading={review.isPending && review.variables?.id === j.id && review.variables.approved} onClick={() => review.mutate({ id: j.id, approved: true })}>
+                Aceptar
+              </Button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="small muted">Al aceptar, la falta pasa a «Justificada».</p>
+    </Card>
+  );
+}
+
 export function ClassesTab() {
   const { can } = useAuth();
   const teach = can('school:teach');
@@ -319,6 +355,7 @@ export function ClassesTab() {
           </div>
         </div>
       </Card>
+      {teach && yearId && <JustificationsCard yearId={yearId} />}
       {groups.error && <ErrorNote error={groups.error} />}
       {groups.data && !group && <EmptyState title="Sin grupos" icon="school">{mine ? 'No tienes grupos asignados en este curso.' : 'No hay grupos en este curso.'}</EmptyState>}
       {group && (

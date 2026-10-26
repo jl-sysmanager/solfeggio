@@ -422,9 +422,12 @@ describe('Escuela de música', () => {
       const fam = await get(`/school/students/${acc.body.student.id}`).expect(200);
       expect(fam.body.family.guardians[0]).toMatchObject({ firstName: 'Elena', lastName: 'Sanz Ruiz', email: 'elena@sanz.local' });
       await post(`/school/applications/${app.id}/reject`).expect(400);
-      const mail = ctx.jobs.of('email.send').find((j) => j.data.to === 'elena@sanz.local')!;
-      expect(mail.data.subject).toContain('Matrícula aceptada');
+      const mail = ctx.jobs.of('email.send').find((j) => j.data.to === 'elena@sanz.local' && j.data.subject.includes('Matrícula aceptada'))!;
       expect(mail.data.text).toContain('Lenguaje 1º: plaza confirmada');
+      // Con la invitación al aceptar activada, Elena recibe además el enlace al portal.
+      expect(acc.body.portal).toBe('invited');
+      expect(mail.data.text).toContain('Os llegará otro email con el enlace');
+      expect(ctx.jobs.of('email.send').some((j) => j.data.to === 'elena@sanz.local' && /invite\//.test(j.data.text))).toBe(true);
     });
 
     it('avisa al pasar a lista de espera o rechazar, salvo que la escuela no avise', async () => {
@@ -517,6 +520,74 @@ describe('Escuela de música', () => {
       const portal = await get('/school/family', familyToken).expect(200);
       expect(portal.body.notices.map((x: { id: string }) => x.id)).toContain(n.body.id);
       expect(portal.body.notices).toHaveLength(2);
+    });
+
+    it('la familia ve sus próximas clases y se entera de las cancelaciones', async () => {
+      const today = madridToday().iso;
+      const portal = await get('/school/family', familyToken).expect(200);
+      const upcoming = portal.body.upcoming as { id: string; date: string; status: string; studentIds: string[]; group: { id: string } }[];
+      if (today > '2027-06-30') return;
+      expect(upcoming.length).toBeGreaterThan(0);
+      expect(upcoming.every((u) => u.date.slice(0, 10) >= today)).toBe(true);
+      const first = upcoming.find((u) => u.group.id === gTheory.id)!;
+      expect(first.studentIds).toEqual(expect.arrayContaining([alvaro.id, lucia.id]));
+      await post(`/school/sessions/${first.id}/cancel`, { notes: 'Concierto' }, teacherToken).expect(200);
+      const job = ctx.jobs.of('notify.fanout').find((j) => j.data.type === 'school.class_cancelled')!;
+      expect(job.data).toMatchObject({ email: true, link: '/family' });
+      expect(job.data.body).toContain('Concierto');
+      const after = (await get('/school/family', familyToken).expect(200)).body.upcoming as { id: string; status: string }[];
+      expect(after.find((u) => u.id === first.id)!.status).toBe('CANCELLED');
+    });
+
+    it('la familia justifica una falta, el profesorado la revisa y queda justificada', async () => {
+      const portal = await get('/school/family', familyToken).expect(200);
+      const absence = portal.body.absences.find((a: { status: string }) => a.status === 'ABSENT');
+      await post(`/school/family/absences/${absence.id}/justify`, { text: 'x' }, familyToken).expect(400);
+      const sent = await post(`/school/family/absences/${absence.id}/justify`, { text: 'Estaba con fiebre' }, familyToken).expect(200);
+      expect(sent.body.justificationStatus).toBe('PENDING');
+      // Sin tutor vinculado (o de otra banda) no hay falta que justificar.
+      await post(`/school/family/absences/${absence.id}/justify`, { text: 'No es mía' }, B.token).expect(404);
+      await post(`/school/family/absences/${absence.id}/justify`, { text: 'No es mía' }, teacherToken).expect(403);
+      const pending = (await get('/school/justifications', teacherToken).expect(200)).body as { id: string; justification: string }[];
+      expect(pending.map((p) => p.id)).toContain(absence.id);
+      expect((await get(`/school/overview?yearId=${year.id}`).expect(200)).body.counts.pendingJustifications).toBeGreaterThanOrEqual(1);
+      await post(`/school/attendance/${absence.id}/review`, { approved: true }, teacherToken).expect(200);
+      await post(`/school/attendance/${absence.id}/review`, { approved: true }, teacherToken).expect(400);
+      const again = (await get('/school/family', familyToken).expect(200)).body.absences.find((a: { id: string }) => a.id === absence.id);
+      expect(again).toMatchObject({ status: 'EXCUSED', justificationStatus: 'APPROVED', justification: 'Estaba con fiebre' });
+    });
+
+    it('la familia ve cómo pagó cada recibo y actualiza su contacto', async () => {
+      const portal = (await get('/school/family', familyToken).expect(200)).body;
+      const paid = portal.charges.find((c: { status: string }) => c.status === 'PAID');
+      expect(paid).toMatchObject({ paymentMethod: 'BIZUM' });
+      expect(paid.paidAt.slice(0, 10)).toBe('2026-10-06');
+      const c = await patch('/school/family/contact', { phone: '600 000 111', email: 'Marta.Nueva@familia.local' }, familyToken).expect(200);
+      expect(c.body).toMatchObject({ phone: '600 000 111', email: 'marta.nueva@familia.local' });
+      await patch('/school/family/contact', { email: 'no-es-email' }, familyToken).expect(400);
+      const g = await get(`/school/families/${family.id}`).expect(200);
+      expect(g.body.guardians.find((x: { id: string }) => x.id === guardian.id).phone).toBe('600 000 111');
+      expect((await get('/school/family', familyToken).expect(200)).body.guardian.email).toBe('marta.nueva@familia.local');
+      await patch('/school/family/contact', { email: 'marta@familia.local' }, familyToken).expect(200);
+    });
+
+    it('da acceso al portal a todas las familias pendientes de una vez', async () => {
+      const fam = (await post('/school/families', { name: 'Familia Lote' }).expect(201)).body;
+      await post(`/school/families/${fam.id}/guardians`, { firstName: 'Pilar', lastName: 'Lote', email: 'pilar@lote.local' }).expect(201);
+      await post(`/school/families/${fam.id}/guardians`, { firstName: 'Sin', lastName: 'Email' }).expect(201);
+      await post('/school/students', { familyId: fam.id, firstName: 'Iris', lastName: 'Lote' }).expect(201);
+      const before = (await get(`/school/overview?yearId=${year.id}`).expect(200)).body.counts;
+      expect(before.guardiansWithoutPortal).toBeGreaterThanOrEqual(1);
+      expect(before.guardiansWithoutContact).toBeGreaterThanOrEqual(1);
+      const r = await post('/school/guardians/invite-all').expect(200);
+      expect(r.body.invited).toBeGreaterThanOrEqual(1);
+      expect(r.body.withoutEmail).toBeGreaterThanOrEqual(1);
+      expect(r.body.limitReached).toBe(false);
+      expect(ctx.jobs.of('email.send').some((j) => j.data.to === 'pilar@lote.local' && /invite\//.test(j.data.text))).toBe(true);
+      // Las invitaciones vigentes no se repiten.
+      expect((await post('/school/guardians/invite-all').expect(200)).body).toMatchObject({ invited: 0, linked: 0 });
+      expect((await get(`/school/overview?yearId=${year.id}`).expect(200)).body.counts.guardiansWithoutPortal).toBe(0);
+      await post('/school/guardians/invite-all', {}, teacherToken).expect(403);
     });
   });
 

@@ -175,3 +175,42 @@ describe('Mensualidades', () => {
     expect(JSON.parse(String(call[1]!.body))).toMatchObject({ chargeIds: ['c1', 'c2'], method: 'BIZUM' });
   });
 });
+
+describe('Portal de familias: clases, recibos y justificaciones', () => {
+  it('muestra las próximas clases y los recibos, y deja justificar una falta', async () => {
+    const data = {
+      guardian: { id: 'g1', firstName: 'Marta', lastName: 'Pérez', email: 'marta@ejemplo.test', phone: null },
+      guardians: [],
+      family: { id: 'f1', name: 'Familia Pérez' },
+      students: [{ id: 's1', firstName: 'Lucía', lastName: 'Pérez', birthDate: null, instrument: null, status: 'ACTIVE', bandStage: 'NONE', enrollments: [] }],
+      upcoming: [
+        { id: 'u1', date: '2026-11-02T00:00:00.000Z', startMin: 1020, endMin: 1080, status: 'CANCELLED', notes: 'Concierto', makeUpForId: null, group: { id: 'gr1', name: 'Grupo A', subject: { name: 'Lenguaje' } }, studentIds: ['s1'] },
+        { id: 'u2', date: '2026-11-04T00:00:00.000Z', startMin: 1020, endMin: 1080, status: 'SCHEDULED', notes: null, makeUpForId: 'u1', group: { id: 'gr1', name: 'Grupo A', subject: { name: 'Lenguaje' } }, studentIds: ['s1'] },
+      ],
+      absences: [{ id: 'a1', studentId: 's1', status: 'ABSENT', note: null, justification: null, justificationStatus: 'NONE', session: { date: '2026-10-19', startMin: 1020, group: { name: 'Grupo A' } } }],
+      charges: [
+        { id: 'c1', studentId: 's1', period: '2026-10', baseCents: 3000, discountCents: 0, amountCents: 3000, detail: { lines: [], discounts: [], pct: 0 }, dueDate: '2026-10-05', status: 'PAID', paidAt: '2026-10-06T00:00:00.000Z', paymentMethod: 'BIZUM' },
+        { id: 'c2', studentId: 's1', period: '2026-11', baseCents: 3000, discountCents: 0, amountCents: 3000, detail: { lines: [], discounts: [], pct: 0 }, dueDate: '2026-11-05', status: 'PENDING', paidAt: null },
+      ],
+      notices: [],
+    };
+    const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+      if (String(url).includes('/justify') && init?.method === 'POST') return json({ id: 'a1', justification: 'Fiebre', justificationStatus: 'PENDING' });
+      return json(data);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderWithProviders(<FamilyPortalPage />, { session: makeSession({ permissions: ['school:family'] }) });
+    expect(await screen.findByRole('heading', { name: 'Próximas clases' })).toBeInTheDocument();
+    expect(screen.getByText('1 cancelada(s)')).toBeInTheDocument();
+    expect(screen.getByText('Recuperación')).toBeInTheDocument();
+    expect(screen.getByText(/Bizum/)).toBeInTheDocument();
+    expect(screen.getByText(/pendiente de pago/)).toHaveTextContent('Tenéis 30,00 € pendiente de pago (1 recibo(s)).');
+    await user.click(screen.getByRole('button', { name: /Justificar la falta de Lucía/ }));
+    await user.type(screen.getByLabelText(/Motivo/), 'Fiebre');
+    await user.click(screen.getByRole('button', { name: 'Enviar' }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/absences/a1/justify'))).toBe(true));
+    const call = fetchMock.mock.calls.find(([u]) => String(u).includes('/justify'))!;
+    expect(JSON.parse(String(call[1]!.body))).toEqual({ text: 'Fiebre' });
+  });
+});

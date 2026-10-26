@@ -23,6 +23,8 @@ export interface SchoolSettings {
   autoIssueDay: number | null;
   autoIssueDueDay: number;
   notifyFamilies: boolean;
+  /** Dar acceso al portal al aceptar una matrícula. */
+  inviteOnAccept: boolean;
   slug?: string;
   /** Ya se guardó la configuración alguna vez. */
   configured?: boolean;
@@ -276,8 +278,34 @@ export interface ReportCard {
   }[];
 }
 
+export type JustificationStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
+
+export interface FamilyUpcomingSession {
+  id: string;
+  date: string;
+  startMin: number;
+  endMin: number;
+  status: SessionStatus;
+  notes: string | null;
+  makeUpForId: string | null;
+  group: { id: string; name: string; subject: { name: string } };
+  studentIds: string[];
+}
+
+export interface Justification {
+  id: string;
+  status: ClassAttendanceStatus;
+  note: string | null;
+  justification: string | null;
+  justificationStatus: JustificationStatus;
+  student: { id: string; firstName: string; lastName: string };
+  session: { id: string; date: string; startMin: number; endMin: number; group: { id: string; name: string; subject: { name: string } } };
+}
+
 export interface FamilyPortalData {
-  guardian: { id: string; firstName: string; lastName: string };
+  guardian: { id: string; firstName: string; lastName: string; email: string | null; phone: string | null };
+  guardians: { id: string; firstName: string; lastName: string; relationship: string | null; email: string | null; phone: string | null }[];
+  upcoming: FamilyUpcomingSession[];
   family: { id: string; name: string };
   students: {
     id: string;
@@ -302,7 +330,15 @@ export interface FamilyPortalData {
       };
     }[];
   }[];
-  absences: { id: string; studentId: string; status: ClassAttendanceStatus; note: string | null; session: { date: string; startMin: number; group: { name: string } } }[];
+  absences: {
+    id: string;
+    studentId: string;
+    status: ClassAttendanceStatus;
+    note: string | null;
+    justification: string | null;
+    justificationStatus: JustificationStatus;
+    session: { date: string; startMin: number; group: { name: string } };
+  }[];
   charges: Omit<TuitionCharge, 'yearId' | 'familyId'>[];
   notices: Notice[];
 }
@@ -365,6 +401,10 @@ export interface SchoolOverview {
     occupied: number;
     /** Nulo si algún grupo no tiene límite de plazas. */
     capacity: number | null;
+    pendingJustifications: number;
+    /** Tutores invitables (con email o socio) que aún no tienen acceso al portal. */
+    guardiansWithoutPortal: number;
+    guardiansWithoutContact: number;
   };
   checklist: SchoolChecklistItem[];
   tuition: {

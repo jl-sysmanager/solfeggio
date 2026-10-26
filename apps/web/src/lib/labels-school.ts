@@ -56,6 +56,13 @@ export const paymentMethod: Record<string, string> = {
   OTHER: 'Otro',
 };
 
+export const justificationStatus: LabelMap = {
+  NONE: { label: 'Sin justificar', tone: 'neutral' },
+  PENDING: { label: 'Justificación enviada', tone: 'warning' },
+  APPROVED: { label: 'Justificada', tone: 'success' },
+  REJECTED: { label: 'Justificación rechazada', tone: 'danger' },
+};
+
 export const discountKind: Record<string, string> = {
   SIBLING: 'Hermanos',
   MEMBER: 'Socio de la banda',

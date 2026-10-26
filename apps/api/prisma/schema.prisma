@@ -1082,6 +1082,8 @@ model SchoolSettings {
   autoIssueDueDay         Int      @default(5)
   /// Avisar por email a las familias de matrículas resueltas y recibos emitidos.
   notifyFamilies          Boolean  @default(true)
+  /// Al aceptar una matrícula, dar acceso al portal al tutor que la pidió.
+  inviteOnAccept          Boolean  @default(true)
   updatedAt               DateTime @updatedAt
 
   @@map("school_settings")
@@ -1370,6 +1372,9 @@ model ClassAttendance {
   student   Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   status    AttendanceStatus
   note      String?
+  /// Justificación enviada por la familia desde el portal.
+  justification       String?
+  justificationStatus JustificationStatus @default(NONE)
 
   @@unique([sessionId, studentId])
   @@index([tenantId, studentId])

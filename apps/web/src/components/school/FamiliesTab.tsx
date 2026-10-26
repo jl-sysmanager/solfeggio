@@ -17,6 +17,7 @@ import { Menu, type MenuItem } from '../Menu';
 import { ConfirmModal, Modal } from '../Modal';
 import { useSchoolYears } from './common';
 import { PayModal } from './PayModal';
+import { useToast } from '../Toasts';
 
 function FamilyModal({ open, onClose, family }: { open: boolean; onClose: () => void; family?: Family | null }) {
   const save = useApiMutation((body: unknown) => (family ? patch(`/school/families/${family.id}`, body) : post('/school/families', body)), {
@@ -253,6 +254,18 @@ export function FamiliesTab() {
   const [linking, setLinking] = useState<Guardian | null>(null);
   const [removing, setRemoving] = useState<Guardian | null>(null);
   const [fees, setFees] = useState<Family | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const toast = useToast();
+  const inviteAll = useApiMutation(() => post<{ linked: number; invited: number; withoutEmail: number; limitReached: boolean }>('/school/guardians/invite-all'), {
+    invalidate: ['/school'],
+    onSuccess: (r) => {
+      setInviting(false);
+      toast.notify(
+        `${r.invited} invitaciones enviadas${r.linked ? `, ${r.linked} tutores vinculados a su usuario` : ''}${r.withoutEmail ? `. ${r.withoutEmail} tutores sin email no se han podido invitar` : ''}${r.limitReached ? '. Se ha llegado al límite de usuarios del plan' : ''}.`,
+      );
+    },
+  });
+  const withoutPortal = (list.data ?? []).flatMap((f) => (f.students?.some((st) => st.status !== 'LEFT') ? f.guardians : [])).filter((g) => !g.portalAccess && (g.email || g.memberId)).length;
   const invite = useApiMutation((g: Guardian) => post<{ linked?: boolean }>(`/school/guardians/${g.id}/invite`), {
     success: 'Portal de familias actualizado',
     invalidate: ['/school/families', '/school/staff-users'],
@@ -289,6 +302,11 @@ export function FamiliesTab() {
         <div className="toolbar">
           <TextField label="Buscar" type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Familia o apellido del tutor" />
           {write && <Button onClick={() => setCreating(true)}>Nueva familia</Button>}
+          {write && withoutPortal > 0 && (
+            <Button variant="ghost" onClick={() => setInviting(true)}>
+              Dar acceso al portal a todas
+            </Button>
+          )}
         </div>
       </Card>
       {list.isLoading && <Loading />}
@@ -335,6 +353,15 @@ export function FamiliesTab() {
       <GuardianModal open={!!guardianFor} familyId={guardianFor?.familyId ?? ''} guardian={guardianFor?.guardian} onClose={() => setGuardianFor(null)} />
       <LinkPortalModal guardian={linking} onClose={() => setLinking(null)} />
       {fees && <FamilyFeesModal family={fees} onClose={() => setFees(null)} />}
+      <ConfirmModal
+        open={inviting}
+        title="Dar acceso al portal"
+        message={`Se enviará la invitación al portal a los tutores con email que aún no tienen acceso (hasta ${withoutPortal}). Quien ya es usuario de la banda queda vinculado sin invitación. Las invitaciones pendientes no se repiten.`}
+        confirmLabel="Enviar invitaciones"
+        loading={inviteAll.isPending}
+        onConfirm={() => inviteAll.mutate(undefined)}
+        onClose={() => setInviting(false)}
+      />
       <ConfirmModal
         open={!!removing}
         title="Eliminar tutor"

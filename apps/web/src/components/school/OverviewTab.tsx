@@ -54,6 +54,8 @@ function Alerts({ o }: { o: SchoolOverview }) {
     c.withoutSlots > 0 && c.groups > 0 && { text: `${c.withoutSlots} grupo(s) sin horario: no tendrán clases`, to: '/school?tab=groups' },
     c.withoutTeacher > 0 && { text: `${c.withoutTeacher} grupo(s) sin profesor`, to: '/school?tab=groups' },
     o.tuition && o.tuition.overdueCount > 0 && { text: `${o.tuition.overdueCount} mensualidad(es) vencida(s) por ${money(o.tuition.overdueCents)}`, to: '/school?tab=tuition' },
+    c.pendingJustifications > 0 && { text: `${c.pendingJustifications} falta(s) justificada(s) por las familias pendientes de revisar`, to: '/school?tab=classes' },
+    c.guardiansWithoutPortal > 0 && { text: `${c.guardiansWithoutPortal} tutor(es) sin acceso al portal de familias`, to: '/school?tab=families' },
   ].filter((x): x is { text: string; to: string } => !!x);
   if (!items.length) return null;
   return (
