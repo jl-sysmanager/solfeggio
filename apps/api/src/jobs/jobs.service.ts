@@ -26,6 +26,7 @@ export type JobMap = {
   'ops.orphan-scan': Record<string, never>;
   'billing.reconcile-addons': Record<string, never>;
   'backups.export-tenants': Record<string, never>;
+  'school.tuition-issue': Record<string, never>;
 };
 
 /** Datos del trabajo sin cuerpos de mensajes: sólo claves cortas y escalares. */

@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { post, put } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
 import type { Section } from '../api/types';
-import type { ReportCard, SchoolYear, StudentDetail } from '../api/types-school';
+import type { ClassGroup, ReportCard, SchoolYear, StudentDetail } from '../api/types-school';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card, StatCard } from '../components/Card';
@@ -11,16 +11,66 @@ import { Chip, StatusChip } from '../components/Chip';
 import { DataTable } from '../components/DataTable';
 import { ErrorNote, Loading } from '../components/EmptyState';
 import { FormError, SelectField, TextField, formValues } from '../components/Field';
-import { Modal } from '../components/Modal';
+import { ConfirmModal, Modal } from '../components/Modal';
 import { Page, PageHeader } from '../components/PageHeader';
-import { groupLabel, slotText } from '../components/school/common';
+import { groupLabel, slotText, useSchoolYears, YearSelect } from '../components/school/common';
+import { Menu } from '../components/Menu';
+import { useToast } from '../components/Toasts';
 import { StudentFormModal } from '../components/school/StudentsTab';
 import { brandOf, escapeHtml, printDocument } from '../components/governance/print';
 import { date, fullName, money } from '../lib/format';
 import { attendanceStatus } from '../lib/labels';
-import { bandStage, enrollmentStatus, score, studentStatus, termName, tuitionStatus } from '../lib/labels-school';
+import { bandStage, enrollmentStatus, paymentMethod, score, studentStatus, termName, tuitionStatus } from '../lib/labels-school';
 
 type Enr = StudentDetail['enrollments'][number];
+
+/** Matrícula desde la ficha: grupos del curso con las plazas libres a la vista. */
+function EnrollModal({ student, open, onClose }: { student: StudentDetail; open: boolean; onClose: () => void }) {
+  const { years, yearId, setYearId } = useSchoolYears();
+  const groups = useApi<ClassGroup[]>(open && yearId ? '/school/groups' : null, { yearId });
+  const taken = new Set(student.enrollments.filter((e) => e.status !== 'WITHDRAWN').map((e) => e.groupId));
+  const toast = useToast();
+  const enroll = useApiMutation((groupId: string) => post<{ status: string }>('/school/enrollments', { studentId: student.id, groupId }), {
+    invalidate: ['/school'],
+    onSuccess: (r) => {
+      toast.notify(r.status === 'WAITLIST' ? 'El grupo está lleno: queda en lista de espera' : 'Matrícula registrada');
+      onClose();
+    },
+  });
+  return (
+    <Modal open={open} onClose={onClose} title={`Matricular a ${student.firstName}`}>
+      <form
+        className="form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const v = formValues(e.currentTarget);
+          if (v.groupId) enroll.mutate(v.groupId);
+        }}
+      >
+        <YearSelect years={years} value={yearId} onChange={setYearId} />
+        <SelectField
+          label="Grupo"
+          name="groupId"
+          required
+          placeholder={groups.isLoading ? 'Cargando…' : 'Elige un grupo'}
+          hint="Si está lleno, queda en lista de espera."
+          options={(groups.data ?? [])
+            .filter((g) => !taken.has(g.id))
+            .map((g) => ({ value: g.id, label: `${groupLabel(g)} — ${g.capacity ? `${Math.max(0, g.capacity - (g.activeCount ?? 0))} libres` : 'sin límite'}` }))}
+        />
+        <FormError error={enroll.error} />
+        <div className="modal__footer">
+          <Button variant="ghost" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button type="submit" loading={enroll.isPending}>
+            Matricular
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
 
 function GradeModal({ target, onClose }: { target: { enrollment: Enr; term: number } | null; onClose: () => void }) {
   const save = useApiMutation((body: unknown) => put(`/school/groups/${target!.enrollment.groupId}/grades`, body), { success: 'Nota guardada', invalidate: ['/school'], onSuccess: onClose });
@@ -198,6 +248,13 @@ export default function StudentDetailPage() {
   const [editing, setEditing] = useState(false);
   const [promoting, setPromoting] = useState(false);
   const [grading, setGrading] = useState<{ enrollment: Enr; term: number } | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
+  const [withdrawing, setWithdrawing] = useState<Enr | null>(null);
+  const withdraw = useApiMutation((enrollmentId: string) => post(`/school/enrollments/${enrollmentId}/withdraw`), {
+    success: 'Baja del grupo registrada',
+    invalidate: ['/school'],
+    onSuccess: () => setWithdrawing(null),
+  });
   const s = q.data;
 
   if (q.isLoading) return <Loading />;
@@ -280,7 +337,7 @@ export default function StudentDetailPage() {
             )}
           </Card>
         </div>
-        <Card title="Matrículas y notas">
+        <Card title="Matrículas y notas" actions={can('school:write') && s.status !== 'LEFT' && <Button size="sm" onClick={() => setEnrolling(true)}>Matricular en un grupo</Button>}>
           <DataTable
             caption="Matrículas del alumno"
             rows={s.enrollments}
@@ -305,6 +362,14 @@ export default function StudentDetailPage() {
                   );
                 },
               })),
+              ...(can('school:write')
+                ? [{
+                    key: 'a',
+                    header: 'Acciones',
+                    render: (e: Enr) =>
+                      e.status !== 'WITHDRAWN' ? <Menu label={`Acciones de ${e.group.subject.name}`} items={[{ label: 'Dar de baja del grupo', onSelect: () => setWithdrawing(e), danger: true }]} /> : null,
+                  }]
+                : []),
             ]}
           />
         </Card>
@@ -319,7 +384,16 @@ export default function StudentDetailPage() {
               columns={[
                 { key: 'p', header: 'Mes', render: (c) => c.period, nowrap: true },
                 { key: 'a', header: 'Importe', render: (c) => money(c.amountCents), numeric: true, nowrap: true },
-                { key: 's', header: 'Estado', render: (c) => <StatusChip value={c.status} map={tuitionStatus} /> },
+                {
+                  key: 's',
+                  header: 'Estado',
+                  render: (c) => (
+                    <span>
+                      <StatusChip value={c.status} map={tuitionStatus} />
+                      {c.status === 'PAID' && c.paymentMethod && <span className="small muted"> {paymentMethod[c.paymentMethod]}</span>}
+                    </span>
+                  ),
+                },
               ]}
             />
           </Card>
@@ -339,6 +413,16 @@ export default function StudentDetailPage() {
       <StudentFormModal open={editing} student={s} onClose={() => setEditing(false)} />
       <PromoteModal student={s} open={promoting} onClose={() => setPromoting(false)} />
       <GradeModal target={grading} onClose={() => setGrading(null)} />
+      {enrolling && <EnrollModal student={s} open onClose={() => setEnrolling(false)} />}
+      <ConfirmModal
+        open={!!withdrawing}
+        title="Dar de baja del grupo"
+        message={withdrawing ? `${s.firstName} dejará ${groupLabel(withdrawing.group)}. Si había lista de espera, entra el primero.` : ''}
+        confirmLabel="Dar de baja"
+        loading={withdraw.isPending}
+        onConfirm={() => withdrawing && withdraw.mutate(withdrawing.id)}
+        onClose={() => setWithdrawing(null)}
+      />
     </Page>
   );
 }

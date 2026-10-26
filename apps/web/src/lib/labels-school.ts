@@ -47,6 +47,15 @@ export const tuitionStatus: LabelMap = {
   WAIVED: { label: 'Condonada', tone: 'neutral' },
 };
 
+export const paymentMethod: Record<string, string> = {
+  CASH: 'Efectivo',
+  CARD: 'Tarjeta',
+  TRANSFER: 'Transferencia',
+  DIRECT_DEBIT: 'Domiciliación',
+  BIZUM: 'Bizum',
+  OTHER: 'Otro',
+};
+
 export const discountKind: Record<string, string> = {
   SIBLING: 'Hermanos',
   MEMBER: 'Socio de la banda',

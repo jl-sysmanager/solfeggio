@@ -14,14 +14,14 @@ Solfeamos es una plataforma SaaS **multi-tenant** para la gestión integral de b
 | **Secretaría** | Socios, altas y bajas, datos personales cifrados, consentimientos, comunicaciones, documentos, derechos RGPD |
 | **Instrumentación** | Inventario, asignaciones, mantenimiento y reparaciones |
 | **Agenda** | Calendario unificado y suscripción ICS (Google, Apple, Outlook) |
-| **Escuela de música** | Alumnos, familias y tutores, matrícula online con lista de espera y pruebas de acceso, asignaturas, grupos, horarios con detección de conflictos, clases y asistencia, notas y boletines, mensualidades con descuentos, paso a la banda y portal de familias |
+| **Escuela de música** | Panel de inicio con lo que falta por configurar, asistente de nuevo curso (festivos, copia de grupos y rematrícula), alumnos, familias y tutores, importación desde hoja de cálculo, acciones en lote, matrícula online con lista de espera, pruebas de acceso y avisos por email, asignaturas, grupos, horarios con detección de conflictos, clases que se crean solas desde el horario, asistencia, notas y boletines, mensualidades con descuentos, simulador de cuota, emisión programada, cobro con forma de pago (suelto, en lote o por familia), rol de coordinación, paso a la banda y portal de familias |
 | **Contrataciones** | Clientes, presupuestos y contratos, facturas encadenadas e inalterables (preparadas para VeriFactu), plantilla mínima por evento y logística |
 | **Bolsa de refuerzos** | Perfiles de músico, necesidades abiertas entre bandas, candidaturas, músicos externos, pagos con retención y datos para los modelos 111 y 190 |
 | **Gobierno** | Asambleas con quórum, delegaciones y votación telemática, libro de actas, junta directiva y encuestas |
 | **BandMarket** | Anuncios entre bandas con moderación, consultas y denuncias |
 | **SaaS** | Planes Free, Basic, Pro y Enterprise; add-ons por banda (Escuela) con cobro por plaza; Stripe (Checkout, Portal, Tax, cupones, prueba gratuita); webhooks idempotentes; periodo de gracia |
 | **Panel global** | Métricas SaaS (MRR, retención, embudo, cohortes), salud de cada banda y listas de acción, ficha de la banda, «ver como» de solo lectura, pagos fallidos y bonificaciones, soporte con SLA, avisos a las bandas, salud técnica y moderación |
-| **Seguridad** | RBAC configurable por banda (10 roles base), auditoría, MFA TOTP, RLS en PostgreSQL, rate limiting, cifrado de campos |
+| **Seguridad** | RBAC configurable por banda (12 roles base), auditoría, MFA TOTP, RLS en PostgreSQL, rate limiting, cifrado de campos |
 
 ## Stack
 

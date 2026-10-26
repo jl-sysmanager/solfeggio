@@ -8,6 +8,7 @@ export type ApplicationStatus = 'PENDING' | 'ACCEPTED' | 'WAITLISTED' | 'REJECTE
 export type SessionStatus = 'SCHEDULED' | 'CANCELLED' | 'DONE';
 export type ClassAttendanceStatus = 'PRESENT' | 'LATE' | 'ABSENT' | 'EXCUSED';
 export type TuitionStatus = 'PENDING' | 'PAID' | 'OVERDUE' | 'WAIVED';
+export type PaymentMethod = 'CASH' | 'CARD' | 'TRANSFER' | 'DIRECT_DEBIT' | 'BIZUM' | 'OTHER';
 
 export type SchoolFeeMode = 'PERCENT' | 'FIXED';
 
@@ -18,7 +19,13 @@ export interface SchoolSettings {
   multiSubjectDiscountPct: number;
   familyDiscountCents: number;
   publicIntro: string | null;
+  /** Día del mes (1–28) de la emisión automática; nulo = manual. */
+  autoIssueDay: number | null;
+  autoIssueDueDay: number;
+  notifyFamilies: boolean;
   slug?: string;
+  /** Ya se guardó la configuración alguna vez. */
+  configured?: boolean;
 }
 
 export interface TuitionTariff {
@@ -236,6 +243,7 @@ export interface TuitionCharge {
   dueDate: string;
   status: TuitionStatus;
   paidAt: string | null;
+  paymentMethod?: PaymentMethod | null;
   student?: { id: string; firstName: string; lastName: string };
   family?: { id: string; name: string } | null;
 }
@@ -311,4 +319,78 @@ export interface StaffUser {
   name: string;
   email: string;
   role?: { key: string; name: string };
+}
+
+export interface TuitionPreviewRow {
+  studentId: string;
+  familyId: string | null;
+  baseCents: number;
+  discountCents: number;
+  amountCents: number;
+  detail: TuitionDetail;
+  student: { firstName: string; lastName: string; family: { id: string; name: string } | null };
+}
+
+export interface TuitionPreview {
+  rows: TuitionPreviewRow[];
+  students: number;
+  totalBaseCents: number;
+  totalDiscountCents: number;
+  totalAmountCents: number;
+}
+
+export interface SchoolChecklistItem {
+  id: string;
+  title: string;
+  detail: string;
+  /** Query string de la página de la escuela (`?tab=…&section=…`). */
+  to: string;
+  done: boolean;
+}
+
+export interface SchoolOverview {
+  year: { id: string; name: string; isCurrent: boolean; enrollmentOpen: boolean; startsOn: string; endsOn: string } | null;
+  hasYears: boolean;
+  counts: {
+    students: number;
+    families: number;
+    subjects: number;
+    teachers: number;
+    groups: number;
+    withoutSlots: number;
+    withoutTeacher: number;
+    waitlist: number;
+    pendingApplications: number;
+    conflicts: number;
+    occupied: number;
+    /** Nulo si algún grupo no tiene límite de plazas. */
+    capacity: number | null;
+  };
+  checklist: SchoolChecklistItem[];
+  tuition: {
+    period: string;
+    issuedCount: number;
+    issuedCents: number;
+    pendingCount: number;
+    pendingCents: number;
+    overdueCount: number;
+    overdueCents: number;
+    autoIssueDay: number | null;
+  } | null;
+  today: (ClassSession & { group: { id: string; name: string; level: string | null; subject: { name: string } } })[];
+}
+
+export interface YearSummary {
+  year: SchoolYear;
+  groups: { id: string; name: string; level: string | null; subject: string; teacher: { firstName: string; lastName: string } | null; slots: number; students: number }[];
+  students: number;
+}
+
+export interface ImportResult {
+  dryRun: boolean;
+  total: number;
+  created: number;
+  newFamilies: number;
+  duplicates: number;
+  errors: { row: number; message: string }[];
 }

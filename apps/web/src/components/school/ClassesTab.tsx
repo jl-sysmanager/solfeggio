@@ -13,14 +13,19 @@ import { DataTable } from '../DataTable';
 import { EmptyState, ErrorNote, Loading } from '../EmptyState';
 import { FormError, SelectField, TextAreaField, TextField, formValues } from '../Field';
 import { Menu } from '../Menu';
-import { Modal } from '../Modal';
+import { ConfirmModal, Modal } from '../Modal';
+import { useToast } from '../Toasts';
 import { groupLabel, useSchoolYears, YearSelect } from './common';
 
 const statusOptions = Object.entries(attendanceStatus).map(([value, { label }]) => ({ value, label }));
 
-function AttendanceModal({ sessionId, onClose }: { sessionId: string | null; onClose: () => void }) {
+export function AttendanceModal({ sessionId, onClose }: { sessionId: string | null; onClose: () => void }) {
   const q = useApi<SessionDetail>(sessionId ? `/school/sessions/${sessionId}` : null);
   const save = useApiMutation((body: unknown) => put(`/school/sessions/${sessionId}/attendance`, body), { success: 'Asistencia guardada', invalidate: ['/school'], onSuccess: onClose });
+  const all = (status: ClassAttendanceStatus) => {
+    const form = document.getElementById(`attendance-${sessionId}`) as HTMLFormElement | null;
+    form?.querySelectorAll<HTMLSelectElement>('select').forEach((sel) => (sel.value = status));
+  };
   const s = q.data;
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -31,8 +36,15 @@ function AttendanceModal({ sessionId, onClose }: { sessionId: string | null; onC
     <Modal open={!!sessionId} onClose={onClose} title={s ? `Pasar lista · ${date(s.date)} ${hhmm(s.startMin)}` : 'Pasar lista'}>
       {q.isLoading && <Loading rows={3} />}
       {s && (
-        <form className="form" onSubmit={submit}>
+        <form className="form" onSubmit={submit} id={`attendance-${sessionId}`}>
           {s.roster.length === 0 && <p className="muted">El grupo no tiene alumnos matriculados.</p>}
+          {s.roster.length > 1 && (
+            <div className="row">
+              <Button size="sm" variant="ghost" onClick={() => all('PRESENT')}>
+                Todos presentes
+              </Button>
+            </div>
+          )}
           {s.roster.map((st) => {
             const current = s.attendance.find((a) => a.studentId === st.id);
             return (
@@ -93,44 +105,55 @@ function MakeUpModal({ session, onClose }: { session: ClassSession | null; onClo
 
 function Sessions({ group }: { group: ClassGroup }) {
   const { can } = useAuth();
-  const sessions = useApi<ClassSession[]>(`/school/groups/${group.id}/sessions`);
+  const toast = useToast();
+  const [past, setPast] = useState(false);
+  const sessions = useApi<ClassSession[]>(`/school/groups/${group.id}/sessions`, past ? undefined : { from: today() });
   const [taking, setTaking] = useState<string | null>(null);
   const [makeUp, setMakeUp] = useState<ClassSession | null>(null);
-  const generate = useApiMutation((body: unknown) => post<{ created: number; skipped: number }>(`/school/groups/${group.id}/sessions/generate`, body), {
-    invalidate: [`/school/groups/${group.id}`],
+  const [cancelling, setCancelling] = useState<ClassSession | null>(null);
+  const sync = useApiMutation(() => post<{ created: number; removed: number }>(`/school/years/${group.yearId}/sessions/sync`), {
+    invalidate: ['/school'],
+    onSuccess: (r) => toast.notify(`${r.created} clases creadas a partir del horario`),
   });
-  const cancel = useApiMutation((id: string) => post(`/school/sessions/${id}/cancel`, {}), { success: 'Clase cancelada', invalidate: [`/school/groups/${group.id}`] });
+  const cancel = useApiMutation((id: string) => post(`/school/sessions/${id}/cancel`, {}), { success: 'Clase cancelada', invalidate: [`/school/groups/${group.id}`, '/school/overview'], onSuccess: () => setCancelling(null) });
 
   return (
-    <Card title="Sesiones">
-      {can('school:write') && (
-        <form
-          className="toolbar"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const v = formValues(e.currentTarget);
-            generate.mutate({ from: v.from, to: v.to });
-          }}
-        >
-          <TextField label="Desde" name="from" type="date" required defaultValue={today()} />
-          <TextField label="Hasta" name="to" type="date" required />
-          <Button type="submit" variant="ghost" loading={generate.isPending}>
-            Generar sesiones
-          </Button>
-          {generate.data && (
-            <span className="small muted" role="status">
-              {generate.data.created} creadas, {generate.data.skipped} ya existían. Se omiten festivos y días fuera del curso.
-            </span>
-          )}
-        </form>
-      )}
+    <Card
+      title="Clases"
+      actions={
+        <div className="segmented" role="group" aria-label="Clases visibles">
+          <button aria-pressed={!past} onClick={() => setPast(false)}>
+            Próximas
+          </button>
+          <button aria-pressed={past} onClick={() => setPast(true)}>
+            Todas
+          </button>
+        </div>
+      }
+    >
+      <p className="small muted">
+        {group.slots.length
+          ? 'Las clases se crean solas con el horario del grupo y se saltan los festivos del curso.'
+          : 'El grupo no tiene horario: añádelo en «Grupos y horarios» y las clases aparecerán aquí.'}
+      </p>
       {sessions.isLoading && <Loading rows={3} />}
       {sessions.data && (
         <DataTable
           caption={`Sesiones de ${group.name}`}
           rows={sessions.data}
           rowKey={(s) => s.id}
-          empty="Genera las sesiones a partir del horario semanal."
+          empty={
+            group.slots.length && can('school:write') ? (
+              <span>
+                No hay clases creadas.{' '}
+                <Button size="sm" loading={sync.isPending} onClick={() => sync.mutate(undefined)}>
+                  Crear las clases del curso
+                </Button>
+              </span>
+            ) : (
+              'No hay clases.'
+            )
+          }
           columns={[
             { key: 'd', header: 'Fecha', render: (s) => date(s.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }), nowrap: true },
             { key: 'h', header: 'Hora', render: (s) => `${hhmm(s.startMin)}–${hhmm(s.endMin)}`, nowrap: true },
@@ -143,7 +166,7 @@ function Sessions({ group }: { group: ClassGroup }) {
                 <Menu
                   label={`Acciones de la clase del ${date(s.date)}`}
                   items={[
-                    ...(s.status !== 'CANCELLED' && can('school:teach') ? [{ label: 'Pasar lista', onSelect: () => setTaking(s.id) }, { label: 'Cancelar clase', onSelect: () => cancel.mutate(s.id), danger: true }] : []),
+                    ...(s.status !== 'CANCELLED' && can('school:teach') ? [{ label: 'Pasar lista', onSelect: () => setTaking(s.id) }, { label: 'Cancelar clase', onSelect: () => setCancelling(s), danger: true }] : []),
                     ...(s.status === 'CANCELLED' && can('school:teach') ? [{ label: 'Programar recuperación', onSelect: () => setMakeUp(s) }] : []),
                   ]}
                 />
@@ -154,6 +177,15 @@ function Sessions({ group }: { group: ClassGroup }) {
       )}
       <AttendanceModal sessionId={taking} onClose={() => setTaking(null)} />
       <MakeUpModal session={makeUp} onClose={() => setMakeUp(null)} />
+      <ConfirmModal
+        open={!!cancelling}
+        title="Cancelar clase"
+        message={cancelling ? `Se cancelará la clase del ${date(cancelling.date)} a las ${hhmm(cancelling.startMin)}. Después podrás programar una recuperación.` : ''}
+        confirmLabel="Cancelar clase"
+        loading={cancel.isPending}
+        onConfirm={() => cancelling && cancel.mutate(cancelling.id)}
+        onClose={() => setCancelling(null)}
+      />
     </Card>
   );
 }

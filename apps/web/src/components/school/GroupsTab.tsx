@@ -93,7 +93,8 @@ function SlotsModal({ group, onClose }: { group: ClassGroup | null; onClose: () 
       setPending(null);
     },
   });
-  const remove = useApiMutation((id: string) => del(`/school/slots/${id}`), { success: 'Franja eliminada', invalidate: ['/school'] });
+  const [removing, setRemoving] = useState<ClassSlot | null>(null);
+  const remove = useApiMutation((id: string) => del(`/school/slots/${id}`), { success: 'Franja eliminada: sus clases futuras se han quitado', invalidate: ['/school'], onSuccess: () => setRemoving(null) });
 
   function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -115,7 +116,7 @@ function SlotsModal({ group, onClose }: { group: ClassGroup | null; onClose: () 
             {group.slots.map((s) => (
               <li key={s.id} className="row between">
                 <span>{slotText(s)}</span>
-                <Button size="sm" variant="ghost" onClick={() => remove.mutate(s.id)} aria-label={`Eliminar franja ${slotText(s)}`}>
+                <Button size="sm" variant="ghost" onClick={() => setRemoving(s)} aria-label={`Eliminar franja ${slotText(s)}`}>
                   Eliminar
                 </Button>
               </li>
@@ -124,6 +125,7 @@ function SlotsModal({ group, onClose }: { group: ClassGroup | null; onClose: () 
         ) : (
           <p className="muted">Sin franjas semanales.</p>
         )}
+        <p className="small muted">Las clases del curso se crean solas con estas franjas y se saltan los festivos. Al cambiar el horario se rehacen las futuras.</p>
         <form className="form" onSubmit={submit}>
           <div className="form-row">
             <SelectField label="Día" name="weekday" defaultValue="1" options={WEEKDAYS.map((d, i) => ({ value: String(i + 1), label: d }))} />
@@ -145,6 +147,15 @@ function SlotsModal({ group, onClose }: { group: ClassGroup | null; onClose: () 
             </div>
           )}
           {!conflicts && <FormError error={add.error} />}
+          <ConfirmModal
+            open={!!removing}
+            title="Eliminar franja"
+            message={removing ? `Se quitará ${slotText(removing)} y las clases futuras de esa franja que aún no tienen asistencia.` : ''}
+            confirmLabel="Eliminar"
+            loading={remove.isPending}
+            onConfirm={() => removing && remove.mutate(removing.id)}
+            onClose={() => setRemoving(null)}
+          />
           <div className="modal__footer">
             <Button variant="ghost" onClick={onClose}>
               Cerrar
@@ -166,7 +177,8 @@ function RosterModal({ groupId, onClose }: { groupId: string | null; onClose: ()
     invalidate: ['/school'],
     success: 'Matrícula registrada',
   });
-  const withdraw = useApiMutation((id: string) => post(`/school/enrollments/${id}/withdraw`), { success: 'Baja registrada', invalidate: ['/school'] });
+  const [leaving, setLeaving] = useState<GroupDetail['enrollments'][number] | null>(null);
+  const withdraw = useApiMutation((id: string) => post(`/school/enrollments/${id}/withdraw`), { success: 'Baja registrada', invalidate: ['/school'], onSuccess: () => setLeaving(null) });
   const g = q.data;
   return (
     <Modal open={!!groupId} onClose={onClose} title={g ? `Alumnos de ${groupLabel(g)}` : 'Alumnos'}>
@@ -184,9 +196,18 @@ function RosterModal({ groupId, onClose }: { groupId: string | null; onClose: ()
               { key: 'n', header: 'Alumno', render: (e) => <Link to={`/school/students/${e.student.id}`}>{e.student.lastName}, {e.student.firstName}</Link> },
               { key: 's', header: 'Estado', render: (e) => <StatusChip value={e.status} map={enrollmentStatus} /> },
               ...(can('school:write')
-                ? [{ key: 'a', header: 'Acciones', render: (e: GroupDetail['enrollments'][number]) => <Button size="sm" variant="ghost" onClick={() => withdraw.mutate(e.id)} aria-label={`Dar de baja a ${e.student.firstName} del grupo`}>Dar de baja</Button> }]
+                ? [{ key: 'a', header: 'Acciones', render: (e: GroupDetail['enrollments'][number]) => <Button size="sm" variant="ghost" onClick={() => setLeaving(e)} aria-label={`Dar de baja a ${e.student.firstName} del grupo`}>Dar de baja</Button> }]
                 : []),
             ]}
+          />
+          <ConfirmModal
+            open={!!leaving}
+            title="Dar de baja del grupo"
+            message={leaving ? `${leaving.student.firstName} ${leaving.student.lastName} dejará el grupo.${leaving.status === 'ACTIVE' ? ' Si hay lista de espera, entra el primero.' : ''}` : ''}
+            confirmLabel="Dar de baja"
+            loading={withdraw.isPending}
+            onConfirm={() => leaving && withdraw.mutate(leaving.id)}
+            onClose={() => setLeaving(null)}
           />
           {can('school:write') && (
             <form
@@ -304,6 +325,13 @@ export function GroupsTab() {
           {write && <Button onClick={() => setCreating(true)}>Nuevo grupo</Button>}
         </div>
       </Card>
+      {groups.data && groups.data.some((g) => !g.slots.length) && (
+        <div className="callout" role="status">
+          <p>
+            {groups.data.filter((g) => !g.slots.length).length} grupo(s) sin horario: usa «Horario» en su menú para que tengan clases.
+          </p>
+        </div>
+      )}
       {conflicts.data && conflicts.data.length > 0 && (
         <div className="callout callout--danger" role="status">
           <div>
@@ -322,7 +350,7 @@ export function GroupsTab() {
             caption="Grupos del curso"
             rows={groups.data}
             rowKey={(g) => g.id}
-            empty="Crea grupos o copia los del curso anterior desde Configuración."
+            empty="Crea grupos o cópialos del curso anterior con el asistente de «Nuevo curso» (Configuración › Cursos y calendario)."
             columns={[
               { key: 'g', header: 'Grupo', render: (g) => <strong>{groupLabel(g)}</strong> },
               { key: 't', header: 'Profesor', render: (g) => (g.teacher ? fullName(g.teacher) : '—') },

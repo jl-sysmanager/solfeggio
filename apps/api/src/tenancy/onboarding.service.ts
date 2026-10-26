@@ -107,6 +107,18 @@ export class OnboardingService {
         tx.membership.findUniqueOrThrow({ where: { id: ctx.membershipId }, select: { setupGuideDismissedAt: true } }),
         tx.user.findUniqueOrThrow({ where: { id: ctx.userId }, select: { mfaEnabled: true } }),
       ]);
+      const school = ctx.features.has('school')
+        ? await (async () => {
+            const year = await tx.schoolYear.findFirst({ orderBy: [{ isCurrent: 'desc' }, { startsOn: 'desc' }], select: { id: true } });
+            const [years, groups, groupsWithoutSlots, students] = await Promise.all([
+              tx.schoolYear.count(),
+              tx.classGroup.count({ where: { yearId: year?.id } }),
+              tx.classGroup.count({ where: { yearId: year?.id, slots: { none: {} } } }),
+              tx.student.count({ where: { status: 'ACTIVE' } }),
+            ]);
+            return { years, groups: year ? groups : 0, groupsWithoutSlots, students };
+          })()
+        : undefined;
       return buildSetupGuide({
         features: ctx.features,
         bandReady: !!(tenant.legalName || tenant.taxId || tenant.logoKey || tenant.region),
@@ -115,6 +127,7 @@ export class OnboardingService {
         eventCount,
         mfaEnabled: user.mfaEnabled,
         dismissed: !!membership.setupGuideDismissedAt,
+        school,
       });
     });
   }

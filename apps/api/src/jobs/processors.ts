@@ -3,6 +3,8 @@ import { Job } from 'bullmq';
 import type IORedis from 'ioredis';
 import { BillingOpsService } from '../billing/billing-ops.service';
 import { BillingService } from '../billing/billing.service';
+import { Audit } from '../audit/audit.service';
+import { featuresFor } from '../billing/entitlements';
 import { appUrl } from '../config/env';
 import { Db } from '../db/db.service';
 import { TYPE_LABEL } from '../events/events.controller';
@@ -10,12 +12,14 @@ import { Mailer } from '../integrations/mailer.service';
 import { InsightsService } from '../platform/insights.service';
 import { OpsService } from '../platform/ops.service';
 import { TenantBackupService } from '../platform/tenant-backup.service';
+import { dayKey } from '../school/school.helpers';
+import { issueTuition, madridToday, tuitionEmails } from '../school/tuition';
 import { SupportService } from '../platform/support.service';
 import { JobMap, Jobs } from './jobs.service';
 
 const REMINDER_TICK_MIN = 15;
 /** Tareas periódicas (coinciden con SCHEDULES del worker). */
-export const CRONS = new Set<string>(['events.reminders', 'billing.grace-sweep', 'finance.overdue', 'storage.recount', 'platform.snapshot', 'support.sla-sweep', 'billing.reconcile-addons', 'ops.orphan-scan', 'backups.export-tenants']);
+export const CRONS = new Set<string>(['events.reminders', 'billing.grace-sweep', 'finance.overdue', 'storage.recount', 'platform.snapshot', 'support.sla-sweep', 'billing.reconcile-addons', 'ops.orphan-scan', 'backups.export-tenants', 'school.tuition-issue']);
 
 @Injectable()
 export class Processors {
@@ -82,6 +86,8 @@ export class Processors {
         return this.billingOps.reconcileAddons();
       case 'backups.export-tenants':
         return this.backups.exportAll();
+      case 'school.tuition-issue':
+        return this.tuitionIssue();
       default:
         this.logger.warn(`Trabajo desconocido: ${job.name}`);
     }
@@ -158,12 +164,49 @@ export class Processors {
     return { sent };
   }
 
+  /** Cuotas de socios y mensualidades de la escuela con el vencimiento ya pasado. */
   async overdue(today = new Date()) {
-    const { count } = await this.db.system.feeCharge.updateMany({
-      where: { status: 'PENDING', dueDate: { lt: new Date(today.toISOString().slice(0, 10)) } },
-      data: { status: 'OVERDUE' },
-    });
-    return { overdue: count };
+    const where = { status: 'PENDING' as const, dueDate: { lt: new Date(today.toISOString().slice(0, 10)) } };
+    const [fees, tuition] = await Promise.all([
+      this.db.system.feeCharge.updateMany({ where, data: { status: 'OVERDUE' } }),
+      this.db.system.tuitionCharge.updateMany({ where, data: { status: 'OVERDUE' } }),
+    ]);
+    return { overdue: fees.count, tuitionOverdue: tuition.count };
+  }
+
+  /**
+   * Emisión programada: las escuelas con día de emisión igual a hoy emiten la mensualidad del mes
+   * en su curso actual (si el mes cae dentro del curso). Idempotente: repetir el día no duplica.
+   */
+  async tuitionIssue(now = new Date()) {
+    const today = madridToday(now);
+    const due = await this.db.system.schoolSettings.findMany({ where: { autoIssueDay: today.day }, select: { tenantId: true } });
+    let issued = 0;
+    for (const { tenantId } of due) {
+      const tenant = await this.db.system.tenant.findUnique({
+        where: { id: tenantId },
+        include: { plan: true, subscription: { select: { stripeSubscriptionId: true, stripeStatus: true } } },
+      });
+      if (!tenant || tenant.deletedAt || tenant.status === 'SUSPENDED' || !(await featuresFor(this.db, tenant)).has('school')) continue;
+      try {
+        const emails = await this.db.tenant(tenantId, async (tx) => {
+          const [settings, year] = await Promise.all([
+            tx.schoolSettings.findUniqueOrThrow({ where: { tenantId } }),
+            tx.schoolYear.findFirst({ where: { isCurrent: true } }),
+          ]);
+          if (!year || today.period < dayKey(year.startsOn).slice(0, 7) || today.period > dayKey(year.endsOn).slice(0, 7)) return [];
+          const dueDay = String(Math.max(settings.autoIssueDueDay, today.day)).padStart(2, '0');
+          const result = await issueTuition(tx, tenantId, { yearId: year.id, period: today.period, dueDate: new Date(`${today.period}-${dueDay}`) });
+          await new Audit().log(tx, { tenantId, userId: '' }, 'tuition.issued', 'school_year', year.id, { period: today.period, created: result.created, automatic: true });
+          issued += result.created;
+          return settings.notifyFamilies ? tuitionEmails(tx, tenant.name, today.period, result.studentIds) : [];
+        });
+        for (const e of emails) await this.jobs.add('email.send', { ...e, tenantId });
+      } catch (e) {
+        this.logger.warn(`No se pudieron emitir las mensualidades de ${tenantId}: ${(e as Error).message}`);
+      }
+    }
+    return { tenants: due.length, issued };
   }
 
   /** Recalcula el almacenamiento real por tenant para corregir derivas. */

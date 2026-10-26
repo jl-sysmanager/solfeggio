@@ -1076,6 +1076,12 @@ model SchoolSettings {
   familyDiscountCents     Int      @default(0)
   /// Texto de presentación del formulario público de matrícula.
   publicIntro             String?
+  /// Día del mes (1–28) en que se emiten solas las mensualidades del curso actual. Nulo: emisión manual.
+  autoIssueDay            Int?
+  /// Día del mes en que vencen las mensualidades emitidas solas.
+  autoIssueDueDay         Int      @default(5)
+  /// Avisar por email a las familias de matrículas resueltas y recibos emitidos.
+  notifyFamilies          Boolean  @default(true)
   updatedAt               DateTime @updatedAt
 
   @@map("school_settings")
@@ -1387,6 +1393,15 @@ model Grade {
   @@map("grades")
 }
 
+enum PaymentMethod {
+  CASH
+  CARD
+  TRANSFER
+  DIRECT_DEBIT
+  BIZUM
+  OTHER
+}
+
 model TuitionCharge {
   id            String       @id @default(uuid()) @db.Uuid
   tenantId      String       @map("tenant_id") @db.Uuid
@@ -1406,6 +1421,7 @@ model TuitionCharge {
   dueDate       DateTime     @db.Date
   status        ChargeStatus @default(PENDING)
   paidAt        DateTime?
+  paymentMethod PaymentMethod?
   transactionId String?      @db.Uuid
 
   @@unique([studentId, period])

@@ -17,10 +17,10 @@ describe('RBAC, planes y estado del tenant', () => {
   });
   afterAll(() => ctx.app.close());
 
-  it('se crean los 11 roles de sistema', async () => {
+  it('se crean los 12 roles de sistema', async () => {
     const roles = await ctx.http().get('/api/v1/roles').set(auth(band.token)).expect(200);
     expect(roles.body.map((r: { key: string }) => r.key).sort()).toEqual(
-      ['admin', 'archivist', 'collaborator', 'director', 'family', 'material_manager', 'musician', 'owner', 'secretary', 'teacher', 'treasurer'],
+      ['admin', 'archivist', 'collaborator', 'director', 'family', 'material_manager', 'musician', 'owner', 'school_coordinator', 'secretary', 'teacher', 'treasurer'],
     );
   });
 

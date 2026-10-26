@@ -256,3 +256,44 @@ export async function familyUserIds(tx: Tx, groupId?: string | null) {
   });
   return [...new Set(memberships.map((m) => m.userId))];
 }
+
+/**
+ * Sesiones de un grupo a partir de su horario semanal y del calendario del curso, desde hoy hasta el
+ * final del curso. Crea las que faltan y quita las futuras que ya no encajan (cambio de franja, nuevo
+ * festivo), salvo las que tienen asistencia, están canceladas o son recuperaciones.
+ */
+export async function syncGroupSessions(tx: Tx, tenantId: string, groupId: string, today = new Date()) {
+  const group = found(await tx.classGroup.findUnique({ where: { id: groupId }, include: { slots: true, year: true } }), 'Grupo');
+  const start = new Date(dayKey(today));
+  const from = new Date(Math.max(start.getTime(), group.year.startsOn.getTime()));
+  const to = group.year.endsOn;
+  const holidays = new Set(group.year.holidays.map(dayKey));
+  const wanted: (Prisma.ClassSessionCreateManyInput & { date: Date })[] = [];
+  for (let d = from; d <= to; d = new Date(d.getTime() + 86_400_000)) {
+    if (holidays.has(dayKey(d))) continue;
+    for (const s of group.slots.filter((x) => x.weekday === isoWeekday(d))) wanted.push({ tenantId, groupId, date: d, startMin: s.startMin, endMin: s.endMin });
+  }
+  const key = (s: { date: Date; startMin: number; endMin: number }) => `${dayKey(s.date)}|${s.startMin}|${s.endMin}`;
+  const keep = new Set(wanted.map(key));
+  const future = await tx.classSession.findMany({
+    where: { groupId, date: { gte: start }, status: 'SCHEDULED', makeUpForId: null, attendance: { none: {} } },
+    select: { id: true, date: true, startMin: true, endMin: true },
+  });
+  const stale = future.filter((s) => !keep.has(key(s))).map((s) => s.id);
+  if (stale.length) await tx.classSession.deleteMany({ where: { id: { in: stale } } });
+  const { count } = wanted.length ? await tx.classSession.createMany({ data: wanted, skipDuplicates: true }) : { count: 0 };
+  return { created: count, removed: stale.length };
+}
+
+/** Recalcula las sesiones de todos los grupos de un curso (fechas o festivos cambiados). */
+export async function syncYearSessions(tx: Tx, tenantId: string, yearId: string) {
+  const groups = await tx.classGroup.findMany({ where: { yearId }, select: { id: true } });
+  let created = 0;
+  let removed = 0;
+  for (const g of groups) {
+    const r = await syncGroupSessions(tx, tenantId, g.id);
+    created += r.created;
+    removed += r.removed;
+  }
+  return { groups: groups.length, created, removed };
+}

@@ -17,7 +17,7 @@ import { Modal } from '../Modal';
 import { useToast } from '../Toasts';
 import { groupLabel, useSchoolYears, YearSelect } from './common';
 
-function PublicLink({ slug }: { slug: string }) {
+export function PublicLink({ slug }: { slug: string }) {
   const toast = useToast();
   const url = `${window.location.origin}/enroll/${slug}`;
   return (
@@ -112,6 +112,7 @@ function AcceptModal({ app, groups, onClose }: { app: Application | null; groups
             />
           ))}
         </fieldset>
+        {app && <p className="small muted">Si la escuela avisa a las familias, {app.guardianEmail} recibirá un email con los grupos asignados.</p>}
         <FormError error={accept.error} />
         <div className="modal__footer">
           <Button variant="ghost" onClick={onClose}>
@@ -148,7 +149,7 @@ export function ApplicationsTab() {
     <div className="stack" style={{ gap: 24 }}>
       {settings.data?.slug && <PublicLink slug={settings.data.slug} />}
       {!years.length ? (
-        <EmptyState title="Sin cursos" icon="calendar">Crea un curso y abre la matrícula en Configuración.</EmptyState>
+        <EmptyState title="Sin cursos" icon="calendar">Crea un curso y abre la matrícula en Configuración › Matrícula y avisos.</EmptyState>
       ) : (
         <>
           <Card>

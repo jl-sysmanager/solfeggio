@@ -1,19 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { del, patch, post } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
 import type { Member, Paginated } from '../../api/types';
-import type { Family, Guardian } from '../../api/types-school';
+import type { Family, Guardian, PaymentMethod, TuitionCharge, TuitionPreview } from '../../api/types-school';
 import { useAuth } from '../../auth/AuthProvider';
-import { fullName } from '../../lib/format';
+import { fullName, money } from '../../lib/format';
+import { tuitionStatus } from '../../lib/labels-school';
 import { Button } from '../Button';
 import { Card } from '../Card';
-import { Chip } from '../Chip';
+import { Chip, StatusChip } from '../Chip';
 import { DataTable } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
 import { FormError, SelectField, TextAreaField, TextField, formValues } from '../Field';
 import { Menu, type MenuItem } from '../Menu';
 import { ConfirmModal, Modal } from '../Modal';
+import { useSchoolYears } from './common';
+import { PayModal } from './PayModal';
 
 function FamilyModal({ open, onClose, family }: { open: boolean; onClose: () => void; family?: Family | null }) {
   const save = useApiMutation((body: unknown) => (family ? patch(`/school/families/${family.id}`, body) : post('/school/families', body)), {
@@ -152,6 +155,93 @@ function LinkPortalModal({ guardian, onClose }: { guardian: Guardian | null; onC
   );
 }
 
+/** Cuota mensual estimada de la familia en el curso actual y, para quien cobra, lo que tiene pendiente. */
+function FamilyFeesModal({ family, onClose }: { family: Family; onClose: () => void }) {
+  const { can } = useAuth();
+  const tuition = can('school:tuition');
+  const { yearId, year } = useSchoolYears();
+  const estimate = useApiMutation((id: string) => post<TuitionPreview>('/school/tuition/preview', { yearId: id, familyId: family.id }));
+  const run = estimate.mutate;
+  useEffect(() => {
+    if (yearId) run(yearId);
+  }, [yearId, run]);
+  const charges = useApi<Paginated<TuitionCharge>>(tuition ? '/school/tuition/charges' : null, { familyId: family.id, pageSize: 100 });
+  const [paying, setPaying] = useState(false);
+  const pay = useApiMutation((v: { date: string; method: PaymentMethod }) => post(`/school/tuition/families/${family.id}/pay`, v), {
+    success: 'Cobro registrado en tesorería',
+    invalidate: ['/school', '/finance'],
+    onSuccess: () => setPaying(false),
+  });
+  const open = (charges.data?.data ?? []).filter((c) => c.status === 'PENDING' || c.status === 'OVERDUE');
+  const openCents = open.reduce((sum, c) => sum + c.amountCents, 0);
+  const r = estimate.data;
+  return (
+    <Modal open onClose={onClose} title={`Cuota de ${family.name}`}>
+      <div className="stack" style={{ gap: 16 }}>
+        <Card tone="cool" title={`Cuota mensual estimada${year ? ` (${year.name})` : ''}`} headingLevel={3}>
+          {!r ? (
+            estimate.isPending ? <Loading rows={2} /> : <p className="muted">{yearId ? 'Sin datos.' : 'Crea un curso para calcularla.'}</p>
+          ) : r.rows.length === 0 ? (
+            <p className="muted">Ningún alumno de la familia tiene matrículas activas en el curso.</p>
+          ) : (
+            <ul className="list-plain list-divided">
+              {r.rows.map((x) => (
+                <li key={x.studentId} className="row between">
+                  <span>
+                    {x.student.firstName}
+                    {x.discountCents > 0 && <span className="small muted"> (−{money(x.discountCents)} de descuento)</span>}
+                  </span>
+                  <strong>{money(x.amountCents)}</strong>
+                </li>
+              ))}
+              <li className="row between">
+                <span>Total al mes</span>
+                <strong>{money(r.totalAmountCents)}</strong>
+              </li>
+            </ul>
+          )}
+          <FormError error={estimate.error} />
+        </Card>
+        {tuition && (
+          <Card title="Pendiente de cobro" headingLevel={3}>
+            {charges.isLoading && <Loading rows={2} />}
+            {charges.data && open.length === 0 && <p className="muted">No tiene mensualidades pendientes.</p>}
+            {open.length > 0 && (
+              <>
+                <ul className="list-plain list-divided">
+                  {open.map((c) => (
+                    <li key={c.id} className="row between">
+                      <span>
+                        {c.period} · {c.student ? c.student.firstName : ''} <StatusChip value={c.status} map={tuitionStatus} />
+                      </span>
+                      <span>{money(c.amountCents)}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="row">
+                  <Button onClick={() => setPaying(true)}>Cobrar todo ({money(openCents)})</Button>
+                </div>
+              </>
+            )}
+          </Card>
+        )}
+      </div>
+      {paying && (
+        <PayModal
+          open
+          title={`Cobrar a ${family.name}`}
+          summary={`${open.length} mensualidades pendientes:`}
+          amountCents={openCents}
+          loading={pay.isPending}
+          error={pay.error}
+          onConfirm={(v) => pay.mutate(v)}
+          onClose={() => setPaying(false)}
+        />
+      )}
+    </Modal>
+  );
+}
+
 export function FamiliesTab() {
   const { can } = useAuth();
   const write = can('school:write');
@@ -162,6 +252,7 @@ export function FamiliesTab() {
   const [guardianFor, setGuardianFor] = useState<{ familyId: string; guardian: Guardian | null } | null>(null);
   const [linking, setLinking] = useState<Guardian | null>(null);
   const [removing, setRemoving] = useState<Guardian | null>(null);
+  const [fees, setFees] = useState<Family | null>(null);
   const invite = useApiMutation((g: Guardian) => post<{ linked?: boolean }>(`/school/guardians/${g.id}/invite`), {
     success: 'Portal de familias actualizado',
     invalidate: ['/school/families', '/school/staff-users'],
@@ -175,6 +266,7 @@ export function FamiliesTab() {
   function actions(f: Family): MenuItem[] {
     return [
       { label: 'Editar familia', onSelect: () => setEditing(f) },
+      { label: can('school:tuition') ? 'Cuota y cobros' : 'Cuota estimada', onSelect: () => setFees(f) },
       { label: 'Añadir tutor', onSelect: () => setGuardianFor({ familyId: f.id, guardian: null }) },
       ...f.guardians.flatMap((g) => [
         { label: `Editar a ${g.firstName}`, onSelect: () => setGuardianFor({ familyId: f.id, guardian: g }) },
@@ -242,6 +334,7 @@ export function FamiliesTab() {
       <FamilyModal open={creating || !!editing} family={editing} onClose={() => { setCreating(false); setEditing(null); }} />
       <GuardianModal open={!!guardianFor} familyId={guardianFor?.familyId ?? ''} guardian={guardianFor?.guardian} onClose={() => setGuardianFor(null)} />
       <LinkPortalModal guardian={linking} onClose={() => setLinking(null)} />
+      {fees && <FamilyFeesModal family={fees} onClose={() => setFees(null)} />}
       <ConfirmModal
         open={!!removing}
         title="Eliminar tutor"

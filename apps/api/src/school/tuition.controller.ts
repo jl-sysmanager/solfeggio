@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Header, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, HttpCode, Param, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
@@ -6,11 +6,13 @@ import type { RequestContext } from '../auth/context';
 import { Ctx, Perm, RequireFeature } from '../auth/decorators';
 import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
-import { idParam, isoDate, toDate } from '../common/schemas';
+import { cents, idParam, isoDate, toDate } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
-import { Db } from '../db/db.service';
+import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
-import { computeTuition, csvCell } from './school.helpers';
+import { Jobs } from '../jobs/jobs.service';
+import { csvCell } from './school.helpers';
+import { issueTuition, PAYMENT_METHODS, payCharge, previewTuition, tuitionEmails } from './tuition';
 
 const period = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Periodo: YYYY-MM');
 const issueSchema = z.object({ yearId: z.string().uuid(), period, dueDate: isoDate });
@@ -22,9 +24,22 @@ const chargesQuery = pageQuery.extend({
   familyId: z.string().uuid().optional(),
   studentId: z.string().uuid().optional(),
 });
-const paySchema = z.object({ date: isoDate });
+const method = z.enum(PAYMENT_METHODS);
+const paySchema = z.object({ date: isoDate, method: method.default('CASH') });
+const payManySchema = paySchema.extend({ chargeIds: z.array(z.string().uuid()).min(1).max(500) });
+const pct = z.number().int().min(0).max(100);
+const previewSchema = z.object({
+  yearId: z.string().uuid(),
+  familyId: z.string().uuid().optional(),
+  studentId: z.string().uuid().optional(),
+  /** Configuración sin guardar (simulador). */
+  settings: z
+    .object({ feeMode: z.enum(['PERCENT', 'FIXED']), siblingDiscountPct: pct, memberDiscountPct: pct, multiSubjectDiscountPct: pct, familyDiscountCents: cents })
+    .partial()
+    .optional(),
+});
 const exportQuery = z.object({ period, status: chargeStatus.optional() });
-const CATEGORY = 'Escuela de música';
+const OPEN = ['PENDING', 'OVERDUE'] as const;
 
 @ApiTags('school')
 @ApiBearerAuth()
@@ -34,41 +49,53 @@ export class TuitionController {
   constructor(
     private readonly db: Db,
     private readonly audit: Audit,
+    private readonly jobs: Jobs,
   ) {}
 
   /** Emite las mensualidades del periodo a los alumnos con matrículas activas. Idempotente por (alumno, periodo). */
-  @Perm('finance:write')
+  @Perm('school:tuition')
   @Post('issue')
-  issue(@Ctx() ctx: RequestContext, @Body(zod(issueSchema)) body: z.infer<typeof issueSchema>) {
+  async issue(@Ctx() ctx: RequestContext, @Body(zod(issueSchema)) body: z.infer<typeof issueSchema>) {
+    const { result, emails } = await this.db.tenant(ctx.tenantId, async (tx) => {
+      const result = await issueTuition(tx, ctx.tenantId, { yearId: body.yearId, period: body.period, dueDate: toDate(body.dueDate) });
+      await this.audit.log(tx, ctx, 'tuition.issued', 'school_year', body.yearId, { period: body.period, created: result.created });
+      const [settings, tenant] = await Promise.all([
+        tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId } }),
+        tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { name: true } }),
+      ]);
+      const emails = settings?.notifyFamilies === false ? [] : await tuitionEmails(tx, tenant.name, body.period, result.studentIds);
+      return { result, emails };
+    });
+    for (const e of emails) await this.jobs.add('email.send', { ...e, tenantId: ctx.tenantId });
+    return { created: result.created, skipped: result.skipped, emailed: emails.length };
+  }
+
+  /**
+   * Cuánto pagaría cada alumno (o una familia) con la configuración guardada o con otra sin guardar.
+   * Lo usan el simulador de Configuración y la confirmación de «Emitir».
+   */
+  @HttpCode(200)
+  @Post('preview')
+  preview(@Ctx() ctx: RequestContext, @Body(zod(previewSchema)) body: z.infer<typeof previewSchema>) {
+    if (!ctx.permissions.has('school:write') && !ctx.permissions.has('school:tuition')) {
+      throw new ForbiddenException({ message: 'No tienes permiso para esta acción', code: 'FORBIDDEN' });
+    }
     return this.db.tenant(ctx.tenantId, async (tx) => {
       found(await tx.schoolYear.findUnique({ where: { id: body.yearId } }), 'Curso');
-      const [settings, students] = await Promise.all([
-        tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId } }),
-        tx.student.findMany({
-          where: { status: 'ACTIVE' },
-          include: {
-            tuitionTariff: { select: { id: true, name: true, monthlyCents: true } },
-            family: { include: { guardians: { select: { memberId: true } } } },
-            enrollments: { where: { status: 'ACTIVE', group: { yearId: body.yearId } }, include: { group: { include: { subject: true } } } },
-          },
-        }),
-      ]);
-      const rows = computeTuition(students, settings ?? { siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, familyDiscountCents: 0 }).filter((r) => r.baseCents > 0);
-      const { count } = rows.length
-        ? await tx.tuitionCharge.createMany({
-            data: rows.map((r) => ({
-              tenantId: ctx.tenantId, yearId: body.yearId, studentId: r.studentId, familyId: r.familyId, period: body.period, baseCents: r.baseCents,
-              discountCents: r.discountCents, amountCents: r.amountCents, detail: r.detail as unknown as Prisma.InputJsonValue, dueDate: toDate(body.dueDate),
-            })),
-            skipDuplicates: true,
-          })
-        : { count: 0 };
-      await this.audit.log(tx, ctx, 'tuition.issued', 'school_year', body.yearId, { period: body.period, created: count });
-      return { created: count, skipped: rows.length - count };
+      const rows = (await previewTuition(tx, ctx.tenantId, body.yearId, body.settings)).filter(
+        (r) => (!body.familyId || r.familyId === body.familyId) && (!body.studentId || r.studentId === body.studentId),
+      );
+      return {
+        rows,
+        students: rows.length,
+        totalBaseCents: rows.reduce((s, r) => s + r.baseCents, 0),
+        totalDiscountCents: rows.reduce((s, r) => s + r.discountCents, 0),
+        totalAmountCents: rows.reduce((s, r) => s + r.amountCents, 0),
+      };
     });
   }
 
-  @Perm('finance:read')
+  @Perm('school:tuition')
   @Get('charges')
   charges(@Ctx() ctx: RequestContext, @Query(zod(chargesQuery)) q: z.infer<typeof chargesQuery>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
@@ -87,32 +114,51 @@ export class TuitionController {
     });
   }
 
-  /** Cobro: marca pagada y registra el ingreso en la categoría «Escuela de música». */
-  @Perm('finance:write')
+  /** Cobro: marca pagada con su forma de pago y registra el ingreso en la categoría «Escuela de música». */
+  @Perm('school:tuition')
   @HttpCode(200)
   @Post('charges/:id/pay')
   pay(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(paySchema)) body: z.infer<typeof paySchema>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
-      const charge = found(await tx.tuitionCharge.findUnique({ where: { id }, include: { student: true } }), 'Mensualidad');
-      if (charge.status === 'PAID' || charge.status === 'WAIVED') throw new BadRequestException({ message: 'La mensualidad ya está cerrada', code: 'CHARGE_CLOSED' });
-      const category = await tx.financeCategory.upsert({
-        where: { tenantId_name_kind: { tenantId: ctx.tenantId, name: CATEGORY, kind: 'INCOME' } },
-        create: { tenantId: ctx.tenantId, name: CATEGORY, kind: 'INCOME' },
-        update: {},
-      });
-      const t = await tx.transaction.create({
-        data: {
-          tenantId: ctx.tenantId, kind: 'INCOME', amountCents: charge.amountCents, date: toDate(body.date), categoryId: category.id,
-          description: `Mensualidad ${charge.period} · ${charge.student.firstName} ${charge.student.lastName}`, memberId: charge.student.memberId, createdById: ctx.userId,
-        },
-      });
-      const updated = await tx.tuitionCharge.update({ where: { id }, data: { status: 'PAID', paidAt: new Date(), transactionId: t.id } });
-      await this.audit.log(tx, ctx, 'tuition.paid', 'tuition_charge', id, { amountCents: charge.amountCents });
+      const updated = await payCharge(tx, ctx.tenantId, ctx.userId, id, toDate(body.date), body.method);
+      await this.audit.log(tx, ctx, 'tuition.paid', 'tuition_charge', id, { amountCents: updated.amountCents, method: body.method });
       return updated;
     });
   }
 
-  @Perm('finance:write')
+  /** Cobro de varias mensualidades a la vez (selección en la tabla). */
+  @Perm('school:tuition')
+  @HttpCode(200)
+  @Post('charges/pay')
+  payMany(@Ctx() ctx: RequestContext, @Body(zod(payManySchema)) body: z.infer<typeof payManySchema>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const ids = [...new Set(body.chargeIds)];
+      const open = await tx.tuitionCharge.findMany({ where: { id: { in: ids }, status: { in: [...OPEN] } }, select: { id: true } });
+      return this.payAll(tx, ctx, open.map((c) => c.id), body, ids.length - open.length);
+    });
+  }
+
+  /** Cobra de una vez todo lo pendiente de una familia. */
+  @Perm('school:tuition')
+  @HttpCode(200)
+  @Post('families/:id/pay')
+  payFamily(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) familyId: string, @Body(zod(paySchema)) body: z.infer<typeof paySchema>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      found(await tx.family.findUnique({ where: { id: familyId } }), 'Familia');
+      const open = await tx.tuitionCharge.findMany({ where: { familyId, status: { in: [...OPEN] } }, select: { id: true }, orderBy: { period: 'asc' } });
+      if (!open.length) throw new BadRequestException({ message: 'La familia no tiene mensualidades pendientes', code: 'NOTHING_TO_PAY' });
+      return this.payAll(tx, ctx, open.map((c) => c.id), body, 0);
+    });
+  }
+
+  private async payAll(tx: Tx, ctx: RequestContext, ids: string[], body: z.infer<typeof paySchema>, skipped: number) {
+    let amountCents = 0;
+    for (const id of ids) amountCents += (await payCharge(tx, ctx.tenantId, ctx.userId, id, toDate(body.date), body.method)).amountCents;
+    await this.audit.log(tx, ctx, 'tuition.paid_many', 'tuition_charge', null, { count: ids.length, amountCents, method: body.method });
+    return { paid: ids.length, skipped, amountCents };
+  }
+
+  @Perm('school:tuition')
   @HttpCode(200)
   @Post('charges/:id/waive')
   waive(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
@@ -126,7 +172,7 @@ export class TuitionController {
   }
 
   /** Exportación CSV de cargos (una línea por familia). */
-  @Perm('finance:read')
+  @Perm('school:tuition')
   @Header('Content-Type', 'text/csv; charset=utf-8')
   @Get('export.csv')
   async csv(@Ctx() ctx: RequestContext, @Query(zod(exportQuery)) q: z.infer<typeof exportQuery>) {

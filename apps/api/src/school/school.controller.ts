@@ -16,8 +16,9 @@ import { Jobs } from '../jobs/jobs.service';
 import { LimitsService } from '../tenancy/limits.service';
 import {
   assertCanTeachGroup, assertNoSlotConflict, blankToNull, dayKey, enroll, escapeLike, familyUserIds, isoWeekday,
-  serializeFamily, serializeGuardian, withdraw, yearConflicts,
+  serializeFamily, serializeGuardian, syncGroupSessions, syncYearSessions, withdraw, yearConflicts,
 } from './school.helpers';
+import { madridToday } from './tuition';
 
 const pct = z.number().int().min(0).max(100);
 const name80 = z.string().trim().min(1).max(80);
@@ -32,6 +33,9 @@ const settingsSchema = z.object({
   multiSubjectDiscountPct: pct.optional(),
   familyDiscountCents: cents.optional(),
   publicIntro: optionalText(4000),
+  autoIssueDay: z.number().int().min(1).max(28).nullable().optional(),
+  autoIssueDueDay: z.number().int().min(1).max(28).optional(),
+  notifyFamilies: z.boolean().optional(),
 });
 const tariffFields = z.object({ name: name80, monthlyCents: cents, active: z.boolean().optional() });
 const tariffPatch = tariffFields.partial();
@@ -65,7 +69,7 @@ const studentFields = z.object({
   notes: optionalText(2000),
   tuitionTariffId: z.string().uuid().nullable().optional(),
 });
-const studentBase = z.preprocess(blankToNull, studentFields);
+const studentBase = z.preprocess(blankToNull, studentFields.extend({ groupIds: z.array(z.string().uuid()).max(10).optional() }));
 const studentPatch = z.preprocess(blankToNull, studentFields.partial());
 const studentsQuery = pageQuery.extend({
   q: z.string().trim().max(100).optional(),
@@ -73,6 +77,32 @@ const studentsQuery = pageQuery.extend({
   familyId: z.string().uuid().optional(),
   groupId: z.string().uuid().optional(),
 });
+const bulkStudentsSchema = z.object({
+  studentIds: z.array(z.string().uuid()).min(1).max(500),
+  action: z.discriminatedUnion('type', [
+    z.object({ type: z.literal('tariff'), tariffId: z.string().uuid().nullable() }),
+    z.object({ type: z.literal('enroll'), groupId: z.string().uuid() }),
+    z.object({ type: z.literal('status'), status: studentStatus }),
+  ]),
+});
+const importRow = z.preprocess(
+  blankToNull,
+  z.object({
+    studentFirstName: name80,
+    studentLastName: z.string().trim().min(1).max(120),
+    birthDate: isoDate.nullable().optional(),
+    instrument: z.string().trim().max(60).nullable().optional(),
+    studentEmail: email,
+    studentPhone: phone,
+    familyName: z.string().trim().max(120).nullable().optional(),
+    guardianFirstName: z.string().trim().max(80).nullable().optional(),
+    guardianLastName: z.string().trim().max(120).nullable().optional(),
+    guardianEmail: email,
+    guardianPhone: phone,
+    notes: optionalText(2000),
+  }),
+);
+const importSchema = z.object({ rows: z.array(z.record(z.unknown())).min(1).max(1000), dryRun: z.boolean().default(true) });
 const familiesQuery = z.object({ q: z.string().trim().max(100).optional() });
 const yearFields = z.object({
   name: text(40),
@@ -82,8 +112,8 @@ const yearFields = z.object({
   enrollmentOpen: z.boolean().optional(),
   isCurrent: z.boolean().optional(),
 });
-const yearBase = yearFields.refine((y) => y.endsOn >= y.startsOn, { message: 'La fecha de fin debe ser posterior al inicio', path: ['endsOn'] });
 const copyFromSchema = z.object({ sourceYearId: z.string().uuid(), renewEnrollments: z.boolean().default(true) });
+const yearBase = yearFields.extend({ copyFrom: copyFromSchema.optional() }).refine((y) => y.endsOn >= y.startsOn, { message: 'La fecha de fin debe ser posterior al inicio', path: ['endsOn'] });
 const subjectFields = z.object({ name: name80, kind: z.enum(['INSTRUMENT', 'THEORY', 'ENSEMBLE', 'OTHER']), monthlyFeeCents: cents.optional(), active: z.boolean().optional() });
 const teacherFields = z.object({
   firstName: name80,
@@ -145,6 +175,7 @@ const promoteSchema = z.object({ stage: z.enum(['EDUCANDO', 'MUSICIAN']), sectio
 const noticeSchema = z.object({ groupId: z.string().uuid().nullable().optional(), title: text(150), body: text(5000) });
 const noticesQuery = z.object({ groupId: z.string().uuid().optional() });
 const reportQuery = z.object({ yearId: z.string().uuid().optional() });
+const overviewQuery = z.object({ yearId: z.string().uuid().optional() });
 
 const changedFields = (body: object) => ({ fields: Object.keys(body) });
 const groupInclude = {
@@ -179,7 +210,10 @@ export class SchoolController {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       const s = await tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId } });
       const tenant = await tx.tenant.findUnique({ where: { id: ctx.tenantId }, select: { slug: true } });
-      return { feeMode: 'PERCENT' as const, siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, familyDiscountCents: 0, publicIntro: null, ...s, slug: tenant?.slug };
+      return {
+        feeMode: 'PERCENT' as const, siblingDiscountPct: 0, memberDiscountPct: 0, multiSubjectDiscountPct: 0, familyDiscountCents: 0, publicIntro: null,
+        autoIssueDay: null, autoIssueDueDay: 5, notifyFamilies: true, ...s, slug: tenant?.slug, configured: !!s,
+      };
     });
   }
 
@@ -190,6 +224,85 @@ export class SchoolController {
       const s = await tx.schoolSettings.upsert({ where: { tenantId: ctx.tenantId }, create: { ...body, tenantId: ctx.tenantId }, update: body });
       await this.audit.log(tx, ctx, 'school.settings_updated', 'school_settings', s.id, changedFields(body));
       return s;
+    });
+  }
+
+  /**
+   * Panel de inicio de la escuela: lista de puesta en marcha (lo que falta por configurar), cifras del
+   * curso, cobros del mes y clases de hoy. Cada bloque depende del permiso de quien lo mira.
+   */
+  @Perm('school:read')
+  @Get('overview')
+  overview(@Ctx() ctx: RequestContext, @Query(zod(overviewQuery)) q: z.infer<typeof overviewQuery>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const years = await tx.schoolYear.findMany({ orderBy: [{ isCurrent: 'desc' }, { startsOn: 'desc' }] });
+      const year = (q.yearId ? years.find((y) => y.id === q.yearId) : years[0]) ?? null;
+      const today = madridToday();
+      const groupWhere: Prisma.ClassGroupWhereInput = { yearId: year?.id ?? '00000000-0000-0000-0000-000000000000' };
+      const [settings, subjects, teachers, students, families, groups, waitlist, pendingApplications, conflicts, todaySessions] = await Promise.all([
+        tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId } }),
+        tx.subject.count({ where: { active: true } }),
+        tx.teacher.count({ where: { active: true } }),
+        tx.student.count({ where: { status: 'ACTIVE' } }),
+        tx.family.count(),
+        tx.classGroup.findMany({ where: groupWhere, select: { id: true, teacherId: true, capacity: true, _count: { select: { slots: true, enrollments: { where: { status: 'ACTIVE' } } } } } }),
+        tx.enrollment.count({ where: { status: 'WAITLIST', group: groupWhere } }),
+        tx.enrollmentApplication.count({ where: { status: 'PENDING', ...(year && { yearId: year.id }) } }),
+        year ? yearConflicts(tx, year.id) : Promise.resolve([]),
+        tx.classSession.findMany({
+          where: {
+            date: new Date(today.iso),
+            group: { ...groupWhere, ...(!ctx.permissions.has('school:write') && { teacher: { userId: ctx.userId } }) },
+          },
+          include: { group: { select: { id: true, name: true, level: true, subject: { select: { name: true } } } }, _count: { select: { attendance: true } } },
+          orderBy: { startMin: 'asc' },
+        }),
+      ]);
+      const withoutSlots = groups.filter((g) => g._count.slots === 0).length;
+      const withoutTeacher = groups.filter((g) => !g.teacherId).length;
+      const capacity = groups.reduce((s, g) => s + (g.capacity ?? 0), 0);
+      const unlimited = groups.some((g) => g.capacity === null);
+      const counts = {
+        students, families, subjects, teachers, groups: groups.length, withoutSlots, withoutTeacher, waitlist, pendingApplications,
+        conflicts: conflicts.length, occupied: groups.reduce((s, g) => s + g._count.enrollments, 0), capacity: unlimited ? null : capacity,
+      };
+      const write = ctx.permissions.has('school:write');
+      const checklist = write
+        ? [
+            { id: 'year', title: 'Crea el curso escolar', detail: 'Fechas de inicio y fin y días sin clase.', to: '?tab=settings&section=cursos', done: years.length > 0 },
+            { id: 'current', title: 'Marca el curso actual', detail: 'Es el que se ve por defecto y el que se cobra.', to: '?tab=settings&section=cursos', done: years.some((y) => y.isCurrent) },
+            { id: 'subjects', title: 'Define las asignaturas y su precio', detail: 'Instrumentos, lenguaje musical y agrupaciones.', to: '?tab=settings&section=oferta', done: subjects > 0 },
+            { id: 'teachers', title: 'Añade al profesorado', detail: 'Con su usuario, cada profesor ve sólo sus grupos.', to: '?tab=settings&section=equipo', done: teachers > 0 },
+            { id: 'groups', title: 'Crea los grupos del curso', detail: 'O cópialos del curso anterior con el asistente.', to: '?tab=groups', done: groups.length > 0 },
+            { id: 'slots', title: 'Pon horario a todos los grupos', detail: withoutSlots ? `${withoutSlots} grupo(s) sin horario.` : 'Las clases se crean solas a partir del horario.', to: '?tab=groups', done: groups.length > 0 && withoutSlots === 0 },
+            { id: 'fees', title: 'Revisa la forma de cobro', detail: 'Descuentos o tarifas fijas, y el día de emisión.', to: '?tab=settings&section=cobro', done: !!settings },
+            { id: 'enrollment', title: 'Abre la matrícula o da de alta alumnos', detail: 'Comparte el formulario online o importa tu lista.', to: '?tab=settings&section=matricula', done: students > 0 || !!year?.enrollmentOpen },
+          ]
+        : [];
+      let tuition = null;
+      if (ctx.permissions.has('school:tuition')) {
+        const open = { status: { in: ['PENDING', 'OVERDUE'] as ('PENDING' | 'OVERDUE')[] } };
+        const [issued, pending, overdue] = await Promise.all([
+          tx.tuitionCharge.aggregate({ where: { period: today.period }, _count: true, _sum: { amountCents: true } }),
+          tx.tuitionCharge.aggregate({ where: { ...open }, _count: true, _sum: { amountCents: true } }),
+          tx.tuitionCharge.aggregate({ where: { status: 'OVERDUE' }, _count: true, _sum: { amountCents: true } }),
+        ]);
+        tuition = {
+          period: today.period,
+          issuedCount: issued._count, issuedCents: issued._sum.amountCents ?? 0,
+          pendingCount: pending._count, pendingCents: pending._sum.amountCents ?? 0,
+          overdueCount: overdue._count, overdueCents: overdue._sum.amountCents ?? 0,
+          autoIssueDay: settings?.autoIssueDay ?? null,
+        };
+      }
+      return {
+        year: year && { id: year.id, name: year.name, isCurrent: year.isCurrent, enrollmentOpen: year.enrollmentOpen, startsOn: year.startsOn, endsOn: year.endsOn },
+        hasYears: years.length > 0,
+        counts,
+        checklist,
+        tuition,
+        today: todaySessions,
+      };
     });
   }
 
@@ -515,10 +628,139 @@ export class SchoolController {
       if (body.status !== 'LEFT') await this.limits.assertCanAddStudent(tx, ctx.tenantId);
       if (body.familyId) found(await tx.family.findUnique({ where: { id: body.familyId } }), 'Familia');
       await this.assertTariff(tx, body.tuitionTariffId);
-      const { birthDate, ...rest } = body;
+      const { birthDate, groupIds = [], ...rest } = body;
       const s = await tx.student.create({ data: { ...rest, birthDate: birthDate ? toDate(birthDate) : null, tenantId: ctx.tenantId } });
-      await this.audit.log(tx, ctx, 'student.created', 'student', s.id, changedFields(body));
-      return s;
+      // Alta y matrícula en el mismo paso.
+      const enrollments = [];
+      for (const groupId of new Set(groupIds)) enrollments.push(await enroll(tx, ctx.tenantId, s.id, groupId));
+      await this.audit.log(tx, ctx, 'student.created', 'student', s.id, { ...changedFields(body), groups: enrollments.length });
+      return { ...s, enrollments };
+    });
+  }
+
+  /** Acciones sobre varios alumnos: tarifa, matrícula en un grupo o estado. */
+  @Perm('school:write')
+  @HttpCode(200)
+  @Post('students/bulk')
+  bulkStudents(@Ctx() ctx: RequestContext, @Body(zod(bulkStudentsSchema)) body: z.infer<typeof bulkStudentsSchema>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const ids = [...new Set(body.studentIds)];
+      const students = await tx.student.findMany({ where: { id: { in: ids } }, select: { id: true, status: true } });
+      if (students.length !== ids.length) throw new BadRequestException({ message: 'Algún alumno no existe', code: 'NOT_FOUND' });
+      const action = body.action;
+      let updated = 0;
+      let waitlisted = 0;
+      let skipped = 0;
+      if (action.type === 'tariff') {
+        if (action.tariffId) await this.assertTariff(tx, action.tariffId);
+        updated = (await tx.student.updateMany({ where: { id: { in: ids } }, data: { tuitionTariffId: action.tariffId } })).count;
+      } else if (action.type === 'enroll') {
+        const group = found(await tx.classGroup.findUnique({ where: { id: action.groupId } }), 'Grupo');
+        const already = new Set(
+          (await tx.enrollment.findMany({ where: { groupId: group.id, studentId: { in: ids }, status: { not: 'WITHDRAWN' } }, select: { studentId: true } })).map((e) => e.studentId),
+        );
+        for (const st of students) {
+          if (already.has(st.id) || st.status === 'LEFT') {
+            skipped++;
+            continue;
+          }
+          const e = await enroll(tx, ctx.tenantId, st.id, group.id);
+          if (e.status === 'WAITLIST') waitlisted++;
+          else updated++;
+        }
+      } else {
+        for (const st of students) {
+          if (st.status === action.status) {
+            skipped++;
+            continue;
+          }
+          if (st.status === 'LEFT') await this.limits.assertCanAddStudent(tx, ctx.tenantId);
+          await tx.student.update({ where: { id: st.id }, data: { status: action.status } });
+          if (action.status === 'LEFT') {
+            const open = await tx.enrollment.findMany({ where: { studentId: st.id, status: { not: 'WITHDRAWN' } }, select: { id: true } });
+            for (const e of open) await withdraw(tx, e.id);
+          }
+          updated++;
+        }
+      }
+      await this.audit.log(tx, ctx, 'student.bulk', 'student', null, { type: action.type, count: ids.length, updated, waitlisted, skipped });
+      return { updated, waitlisted, skipped };
+    });
+  }
+
+  /**
+   * Importación de alumnos y familias desde una hoja de cálculo. Con `dryRun` sólo valida y cuenta;
+   * sin él, crea lo válido. Los alumnos que ya existen (mismo nombre y fecha de nacimiento) se saltan.
+   * Las filas con el mismo nombre de familia o el mismo email de tutor comparten familia.
+   */
+  @Perm('school:write')
+  @HttpCode(200)
+  @Post('students/import')
+  importStudents(@Ctx() ctx: RequestContext, @Body(zod(importSchema)) body: z.infer<typeof importSchema>) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const errors: { row: number; message: string }[] = [];
+      const valid: { row: number; data: z.infer<typeof importRow> }[] = [];
+      body.rows.forEach((raw, i) => {
+        const r = importRow.safeParse(raw);
+        if (r.success) valid.push({ row: i + 1, data: r.data });
+        else errors.push({ row: i + 1, message: r.error.issues.map((x) => `${x.path.join('.') || 'fila'}: ${x.message}`).join('; ') });
+      });
+      const [students, families, guardians] = await Promise.all([
+        tx.student.findMany({ select: { firstName: true, lastName: true, birthDate: true } }),
+        tx.family.findMany({ select: { id: true, name: true } }),
+        tx.guardian.findMany({ where: { email: { not: null } }, select: { familyId: true, email: true } }),
+      ]);
+      const norm = (v: string) => v.normalize('NFD').replace(/\p{M}/gu, '').trim().toLowerCase();
+      const studentKey = (first: string, last: string, birth: string | null | undefined) => `${norm(first)}|${norm(last)}|${birth ?? ''}`;
+      const seen = new Set(students.map((s) => studentKey(s.firstName, s.lastName, s.birthDate ? dayKey(s.birthDate) : null)));
+      const familyByName = new Map(families.map((f) => [norm(f.name), f.id]));
+      const familyByEmail = new Map(guardians.map((g) => [g.email!.toLowerCase(), g.familyId]));
+      const pending = new Map<string, string>(); // clave de familia nueva → id (o marcador en simulación)
+      let created = 0;
+      let duplicates = 0;
+      let newFamilies = 0;
+      for (const { row, data } of valid) {
+        const key = studentKey(data.studentFirstName, data.studentLastName, data.birthDate);
+        if (seen.has(key)) {
+          duplicates++;
+          errors.push({ row, message: 'El alumno ya existe: se omite' });
+          continue;
+        }
+        seen.add(key);
+        const guardianEmail = data.guardianEmail?.toLowerCase() ?? null;
+        const familyName = data.familyName ?? (data.guardianLastName || guardianEmail ? `Familia ${data.studentLastName}` : null);
+        let familyId: string | null = (guardianEmail && familyByEmail.get(guardianEmail)) || (data.familyName && familyByName.get(norm(data.familyName))) || null;
+        const newKey = guardianEmail ?? (familyName ? norm(familyName) : null);
+        if (!familyId && newKey) familyId = pending.get(newKey) ?? null;
+        if (!familyId && familyName && newKey) {
+          newFamilies++;
+          familyId = body.dryRun ? `new:${newKey}` : (await tx.family.create({ data: { tenantId: ctx.tenantId, name: familyName } })).id;
+          pending.set(newKey, familyId);
+          if (data.familyName) familyByName.set(norm(data.familyName), familyId);
+          if (!body.dryRun && (data.guardianFirstName || guardianEmail)) {
+            await tx.guardian.create({
+              data: {
+                tenantId: ctx.tenantId, familyId, firstName: data.guardianFirstName ?? guardianEmail!.split('@')[0], lastName: data.guardianLastName ?? '-',
+                email: guardianEmail, phone: data.guardianPhone ?? null,
+              },
+            });
+          }
+          if (guardianEmail) familyByEmail.set(guardianEmail, familyId);
+        }
+        if (!body.dryRun) {
+          await this.limits.assertCanAddStudent(tx, ctx.tenantId);
+          await tx.student.create({
+            data: {
+              tenantId: ctx.tenantId, familyId, firstName: data.studentFirstName, lastName: data.studentLastName,
+              birthDate: data.birthDate ? toDate(data.birthDate) : null, instrument: data.instrument ?? null,
+              email: data.studentEmail?.toLowerCase() ?? null, phone: data.studentPhone ?? null, notes: data.notes ?? null,
+            },
+          });
+        }
+        created++;
+      }
+      if (!body.dryRun) await this.audit.log(tx, ctx, 'student.imported', 'student', null, { created, newFamilies, duplicates, errors: errors.length });
+      return { dryRun: body.dryRun, total: body.rows.length, created, newFamilies, duplicates, errors: errors.sort((a, b) => a.row - b.row) };
     });
   }
 
@@ -542,7 +784,7 @@ export class SchoolController {
         'Alumno',
       );
       const attendance = await tx.classAttendance.groupBy({ by: ['status'], where: { studentId: id }, _count: true });
-      const charges = ctx.permissions.has('finance:read')
+      const charges = ctx.permissions.has('school:tuition')
         ? await tx.tuitionCharge.findMany({ where: { studentId: id }, orderBy: { period: 'desc' }, take: 24 })
         : undefined;
       const { family, ...rest } = s;
@@ -657,12 +899,15 @@ export class SchoolController {
   @Post('years')
   createYear(@Ctx() ctx: RequestContext, @Body(zod(yearBase)) body: z.infer<typeof yearBase>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
-      if (body.isCurrent) await tx.schoolYear.updateMany({ data: { isCurrent: false } });
+      const { copyFrom, ...fields } = body;
+      if (fields.isCurrent) await tx.schoolYear.updateMany({ data: { isCurrent: false } });
       const y = await tx.schoolYear.create({
-        data: { ...body, startsOn: toDate(body.startsOn), endsOn: toDate(body.endsOn), holidays: (body.holidays ?? []).map(toDate), tenantId: ctx.tenantId },
+        data: { ...fields, startsOn: toDate(fields.startsOn), endsOn: toDate(fields.endsOn), holidays: (fields.holidays ?? []).map(toDate), tenantId: ctx.tenantId },
       });
       await this.audit.log(tx, ctx, 'school_year.created', 'school_year', y.id, { name: y.name });
-      return y;
+      // Asistente de nuevo curso: copia grupos y horarios (y rematricula) en el mismo paso.
+      const copied = copyFrom ? await this.copyGroups(tx, ctx, y.id, copyFrom) : null;
+      return { ...y, copied };
     });
   }
 
@@ -677,7 +922,9 @@ export class SchoolController {
       if (body.isCurrent) await tx.schoolYear.updateMany({ where: { id: { not: id } }, data: { isCurrent: false } });
       const y = await tx.schoolYear.update({ where: { id }, data: { ...body, startsOn, endsOn, holidays: body.holidays?.map(toDate) } });
       await this.audit.log(tx, ctx, 'school_year.updated', 'school_year', id, changedFields(body));
-      return y;
+      // Nuevas fechas o festivos: las sesiones futuras se rehacen solas.
+      const sessions = body.startsOn || body.endsOn || body.holidays ? await syncYearSessions(tx, ctx.tenantId, id) : null;
+      return { ...y, sessions };
     });
   }
 
@@ -687,38 +934,74 @@ export class SchoolController {
   copyFrom(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(copyFromSchema)) body: z.infer<typeof copyFromSchema>) {
     return this.db.tenant(ctx.tenantId, async (tx) => {
       found(await tx.schoolYear.findUnique({ where: { id } }), 'Curso');
-      found(await tx.schoolYear.findUnique({ where: { id: body.sourceYearId } }), 'Curso de origen');
-      if (id === body.sourceYearId) throw new BadRequestException({ message: 'Elige otro curso de origen', code: 'SAME_YEAR' });
-      const [source, existing] = await Promise.all([
-        tx.classGroup.findMany({
-          where: { yearId: body.sourceYearId },
-          include: { slots: true, enrollments: { where: { status: 'ACTIVE', student: { status: 'ACTIVE' } }, orderBy: { enrolledAt: 'asc' } } },
-        }),
-        tx.classGroup.findMany({ where: { yearId: id }, select: { subjectId: true, name: true } }),
-      ]);
-      let groups = 0;
-      let enrollments = 0;
-      let waitlisted = 0;
-      for (const g of source) {
-        // Idempotente: no duplica grupos ya copiados (misma asignatura y nombre).
-        if (existing.some((e) => e.subjectId === g.subjectId && e.name === g.name)) continue;
-        const created = await tx.classGroup.create({
-          data: {
-            tenantId: ctx.tenantId, yearId: id, subjectId: g.subjectId, name: g.name, level: g.level, teacherId: g.teacherId,
-            capacity: g.capacity, monthlyFeeCents: g.monthlyFeeCents,
-            slots: { create: g.slots.map((s) => ({ tenantId: ctx.tenantId, weekday: s.weekday, startMin: s.startMin, endMin: s.endMin, roomId: s.roomId })) },
-          },
-        });
-        groups++;
-        if (!body.renewEnrollments) continue;
-        for (const e of g.enrollments) {
-          const n = await enroll(tx, ctx.tenantId, e.studentId, created.id);
-          if (n.status === 'ACTIVE') enrollments++;
-          else waitlisted++;
-        }
+      return this.copyGroups(tx, ctx, id, body);
+    });
+  }
+
+  /** Copia grupos y horarios de otro curso (sin duplicar) y, si se pide, rematricula a los alumnos activos. */
+  private async copyGroups(tx: Tx, ctx: RequestContext, id: string, body: z.infer<typeof copyFromSchema>) {
+    found(await tx.schoolYear.findUnique({ where: { id: body.sourceYearId } }), 'Curso de origen');
+    if (id === body.sourceYearId) throw new BadRequestException({ message: 'Elige otro curso de origen', code: 'SAME_YEAR' });
+    const [source, existing] = await Promise.all([
+      tx.classGroup.findMany({
+        where: { yearId: body.sourceYearId },
+        include: { slots: true, enrollments: { where: { status: 'ACTIVE', student: { status: 'ACTIVE' } }, orderBy: { enrolledAt: 'asc' } } },
+      }),
+      tx.classGroup.findMany({ where: { yearId: id }, select: { subjectId: true, name: true } }),
+    ]);
+    let groups = 0;
+    let enrollments = 0;
+    let waitlisted = 0;
+    for (const g of source) {
+      // Idempotente: no duplica grupos ya copiados (misma asignatura y nombre).
+      if (existing.some((e) => e.subjectId === g.subjectId && e.name === g.name)) continue;
+      const created = await tx.classGroup.create({
+        data: {
+          tenantId: ctx.tenantId, yearId: id, subjectId: g.subjectId, name: g.name, level: g.level, teacherId: g.teacherId,
+          capacity: g.capacity, monthlyFeeCents: g.monthlyFeeCents,
+          slots: { create: g.slots.map((s) => ({ tenantId: ctx.tenantId, weekday: s.weekday, startMin: s.startMin, endMin: s.endMin, roomId: s.roomId })) },
+        },
+      });
+      groups++;
+      await syncGroupSessions(tx, ctx.tenantId, created.id);
+      if (!body.renewEnrollments) continue;
+      for (const e of g.enrollments) {
+        const n = await enroll(tx, ctx.tenantId, e.studentId, created.id);
+        if (n.status === 'ACTIVE') enrollments++;
+        else waitlisted++;
       }
-      await this.audit.log(tx, ctx, 'school_year.copied', 'school_year', id, { sourceYearId: body.sourceYearId, groups, enrollments, waitlisted });
-      return { groups, enrollments, waitlisted };
+    }
+    await this.audit.log(tx, ctx, 'school_year.copied', 'school_year', id, { sourceYearId: body.sourceYearId, groups, enrollments, waitlisted });
+    return { groups, enrollments, waitlisted };
+  }
+
+  /** Resumen de un curso para el asistente: qué se copiaría. */
+  @Perm('school:read')
+  @Get('years/:id/summary')
+  yearSummary(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      const year = found(await tx.schoolYear.findUnique({ where: { id } }), 'Curso');
+      const groups = await tx.classGroup.findMany({
+        where: { yearId: id },
+        include: { subject: { select: { name: true } }, teacher: { select: { firstName: true, lastName: true } }, _count: { select: { slots: true, enrollments: { where: { status: 'ACTIVE', student: { status: 'ACTIVE' } } } } } },
+        orderBy: [{ subject: { name: 'asc' } }, { name: 'asc' }],
+      });
+      return {
+        year,
+        groups: groups.map((g) => ({ id: g.id, name: g.name, level: g.level, subject: g.subject.name, teacher: g.teacher, slots: g._count.slots, students: g._count.enrollments })),
+        students: new Set((await tx.enrollment.findMany({ where: { group: { yearId: id }, status: 'ACTIVE', student: { status: 'ACTIVE' } }, select: { studentId: true } })).map((e) => e.studentId)).size,
+      };
+    });
+  }
+
+  /** Rehace las sesiones de todos los grupos del curso a partir del horario y los festivos. */
+  @Perm('school:write')
+  @HttpCode(200)
+  @Post('years/:id/sessions/sync')
+  syncSessions(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
+    return this.db.tenant(ctx.tenantId, async (tx) => {
+      found(await tx.schoolYear.findUnique({ where: { id } }), 'Curso');
+      return syncYearSessions(tx, ctx.tenantId, id);
     });
   }
 
@@ -917,7 +1200,8 @@ export class SchoolController {
       const conflicts = await assertNoSlotConflict(tx, group, { ...slot, roomId: slot.roomId ?? null }, force);
       const created = await tx.classSlot.create({ data: { ...slot, groupId, tenantId: ctx.tenantId }, include: { room: { select: { id: true, name: true } } } });
       if (conflicts.length) await this.audit.log(tx, ctx, 'class_slot.conflict_forced', 'class_slot', created.id, { conflicts: conflicts.length });
-      return created;
+      const sessions = await syncGroupSessions(tx, ctx.tenantId, groupId);
+      return { ...created, sessions };
     });
   }
 
@@ -933,7 +1217,8 @@ export class SchoolController {
       const conflicts = await assertNoSlotConflict(tx, current.group, next, force);
       const updated = await tx.classSlot.update({ where: { id }, data: patch, include: { room: { select: { id: true, name: true } } } });
       if (conflicts.length) await this.audit.log(tx, ctx, 'class_slot.conflict_forced', 'class_slot', id, { conflicts: conflicts.length });
-      return updated;
+      const sessions = await syncGroupSessions(tx, ctx.tenantId, current.groupId);
+      return { ...updated, sessions };
     });
   }
 
@@ -942,8 +1227,9 @@ export class SchoolController {
   @Delete('slots/:id')
   async deleteSlot(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string) {
     await this.db.tenant(ctx.tenantId, async (tx) => {
-      found(await tx.classSlot.findUnique({ where: { id } }), 'Franja');
+      const slot = found(await tx.classSlot.findUnique({ where: { id } }), 'Franja');
       await tx.classSlot.delete({ where: { id } });
+      await syncGroupSessions(tx, ctx.tenantId, slot.groupId);
     });
   }
 
@@ -995,8 +1281,8 @@ export class SchoolController {
   @Perm('school:write')
   @HttpCode(200)
   @Post('applications/:id/accept')
-  accept(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(acceptSchema)) body: z.infer<typeof acceptSchema>) {
-    return this.db.tenant(ctx.tenantId, async (tx) => {
+  async accept(@Ctx() ctx: RequestContext, @Param('id', zod(idParam)) id: string, @Body(zod(acceptSchema)) body: z.infer<typeof acceptSchema>) {
+    const { result, email } = await this.db.tenant(ctx.tenantId, async (tx) => {
       const app = found(await tx.enrollmentApplication.findUnique({ where: { id } }), 'Solicitud');
       if (app.status === 'ACCEPTED' || app.status === 'REJECTED') throw new BadRequestException({ message: 'La solicitud ya está resuelta', code: 'APPLICATION_CLOSED' });
       const groups = await tx.classGroup.findMany({ where: { id: { in: body.groupIds } } });
@@ -1023,8 +1309,29 @@ export class SchoolController {
       for (const g of groups) enrollments.push(await enroll(tx, ctx.tenantId, student.id, g.id));
       const updated = await tx.enrollmentApplication.update({ where: { id }, data: { status: 'ACCEPTED', studentId: student.id, reviewedAt: new Date() } });
       await this.audit.log(tx, ctx, 'application.accepted', 'enrollment_application', id, { studentId: student.id, groups: body.groupIds.length });
-      return { application: updated, student, enrollments };
+      const lines = enrollments.map((e) => {
+        const g = groups.find((x) => x.id === e.groupId)!;
+        return `- ${g.name}: ${e.status === 'ACTIVE' ? 'plaza confirmada' : 'en lista de espera'}`;
+      });
+      return { result: { application: updated, student, enrollments }, email: await this.applicantEmail(tx, ctx, app, 'ACCEPTED', lines) };
     });
+    // Se encola tras confirmar la transacción para no avisar de algo que no se ha guardado.
+    if (email) await this.jobs.add('email.send', email);
+    return result;
+  }
+
+  /** Email al tutor que hizo la solicitud cuando se resuelve (si la escuela avisa a las familias). */
+  private async applicantEmail(tx: Tx, ctx: RequestContext, app: { studentFirstName: string; guardianEmail: string }, status: 'ACCEPTED' | 'WAITLISTED' | 'REJECTED', lines: string[] = []) {
+    const settings = await tx.schoolSettings.findUnique({ where: { tenantId: ctx.tenantId }, select: { notifyFamilies: true } });
+    if (settings?.notifyFamilies === false) return null;
+    const tenant = await tx.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId }, select: { name: true } });
+    const text = {
+      ACCEPTED: `Hola:\n\nLa solicitud de matrícula de ${app.studentFirstName} en la escuela de ${tenant.name} ha sido aceptada.${lines.length ? `\n\n${lines.join('\n')}` : ''}\n\nEn breve recibiréis el acceso al portal de familias con el horario.`,
+      WAITLISTED: `Hola:\n\nLa solicitud de matrícula de ${app.studentFirstName} en la escuela de ${tenant.name} queda en lista de espera. Os avisaremos en cuanto haya plaza.`,
+      REJECTED: `Hola:\n\nSentimos comunicaros que la solicitud de matrícula de ${app.studentFirstName} en la escuela de ${tenant.name} no ha podido aceptarse este curso. Para cualquier duda, responded a este correo o contactad con la escuela.`,
+    }[status];
+    const subject = { ACCEPTED: 'Matrícula aceptada', WAITLISTED: 'Matrícula en lista de espera', REJECTED: 'Solicitud de matrícula' }[status];
+    return { to: app.guardianEmail, subject: `${tenant.name}: ${subject}`, text, tenantId: ctx.tenantId };
   }
 
   @Perm('school:write')
@@ -1041,14 +1348,17 @@ export class SchoolController {
     return this.resolveApplication(ctx, id, 'REJECTED');
   }
 
-  private resolveApplication(ctx: RequestContext, id: string, status: 'WAITLISTED' | 'REJECTED') {
-    return this.db.tenant(ctx.tenantId, async (tx) => {
+  private async resolveApplication(ctx: RequestContext, id: string, status: 'WAITLISTED' | 'REJECTED') {
+    const { updated, email } = await this.db.tenant(ctx.tenantId, async (tx) => {
       const app = found(await tx.enrollmentApplication.findUnique({ where: { id } }), 'Solicitud');
       if (app.status === 'ACCEPTED') throw new BadRequestException({ message: 'La solicitud ya está aceptada', code: 'APPLICATION_CLOSED' });
       const updated = await tx.enrollmentApplication.update({ where: { id }, data: { status, reviewedAt: new Date() } });
       await this.audit.log(tx, ctx, `application.${status.toLowerCase()}`, 'enrollment_application', id);
-      return updated;
+      // Sólo se avisa al cambiar de estado (pasar dos veces a lista de espera no repite el correo).
+      return { updated, email: app.status === status ? null : await this.applicantEmail(tx, ctx, app, status) };
     });
+    if (email) await this.jobs.add('email.send', email);
+    return updated;
   }
 
   // ── Clases: sesiones, asistencia y notas ──────────────────────────────────

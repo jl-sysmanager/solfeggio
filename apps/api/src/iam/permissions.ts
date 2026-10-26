@@ -29,6 +29,7 @@ export const PERMISSIONS = [
   { key: 'school:read', group: 'Escuela', label: 'Ver alumnos, grupos y horarios' },
   { key: 'school:write', group: 'Escuela', label: 'Gestionar alumnos, matrículas y grupos' },
   { key: 'school:teach', group: 'Escuela', label: 'Pasar lista, poner notas y avisos en clase' },
+  { key: 'school:tuition', group: 'Escuela', label: 'Emitir y cobrar mensualidades' },
   { key: 'school:family', group: 'Escuela', label: 'Portal de familias' },
   { key: 'performances:read', group: 'Actuaciones', label: 'Ver clientes, presupuestos y facturas' },
   { key: 'performances:write', group: 'Actuaciones', label: 'Presupuestar, contratar y facturar actuaciones' },
@@ -72,7 +73,7 @@ export const SYSTEM_ROLES: { key: string; name: string; permissions: Permission[
     name: 'Tesorero',
     permissions: [
       'finance:read', 'finance:write', 'members:read', 'members:sensitive', 'events:read', 'attendance:self',
-      'documents:read', 'archive:read', 'incidents:write', 'school:read', 'performances:read', 'performances:write',
+      'documents:read', 'archive:read', 'incidents:write', 'school:read', 'school:tuition', 'performances:read', 'performances:write',
       'governance:read', 'governance:vote',
     ],
   },
@@ -95,6 +96,7 @@ export const SYSTEM_ROLES: { key: string; name: string; permissions: Permission[
       'incidents:write',
     ],
   },
+  { key: 'school_coordinator', name: 'Coordinador de escuela', permissions: ['events:read', 'school:read', 'school:teach', 'school:tuition', 'school:write'] },
   { key: 'teacher', name: 'Profesor', permissions: ['archive:read', 'events:read', 'school:read', 'school:teach'] },
   { key: 'family', name: 'Familia', permissions: ['school:family'] },
 ];

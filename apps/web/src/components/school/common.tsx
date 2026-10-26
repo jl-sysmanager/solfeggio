@@ -57,3 +57,47 @@ export function centsOrNull(v: string | undefined) {
 }
 
 export const euros = (cents: number | null | undefined) => (cents === null || cents === undefined ? '' : (cents / 100).toFixed(2).replace('.', ','));
+
+/**
+ * Curso que propone el asistente: el siguiente al más reciente o, en una escuela sin cursos, el que
+ * está en marcha (septiembre a junio).
+ */
+export function suggestedYear(years: Pick<SchoolYear, 'startsOn'>[], now = new Date()) {
+  const latest = years.map((y) => Number(y.startsOn.slice(0, 4))).sort((a, b) => b - a)[0];
+  const start = latest !== undefined ? latest + 1 : now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
+  return { name: `${start}-${String((start + 1) % 100).padStart(2, '0')}`, startsOn: `${start}-09-01`, endsOn: `${start + 1}-06-30` };
+}
+
+/** CSV de una hoja de cálculo (separador «;» o «,», comillas dobles) → filas de texto. */
+export function parseCsv(text: string): string[][] {
+  const clean = text.replace(/^﻿/, '');
+  const firstLine = clean.split(/\r?\n/, 1)[0] ?? '';
+  const sep = (firstLine.match(/;/g)?.length ?? 0) >= (firstLine.match(/,/g)?.length ?? 0) ? ';' : ',';
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i];
+    if (quoted) {
+      if (ch === '"' && clean[i + 1] === '"') {
+        cell += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else cell += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === sep) {
+      row.push(cell);
+      cell = '';
+    } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && clean[i + 1] === '\n') i++;
+      row.push(cell);
+      if (row.some((c) => c.trim())) rows.push(row);
+      row = [];
+      cell = '';
+    } else cell += ch;
+  }
+  row.push(cell);
+  if (row.some((c) => c.trim())) rows.push(row);
+  return rows;
+}
