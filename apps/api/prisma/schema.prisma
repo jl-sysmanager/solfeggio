@@ -109,6 +109,16 @@ model Tenant {
   @@map("tenants")
 }
 
+/// Ajustes globales del panel. Una sola fila (`id = default`).
+model PlatformConfig {
+  id              String   @id
+  /// Copias de cada banda que se conservan. Las más antiguas se borran.
+  backupRetention Int      @default(30)
+  updatedAt       DateTime @updatedAt
+
+  @@map("platform_config")
+}
+
 /// Logotipo de la plataforma. Una sola fila (`id = platform`), editable desde el panel global.
 model PlatformBrand {
   id       String   @id

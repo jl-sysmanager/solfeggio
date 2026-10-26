@@ -6,6 +6,8 @@ import { Storage } from '../storage/storage.service';
 
 /** Datos de plataforma que no forman parte de la banda y no deben sustituirse. */
 const EXCLUDED_TABLES = new Set(['subscriptions', 'invoices', 'email_logs', 'tenant_snapshots', 'impersonation_sessions', 'tenant_backups']);
+const CONFIG_ID = 'default';
+const DEFAULT_RETENTION = 30;
 const PROFILE_FIELDS = ['name', 'legalName', 'taxId', 'country', 'timezone', 'locale', 'logoKey', 'logoMime'] as const;
 
 type Row = Record<string, unknown>;
@@ -25,8 +27,30 @@ export class TenantBackupService {
     private readonly storage: Storage,
   ) {}
 
-  list(tenantId: string) {
-    return this.db.system.tenantBackup.findMany({ where: { tenantId }, orderBy: { createdAt: 'desc' }, take: 30 });
+  async settings() {
+    const row = await this.db.system.platformConfig.findUnique({ where: { id: CONFIG_ID } });
+    return { retention: row?.backupRetention ?? DEFAULT_RETENTION };
+  }
+
+  /** Guarda cuántas copias conserva cada banda y borra ya las que sobran. */
+  async setRetention(retention: number) {
+    const row = await this.db.system.platformConfig.upsert({
+      where: { id: CONFIG_ID },
+      create: { id: CONFIG_ID, backupRetention: retention },
+      update: { backupRetention: retention },
+    });
+    const tenants = await this.db.system.tenantBackup.findMany({ distinct: ['tenantId'], select: { tenantId: true } });
+    for (const tenant of tenants) await this.prune(tenant.tenantId, retention);
+    return { retention: row.backupRetention };
+  }
+
+  async list(tenantId: string) {
+    const { retention } = await this.settings();
+    return this.db.system.tenantBackup.findMany({
+      where: { tenantId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: retention,
+    });
   }
 
   async exportTenant(tenantId: string, createdBy?: string) {
@@ -35,7 +59,12 @@ export class TenantBackupService {
     const tables = await this.tenantTables();
     const data: Record<string, Row[]> = {};
     for (const table of tables) {
-      const rows = await this.db.system.$queryRawUnsafe<Row[]>(`SELECT * FROM "${table}" WHERE tenant_id = $1::uuid`, tenantId);
+      const columns = await this.exportColumns(table);
+      if (!columns.length) continue;
+      const rows = await this.db.system.$queryRawUnsafe<Row[]>(
+        `SELECT ${columns.map((column) => `"${column}"`).join(', ')} FROM "${table}" WHERE tenant_id = $1::uuid`,
+        tenantId,
+      );
       data[table] = rows.map(encodeRow);
     }
     const manifest: Manifest = {
@@ -49,9 +78,11 @@ export class TenantBackupService {
     const checksum = createHash('sha256').update(payload).digest('hex');
     const fileKey = `platform/backups/tenants/${tenantId}/${checksum}.json`;
     await this.storage.putObject(fileKey, payload, 'application/json');
-    return this.db.system.tenantBackup.create({
+    const created = await this.db.system.tenantBackup.create({
       data: { tenantId, fileKey, checksum, bytes: payload.byteLength, createdBy },
     });
+    await this.prune(tenantId, (await this.settings()).retention);
+    return created;
   }
 
   async exportAll() {
@@ -103,6 +134,27 @@ export class TenantBackupService {
       await tx.tenantBackup.update({ where: { id: backup.id }, data: { restoredAt: new Date() } });
     }, { timeout: 120_000 });
     return { restored: true, skipped };
+  }
+
+  /** Borra las copias de la banda que superan el cupo, de la más antigua a la más reciente. */
+  private async prune(tenantId: string, keep: number) {
+    const extra = await this.db.system.tenantBackup.findMany({
+      where: { tenantId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: keep,
+      select: { id: true, fileKey: true },
+    });
+    for (const row of extra) await this.storage.remove(row.fileKey);
+    if (extra.length) await this.db.system.tenantBackup.deleteMany({ where: { id: { in: extra.map((row) => row.id) } } });
+  }
+
+  /** Omite tsvector: Prisma no lo deserializa y el trigger de obras lo regenera al insertar. */
+  private async exportColumns(table: string) {
+    const columns = await this.db.system.$queryRaw<{ column_name: string }[]>`
+      SELECT column_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = ${table} AND udt_name <> 'tsvector'
+      ORDER BY ordinal_position`;
+    return columns.map((column) => column.column_name).filter((name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name));
   }
 
   private async tenantTables() {

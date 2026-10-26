@@ -152,6 +152,24 @@ describe('Salud técnica del panel global', () => {
     await http().post(`${O}/schedules/finance.overdue/run`).set(auth(admin.token)).expect(202);
   });
 
+  it('exporta una banda aunque el archivo tenga el índice de búsqueda', async () => {
+    await ctx.db.system.work.create({ data: { tenantId: band.tenantId, title: 'Pasodoble' } });
+    await http().post(`${O}/tenants/${band.tenantId}/backups`).set(auth(admin.token)).expect(201);
+  });
+
+  it('conserva sólo el número de copias configurado', async () => {
+    expect((await http().get(`${O}/backups/settings`).set(auth(admin.token)).expect(200)).body.retention).toBe(30);
+    await http().put(`${O}/backups/settings`).set(auth(admin.token)).send({ retention: 0 }).expect(400);
+    await http().put(`${O}/backups/settings`).set(auth(band.token)).send({ retention: 1 }).expect(403);
+    await http().put(`${O}/backups/settings`).set(auth(admin.token)).send({ retention: 1 }).expect(200);
+    const first = await http().post(`${O}/tenants/${band.tenantId}/backups`).set(auth(admin.token)).expect(201);
+    const second = await http().post(`${O}/tenants/${band.tenantId}/backups`).set(auth(admin.token)).expect(201);
+    const list = await http().get(`${O}/tenants/${band.tenantId}/backups`).set(auth(admin.token)).expect(200);
+    expect(list.body.map((backup: { id: string }) => backup.id)).toEqual([second.body.id]);
+    expect(await ctx.db.system.tenantBackup.findUnique({ where: { id: first.body.id } })).toBeNull();
+    await http().put(`${O}/backups/settings`).set(auth(admin.token)).send({ retention: 30 }).expect(200);
+  });
+
   it('la restauración sustituye la banda original y no toca otra ni las cuentas', async () => {
     await ctx.db.system.member.create({ data: { tenantId: band.tenantId, memberNumber: 1, firstName: 'Lucía', lastName: 'Pérez' } });
     const created = await http().post(`${O}/tenants/${band.tenantId}/backups`).set(auth(admin.token)).expect(201);

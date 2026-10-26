@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Put, UnauthorizedException } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
@@ -29,6 +29,7 @@ const providerParam = z.string().regex(/^[a-z0-9-]{2,30}$/);
 const orphanDelete = z.object({ confirm: z.literal('ELIMINAR') });
 const orphanAccountsDelete = z.object({ confirm: z.literal('ELIMINAR'), ids: z.array(z.string().uuid()).max(100).optional() });
 const restoreBody = z.object({ confirm: z.string().trim().min(2).max(80) });
+const backupSettingsBody = z.object({ retention: z.number().int().min(1).max(365) });
 const scheduleParam = z.string().refine((value) => !!scheduledTask(value), 'Tarea no permitida');
 const scheduleBody = z.object({
   pattern: z.string().trim().regex(/^(\S+\s+){4}\S+$/, 'La programación debe tener cinco campos cron').max(100),
@@ -167,6 +168,18 @@ export class AdminOpsController {
     await this.jobs.add(key as keyof import('../jobs/jobs.service').JobMap, {} as never);
     await platformAudit(this.db.system, ctx, 'ops.schedule.run', 'scheduled_task', key, { key });
     return { queued: true };
+  }
+
+  @Get('admin/ops/backups/settings')
+  backupSettings() {
+    return this.backups.settings();
+  }
+
+  @Put('admin/ops/backups/settings')
+  async updateBackupSettings(@Ctx() ctx: RequestContext, @Body(zod(backupSettingsBody)) body: z.infer<typeof backupSettingsBody>) {
+    const settings = await this.backups.setRetention(body.retention);
+    await platformAudit(this.db.system, ctx, 'ops.backup.retention', 'platform_config', 'default', settings);
+    return settings;
   }
 
   @Get('admin/ops/tenants/:id/backups')

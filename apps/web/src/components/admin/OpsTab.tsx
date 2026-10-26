@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { del, post } from '../../api/client';
+import { del, post, put } from '../../api/client';
 import { useApi, useApiMutation } from '../../api/hooks';
 import type { OpsEmail, OpsHeartbeats, OpsQueues, OpsSchedule, OpsStorage } from '../../api/types-admin-support';
 import { bytes, dateTime } from '../../lib/format';
@@ -8,7 +8,7 @@ import { Card, StatCard } from '../Card';
 import { Chip } from '../Chip';
 import { DataTable } from '../DataTable';
 import { ErrorNote, Loading } from '../EmptyState';
-import { FormError, SelectField, TextField } from '../Field';
+import { FormError, SelectField, TextField, formValues } from '../Field';
 import { ConfirmModal, Drawer } from '../Modal';
 import { UrlTabs } from '../Tabs';
 import { KpiRow } from './support/shared';
@@ -280,13 +280,32 @@ function Schedules() {
 
 function Backups() {
   const q = useApi<OpsHeartbeats>('/admin/ops/heartbeats');
-  if (q.isLoading) return <Loading />;
+  const settings = useApi<{ retention: number }>('/admin/ops/backups/settings');
+  const save = useApiMutation((retention: number) => put('/admin/ops/backups/settings', { retention }), {
+    success: 'Número de copias guardado',
+    invalidate: ['/admin/ops/backups/settings'],
+  });
+  if (q.isLoading || settings.isLoading) return <Loading />;
   if (q.error || !q.data) return <ErrorNote error={q.error} />;
+  if (settings.error || !settings.data) return <ErrorNote error={settings.error} />;
   return (
     <Card title="Copias de seguridad">
       <p className="small muted">
-        La copia completa del sistema se ejecuta fuera de la aplicación. Desde la ficha de cada banda se puede crear una copia y restaurarla: la restauración sustituye los datos de esa banda y conserva su plan, su suscripción y las cuentas.
+        La copia completa del sistema se ejecuta fuera de la aplicación. De cada banda se conservan las copias más recientes y se borran las anteriores, también su archivo. Desde la ficha de cada banda se puede crear una copia y restaurarla: la restauración sustituye los datos de esa banda y conserva su plan, su suscripción y las cuentas.
       </p>
+      <form
+        className="toolbar"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const retention = Number(formValues(event.currentTarget).retention);
+          if (!Number.isInteger(retention) || retention < 1 || retention > 365) return;
+          save.mutate(retention);
+        }}
+      >
+        <TextField label="Copias por banda" name="retention" type="number" min={1} max={365} required defaultValue={settings.data.retention} hint="Entre 1 y 365." />
+        <Button type="submit" loading={save.isPending}>Guardar</Button>
+      </form>
+      <FormError error={save.error} />
       <DataTable
         caption="Copias de seguridad y latidos externos"
         rows={q.data.heartbeats}
