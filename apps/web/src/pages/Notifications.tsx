@@ -1,7 +1,7 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { post } from '../api/client';
 import { useApi, useApiMutation } from '../api/hooks';
-import type { NotificationItem, SetupGuide } from '../api/types';
+import type { NotificationItem, Session, SetupGuide } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -11,13 +11,25 @@ import { pendingSteps, setupPendingCopy } from '../components/SetupGuide';
 import { dateTime } from '../lib/format';
 
 export default function NotificationsPage() {
-  const { session } = useAuth();
+  const { session, applyTokenSession } = useAuth();
+  const navigate = useNavigate();
   const q = useApi<NotificationItem[]>('/notifications');
   const guide = useApi<SetupGuide>(session?.role?.key === 'owner' ? '/setup-guide' : null);
   const pending = pendingSteps(guide.data);
   const read = useApiMutation((id: string) => post(`/notifications/${id}/read`), { invalidate: ['/notifications'] });
   const readAll = useApiMutation(() => post('/notifications/read-all'), { success: 'Todas marcadas como leídas', invalidate: ['/notifications'] });
+  const accept = useApiMutation(
+    (id: string) => post<{ accessToken: string; session: Session }>('/auth/invitations/pending/accept', { id }),
+    {
+      success: 'Ya formas parte de la banda. Puedes cambiar entre ellas desde el menú.',
+      onSuccess: (res) => {
+        applyTokenSession(res);
+        navigate('/');
+      },
+    },
+  );
   const unread = q.data?.filter((n) => !n.readAt).length ?? 0;
+  const canMarkRead = q.data?.some((n) => !n.readAt && n.type !== 'invitation') ?? false;
   return (
     <Page
       header={
@@ -25,7 +37,7 @@ export default function NotificationsPage() {
           tone="cream"
           title="Notificaciones"
           description={`${unread} sin leer`}
-          actions={unread > 0 && <Button variant="ghost" onClick={() => readAll.mutate(undefined)}>Marcar todas como leídas</Button>}
+          actions={canMarkRead && <Button variant="ghost" onClick={() => readAll.mutate(undefined)}>Marcar todas como leídas</Button>}
         />
       }
     >
@@ -59,15 +71,23 @@ export default function NotificationsPage() {
                     <p className="small muted">{dateTime(n.createdAt)}</p>
                   </div>
                   <div className="row">
-                    {n.link && (
-                      <Link className="link-arrow small" to={n.link} onClick={() => !n.readAt && read.mutate(n.id)}>
-                        Ver
-                      </Link>
-                    )}
-                    {!n.readAt && (
-                      <Button size="sm" variant="ghost" onClick={() => read.mutate(n.id)} aria-label={`Marcar como leída: ${n.title}`}>
-                        Leída
+                    {n.type === 'invitation' ? (
+                      <Button size="sm" onClick={() => accept.mutate(n.id)} disabled={accept.isPending} aria-label={`Aceptar: ${n.title}`}>
+                        Aceptar
                       </Button>
+                    ) : (
+                      <>
+                        {n.link && (
+                          <Link className="link-arrow small" to={n.link} onClick={() => !n.readAt && read.mutate(n.id)}>
+                            Ver
+                          </Link>
+                        )}
+                        {!n.readAt && (
+                          <Button size="sm" variant="ghost" onClick={() => read.mutate(n.id)} aria-label={`Marcar como leída: ${n.title}`}>
+                            Leída
+                          </Button>
+                        )}
+                      </>
                     )}
                   </div>
                 </li>

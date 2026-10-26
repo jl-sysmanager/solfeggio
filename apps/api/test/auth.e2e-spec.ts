@@ -120,6 +120,35 @@ describe('Autenticación', () => {
     expect(accepted.body.session.memberId).toBe(inv.body.memberId);
   });
 
+  it('una cuenta existente acepta la invitación en el panel y puede cambiar de banda', async () => {
+    const home = await signupBand(ctx, 'inv-home');
+    const host = await signupBand(ctx, 'inv-host');
+    const roles = await ctx.http().get('/api/v1/roles').set(auth(host.token)).expect(200);
+    const musician = roles.body.find((r: { key: string }) => r.key === 'musician');
+    const created = await ctx.http().post('/api/v1/invitations').set(auth(host.token)).send({ email: home.email, roleId: musician.id }).expect(201);
+    const mail = ctx.jobs.of('email.send').filter((j) => j.data.to === home.email).at(-1)!;
+    expect(mail.data.text).not.toContain('/invite/');
+    expect(mail.data.text).toContain('/login');
+
+    const notes = await ctx.http().get('/api/v1/notifications').set(auth(home.token)).expect(200);
+    const invite = notes.body.find((n: { type: string; id: string }) => n.type === 'invitation');
+    expect(invite.id).toBe(created.body.id);
+
+    await ctx.http().post('/api/v1/auth/invitations/pending/accept').set(auth(host.token)).send({ id: invite.id }).expect(400);
+    const accepted = await ctx.http().post('/api/v1/auth/invitations/pending/accept').set(auth(home.token)).send({ id: invite.id }).expect(200);
+    expect(accepted.body.session.tenant.slug).toBe('inv-host');
+    expect(accepted.body.session.memberships).toHaveLength(2);
+    expect(accepted.body.session.role.key).toBe('musician');
+
+    const back = await ctx.http().post('/api/v1/auth/switch-tenant').set(auth(accepted.body.accessToken)).send({ tenantId: home.tenantId }).expect(200);
+    expect(back.body.session.tenant.slug).toBe('inv-home');
+    expect(back.body.session.memberships).toHaveLength(2);
+    const gone = (await ctx.http().get('/api/v1/notifications').set(auth(back.body.accessToken)).expect(200)).body.find(
+      (n: { type: string }) => n.type === 'invitation',
+    );
+    expect(gone).toBeUndefined();
+  });
+
   it('switch-tenant entre bandas del mismo usuario', async () => {
     const one = await signupBand(ctx, 'multi-uno');
     const two = await ctx.http().post('/api/v1/onboarding').set(auth(one.token)).send({ bandName: 'Multi Dos', slug: 'multi-dos' }).expect(201);

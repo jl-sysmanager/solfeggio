@@ -171,7 +171,26 @@ export class AuthService {
         data: { email: inv.email, name, passwordHash: await hashPassword(password), emailVerifiedAt: new Date() },
       });
     }
-    const userId = user.id;
+    await this.consumeInvitation(inv, user.id);
+    return this.issue(user.id, inv.tenantId);
+  }
+
+  /** Acepta una invitación pendiente de la cuenta que ya ha iniciado sesión y entra en esa banda. */
+  async acceptOwnInvitation(userId: string, invitationId: string) {
+    const user = await this.db.system.user.findUnique({ where: { id: userId }, select: { id: true, email: true, blockedAt: true } });
+    if (!user || user.blockedAt) throw new ForbiddenException({ message: 'Cuenta bloqueada', code: 'ACCOUNT_BLOCKED' });
+    const inv = await this.db.system.invitation.findFirst({
+      where: { id: invitationId, email: user.email, acceptedAt: null, expiresAt: { gt: new Date() } },
+    });
+    if (!inv) throw new BadRequestException({ message: 'Invitación no válida o caducada', code: 'INVITATION_INVALID' });
+    await this.consumeInvitation(inv, user.id);
+    return this.issue(user.id, inv.tenantId);
+  }
+
+  private async consumeInvitation(
+    inv: { id: string; tenantId: string; roleId: string; memberId: string | null; guardianId: string | null },
+    userId: string,
+  ) {
     await this.db.tenant(inv.tenantId, async (tx) => {
       const membership = await tx.membership.upsert({
         where: { tenantId_userId: { tenantId: inv.tenantId, userId } },
@@ -182,7 +201,6 @@ export class AuthService {
       await tx.invitation.update({ where: { id: inv.id }, data: { acceptedAt: new Date() } });
       await this.audit.log(tx, { tenantId: inv.tenantId, userId }, 'invitation.accepted', 'membership', membership.id);
     });
-    return this.issue(userId, inv.tenantId);
   }
 
   /**

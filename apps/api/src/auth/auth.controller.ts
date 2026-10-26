@@ -27,6 +27,7 @@ const loginSchema = z.object({ email: z.string().email(), password: z.string().m
 const switchSchema = z.object({ tenantId: z.string().uuid() });
 const codeSchema = z.object({ code: z.string().regex(/^\d{6}$/) });
 const acceptSchema = z.object({ token: z.string().min(20), name: z.string().trim().min(2).max(120).optional(), password: passwordSchema.optional() });
+const acceptOwnSchema = z.object({ id: z.string().uuid() });
 const changePasswordSchema = z
   .object({ currentPassword: z.string().min(1).max(128), newPassword: passwordSchema })
   .refine((b) => b.currentPassword !== b.newPassword, { message: 'La nueva contraseña debe ser distinta', path: ['newPassword'] });
@@ -267,6 +268,16 @@ export class AuthController {
   async accept(@Req() req: Request, @Body(zod(acceptSchema)) body: z.infer<typeof acceptSchema>, @Res({ passthrough: true }) res: Response) {
     const currentUserId = await this.tokens.userIdFromHeader(req.headers.authorization);
     const { accessToken, refresh, session } = await this.auth.acceptInvitation(body.token, currentUserId, body.name, body.password);
+    this.setCookie(res, refresh);
+    return { accessToken, session };
+  }
+
+  /** La cuenta ya existe: acepta desde el panel, sin el enlace de alta. */
+  @NoTenant()
+  @HttpCode(200)
+  @Post('invitations/pending/accept')
+  async acceptOwn(@Ctx() ctx: RequestContext, @Body(zod(acceptOwnSchema)) body: z.infer<typeof acceptOwnSchema>, @Res({ passthrough: true }) res: Response) {
+    const { accessToken, refresh, session } = await this.auth.acceptOwnInvitation(ctx.userId, body.id);
     this.setCookie(res, refresh);
     return { accessToken, session };
   }

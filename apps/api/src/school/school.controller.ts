@@ -9,7 +9,7 @@ import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { cents, idParam, isoDate, isoDateTime, optionalText, text, toDate } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
-import { appUrl } from '../config/env';
+import { invitationEmail } from '../iam/invitation-mail';
 import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { Jobs } from '../jobs/jobs.service';
@@ -434,11 +434,8 @@ export class SchoolController {
     if (result.linked) return { linked: true, guardianId: result.guardianId, membershipId: result.membershipId };
 
     const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
-    await this.jobs.add('email.send', {
-      to: result.email,
-      subject: `Invitación a ${tenant.name} en Solfeamos`,
-      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${appUrl(`/invite/${result.token}`)}`,
-    });
+    const existing = await this.db.system.user.findUnique({ where: { email: result.email }, select: { id: true } });
+    await this.jobs.add('email.send', { to: result.email, ...invitationEmail(tenant.name, result.token, !!existing) });
     const { token: _t, ...publicResult } = result;
     return publicResult;
   }

@@ -2,7 +2,7 @@ import { BadRequestException, Body, Controller, Get, HttpCode, Param, Post, Quer
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import type { RequestContext } from '../auth/context';
-import { Ctx, Perm } from '../auth/decorators';
+import { Ctx, NoTenant, Perm } from '../auth/decorators';
 import { found } from '../common/errors';
 import { idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
@@ -27,15 +27,48 @@ export class NotificationsController {
     private readonly jobs: Jobs,
   ) {}
 
+  /** Avisos de la banda activa y las invitaciones pendientes de otras bandas, aunque aún no haya banda elegida. */
+  @NoTenant()
   @Get('notifications')
-  list(@Ctx() ctx: RequestContext, @Query('unread') unread?: string) {
-    return this.db.tenant(ctx.tenantId, (tx) =>
-      tx.notification.findMany({
-        where: { userId: ctx.userId, readAt: unread === 'true' ? null : undefined },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-      }),
-    );
+  async list(@Ctx() ctx: RequestContext, @Query('unread') unread?: string) {
+    const rows = ctx.tenantId
+      ? await this.db.tenant(ctx.tenantId, (tx) =>
+          tx.notification.findMany({
+            where: { userId: ctx.userId, readAt: unread === 'true' ? null : undefined },
+            orderBy: { createdAt: 'desc' },
+            take: 100,
+          }),
+        )
+      : [];
+    const invitations = await this.pendingInvitations(ctx.userId);
+    const merged = [...invitations, ...rows].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    return unread === 'true' ? merged.filter((n) => !n.readAt) : merged;
+  }
+
+  /** Invitaciones de otras bandas: no caben en `notifications` porque esa tabla queda oculta por el tenant activo. */
+  private async pendingInvitations(userId: string) {
+    const user = await this.db.system.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (!user) return [];
+    const invitations = await this.db.system.invitation.findMany({
+      where: { email: user.email, acceptedAt: null, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!invitations.length) return [];
+    const [tenants, roles] = await Promise.all([
+      this.db.system.tenant.findMany({ where: { id: { in: invitations.map((i) => i.tenantId) } }, select: { id: true, name: true } }),
+      this.db.system.role.findMany({ where: { id: { in: invitations.map((i) => i.roleId) } }, select: { id: true, name: true } }),
+    ]);
+    const tenantName = new Map(tenants.map((t) => [t.id, t.name]));
+    const roleName = new Map(roles.map((r) => [r.id, r.name]));
+    return invitations.map((inv) => ({
+      id: inv.id,
+      type: 'invitation' as const,
+      title: `Invitación a ${tenantName.get(inv.tenantId) ?? 'una banda'}`,
+      body: `Te invitan a unirte con el rol ${roleName.get(inv.roleId) ?? 'miembro'}. Acéptala para entrar en esa banda y cambiar entre las tuyas.`,
+      link: null,
+      readAt: null,
+      createdAt: inv.createdAt,
+    }));
   }
 
   @HttpCode(204)

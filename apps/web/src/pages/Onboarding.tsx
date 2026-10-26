@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { post } from '../api/client';
-import type { Session } from '../api/types';
+import { useApi } from '../api/hooks';
+import type { NotificationItem, Session } from '../api/types';
 import { useAuth } from '../auth/AuthProvider';
 import { Button } from '../components/Button';
 import { FormError, SelectField, TextField, formValues } from '../components/Field';
@@ -150,12 +151,14 @@ export function OnboardingPage() {
 }
 
 export function TenantPickerPage() {
-  const { session, switchTenant } = useAuth();
+  const { session, switchTenant, applyTokenSession } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const invites = useApi<NotificationItem[]>('/notifications', { unread: true });
+  const pending = invites.data?.filter((n) => n.type === 'invitation') ?? [];
 
   async function pick(tenantId: string) {
     setBusy(tenantId);
@@ -170,8 +173,35 @@ export function TenantPickerPage() {
     }
   }
 
+  async function accept(id: string) {
+    setBusy(id);
+    setError(null);
+    try {
+      const res = await post<{ accessToken: string; session: Session }>('/auth/invitations/pending/accept', { id });
+      applyTokenSession(res);
+      navigate('/', { replace: true });
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <AuthLayout title="Elige una banda">
+      {pending.length > 0 && (
+        <ul className="list-plain stack" style={{ marginBottom: 16 }}>
+          {pending.map((n) => (
+            <li key={n.id} className="card stack" style={{ gap: 8 }}>
+              <strong>{n.title}</strong>
+              <span className="small">{n.body}</span>
+              <Button onClick={() => accept(n.id)} disabled={busy !== null}>
+                Aceptar y entrar
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
       <ul className="list-plain stack">
         {session?.memberships.map((m) => (
           <li key={m.tenantId}>

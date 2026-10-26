@@ -8,7 +8,7 @@ import { found } from '../common/errors';
 import { page, pageQuery, skipTake } from '../common/pagination';
 import { idParam } from '../common/schemas';
 import { zod } from '../common/zod.pipe';
-import { appUrl } from '../config/env';
+import { invitationEmail } from './invitation-mail';
 import { Db, Tx } from '../db/db.service';
 import { Audit } from '../audit/audit.service';
 import { Jobs } from '../jobs/jobs.service';
@@ -232,11 +232,8 @@ export class IamController {
       return { id: inv.id, email, roleId: role.id, memberId: memberId ?? null, expiresAt: inv.expiresAt };
     });
     const tenant = await this.db.system.tenant.findUniqueOrThrow({ where: { id: ctx.tenantId } });
-    await this.jobs.add('email.send', {
-      to: email,
-      subject: `Invitación a ${tenant.name} en Solfeamos`,
-      text: `Te han invitado a unirte a ${tenant.name}.\n\nAcepta la invitación aquí (caduca en 7 días):\n${appUrl(`/invite/${token}`)}`,
-    });
+    const existing = await this.db.system.user.findUnique({ where: { email }, select: { id: true } });
+    await this.jobs.add('email.send', { to: email, ...invitationEmail(tenant.name, token, !!existing) });
     return result;
   }
 
